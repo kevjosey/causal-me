@@ -10,8 +10,8 @@ library(SuperLearner)
 library(data.table)
 
 # Functions for generating and fitting data
-source("D:/Dropbox (Personal)/ERC-EPE/Code/gen-data-dr.R")
-source("D:/Dropbox (Personal)/ERC-EPE/Code/hct-dr.R")
+source("D:/Github/causal-me/gen-data.R")
+source("D:/Github/causal-me/hct-dr.R")
 
 n.sim <- 100
 
@@ -19,7 +19,6 @@ n.sim <- 100
 n <- 5000 # c(1000, 4000)
 m <- 500 # c(100, 200)
 sig_gps <- 2
-sig_out <- 1
 
 a.vals <- seq(-1, 3, length.out = 21)
 sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction")
@@ -27,7 +26,7 @@ span <- NULL
 k <- 5
 span.seq <- seq(0.15, 1, by = 0.05)
 
-gps_scen <- "b"
+gps_scen <- "a"
 out_scen <- "a"
 
 est <- array(NA, dim = c(n.sim, 2, length(a.vals)))
@@ -37,15 +36,15 @@ for (i in 1:n.sim){
   
   print(i)
   
-  dat <- gen_agg_dr(n = n, m = m, sig_gps = sig_gps, gps_scen = gps_scen, out_scen = out_scen)
+  dat <- gen_dr_data(n = n, m = m, sig_gps = sig_gps, gps_scen = gps_scen, out_scen = out_scen)
   
   y <- dat$y
   a <- dat$t 
-  x <- dat$X
+  x <- dat$x
   y.id <- dat$id
   
   out <- hct_dr(y = y, a = a, x = x, y.id = y.id, a.vals = a.vals, span.seq = span.seq, k = k, sl.lib = sl.lib)
-  est[i,1,] <- predict.example(a = a.vals, x = x, id = y.id, out_scen = out_scen)
+  est[i,1,] <- predict_example(a = a.vals, x = x, id = y.id, out_scen = out_scen)
   est[i,2,] <- out$estimate
   sd[i,] <- sqrt(out$variance)
   

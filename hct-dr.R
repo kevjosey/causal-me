@@ -11,9 +11,10 @@ hct_dr <- function(a, y, x, y.id = NULL, a.vals = seq(min(a), max(a), length.out
   
   size <- unname(table(y.id))
   attributes(size) <- NULL
-  w <- size/mean(size)
+  w <- size
   
   wrap <- np_est(y = y, a = a, x = x, y.id = y.id, sl.lib = sl.lib)
+  
   muhat <- wrap$muhat
   mhat <- wrap$mhat
   pihat <- wrap$pihat
@@ -108,20 +109,13 @@ np_est <- function(a, y, x, y.id, sl.lib){
   muhat <- df$muhat
   y.agg <- df$y
   a.agg <- df$a
-  x.agg <- as.data.frame(df[,5:ncol(df)])
+  x.agg <- as.matrix(df[,5:ncol(df)])
+  size <- unname(table(y.id))
   
   # estimate nuisance GPS functions via super learner
-  pimod <- SuperLearner(Y = a.agg, X = x.agg, SL.library = sl.lib)
-  pimod.vals <- c(pimod$SL.predict)
-  pi2mod <- SuperLearner(Y = (a.agg - pimod.vals)^2, X = x.agg, SL.library = sl.lib)
-  pi2mod.vals <- c(pi2mod$SL.predict)
-  
-  if (any(pi2mod.vals < 0)) {
-    
-    pi2mod <- SuperLearner(Y = (a.agg - pimod.vals)^2, X = x.agg, SL.library = "SL.mean")
-    pi2mod.vals <- pi2mod$SL.predict
-    
-  }
+  pimod <- lm(a.agg ~ x.agg, weights = size)
+  pimod.vals <- predict(pimod)
+  pi2mod.vals <- sigma(pimod)^2/size
   
   # exposure models
   pihat <- dnorm(a.agg, pimod.vals, sqrt(pi2mod.vals))

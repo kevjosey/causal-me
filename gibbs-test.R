@@ -6,24 +6,27 @@ rm(list = ls())
 
 library(data.table)
 library(mvtnorm)
+library(SuperLearner)
+library(parallel)
 
 # Code for generating and fitting data
-source("D:/Dropbox (Personal)/ERC-EPE/Code/gen-data.R")
-source("D:/Dropbox (Personal)/ERC-EPE/Code/gibbs-dr.R")
-source("D:/Dropbox (Personal)/ERC-EPE/Code/hct-dr.R")
+source("D:/Github/causal-me/gen-data.R")
+source("D:/Github/causal-me/gibbs-dr.R")
+source("D:/Github/causal-me/hct-dr.R")
+source("D:/Github/causal-me/mclapply-hack.R")
 
 # simulation arguments
 n.sim <- 100
 n.adapt <- 100
 n.iter <- 1000
-sig_epe <- 1
-sig_gps <- 2
+sig_epe <- sqrt(0.5)
+sig_gps <- sqrt(2)
 prob <- 0.1
 
 # gen data arguments
 l <- 2000 # c(500, 800)
 m <- 200 # c(100, 200)
-n <- 2000 # c(1000, 4000)
+n <- 4000 # c(1000, 4000)
 
 # dr arguments
 a.vals <- seq(-1, 3, by = 0.25)
@@ -32,10 +35,9 @@ trim <- 0.01
 thin <- 10
 
 # prior values
-a <- 0.001 # gamma shape
-b <- 0.001 # gamma rate
-c <- 1e5 # normal rate
-h <- 1 # mh tuning
+shape <- 1e-5 # gamma shape
+rate <- 1e-5 # gamma rate
+scale <- 1e5 # normal scale
 
 est <- array(NA, dim = c(n.sim, 2, length(a.vals)))
 se1 <- se2 <- cp <- matrix(NA, n.sim, length(a.vals))
@@ -44,7 +46,7 @@ for (i in 1:n.sim){
   
   print(i)
   
-  dat <- gen_agg_data(l = l, m = m, n = n,  prob = prob)
+  dat <- gen_bayes_data(l = l, m = m, n = n, sig_gps = sig_gps, sig_epe = sig_epe, prob = prob)
   
   s.id <- dat$s.id
   y.id <- dat$y.id
@@ -53,9 +55,8 @@ for (i in 1:n.sim){
   
   y <- dat$y
   s <- dat$s
-  t <- dat$t
   x <- dat$x
-  w <- dat$w
+  a <- dat$a
   
   if (length(ungroup)!= 0) {
     y <- dat$y[!(y.id %in% ungroup)]
@@ -64,14 +65,18 @@ for (i in 1:n.sim){
   }
     
   fmla.s <- formula("~ w1 + w2 + w3 + w4")
-  fmla.z <- formula("~ x1 + x2 + x3 + x4")
-  fmla.y <- formula("~ x1 + x2 + x3 + x4 + z*(x1 + x2 + x3 + x4)")
+  fmla.a <- formula("~ x1 + x2 + x3 + x4")
   
-  out <- gibbs_dr(s = s, t = t, w = w, s.id = s.id, y = y, x = x, y.id = y.id, 
-                  fmla.s = fmla.s, fmla.z = fmla.z, fmla.y = fmla.y, 
-                  a = a, b = b, c = c, h = h, a.vals = a.vals, thin = 5)
+  v <- as.matrix(aggregate(x, by = list(y.id), mean)[,2:5])
+  fit <- lm(a ~ v)
+  sigma(fit)
+  coef(fit)
   
-  est[i,1,] <- predict.example(a = a.vals, x = x, id = y.id)
+  out <- gibbs_dr(s = s, y = y, x = x, s.id = s.id, y.id = y.id, 
+                  fmla.s = fmla.s, fmla.a = fmla.a,
+                  shape = shape, rate = rate, scale = scale, a.vals = a.vals, thin = 5)
+  
+  est[i,1,] <- predict_example(a = a.vals, x = x, id = y.id)
   est[i,2,] <- out$est
   se1[i,] <- out$se1
   se2[i,] <- out$se2
