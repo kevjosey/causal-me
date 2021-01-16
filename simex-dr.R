@@ -1,26 +1,25 @@
-simex_dr <- function(z, y, x, z.id, y.id, sig_epe, 
-                     n.boot = 100, degree = 2, 
-                     lambda = seq(0.1, 2.1, by = 0.25),
+simex_dr <- function(z, y, x, id, y.id, sigma, 
+                     n.boot = 100, degree = 2, lambda = seq(0.1, 2.1, by = 0.25),
                      a.vals = seq(min(a), max(a), length.out = 20), 
                      span = NULL, span.seq = seq(0.5, 1, by = 0.05), k = 10,
                      sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "sL.gam")){
   
-  if (any(duplicated(z.id)))
-    stop("duplicate z.id detected")
+  if (any(duplicated(id)))
+    stop("duplicate id detected")
   
   size <- unname(table(y.id))
-  z <- z[order(z.id)]
-  z.id <- z.id[order(z.id)]
+  z <- z[order(id)]
+  id <- id[order(id)]
   
-  eps <- replicate(n.boot, rnorm(length(z.id), 0, sig_epe))
+  eps <- replicate(n.boot, rnorm(length(id), 0, sig_epe))
   
   l.vals <- mclapply.hack(lambda, function(lam, ...){
     
     z.mat <- z + sqrt(lam)*eps
-    a.mat <- matrix(NA, nrow = n, ncol = n.boot)
+    a.mat <- matrix(NA, nrow = length(y.id), ncol = n.boot)
     
-    for(g in z.id)
-      a.mat[y.id == g,] <- z.mat[z.id == g,]
+    for(g in id)
+      a.mat[y.id == g,] <- z.mat[id == g,]
     
     vals <- apply(a.mat, 2, hct_dr, y = y, x = x, y.id = y.id, a.vals = a.vals, 
                   span = span, span.seq = span.seq, k = k, sl.lib = sl.lib)

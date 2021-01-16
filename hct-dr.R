@@ -1,6 +1,5 @@
 
-## hcTMLE: function to run full hierarchical TMLE under nonparametric model with continuous treatment
-
+# function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
 hct_dr <- function(a, y, x, y.id = NULL, a.vals = seq(min(a), max(a), length.out = 20), 
                    span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10,
                    sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "sL.gam")) {	
@@ -62,6 +61,7 @@ hct_dr <- function(a, y, x, y.id = NULL, a.vals = seq(min(a), max(a), length.out
   
 }
 
+# LOESS function
 dr_est <- function(newa, a, psi, int, w, span, se.fit = FALSE) {
   
   a.std <- a - newa
@@ -88,6 +88,7 @@ dr_est <- function(newa, a, psi, int, w, span, se.fit = FALSE) {
   
 }
 
+# Nonparametric estimation
 np_est <- function(a, y, x, y.id, sl.lib){
   
   if (is.null(y.id))
@@ -100,7 +101,7 @@ np_est <- function(a, y, x, y.id, sl.lib){
   xa <- data.frame(x, a)
   
   # estimate nuisance outcome model with SuperLearner
-  mumod <- SuperLearner(Y = y, X = xa, id = y.id, SL.library = sl.lib, family = binomial())
+  mumod <- SuperLearner(Y = y, X = xa, SL.library = sl.lib, family = binomial())
   mumod.vals <- c(mumod$SL.predict)
 
   # aggregate data and predictions with data.table
@@ -137,13 +138,14 @@ np_est <- function(a, y, x, y.id, sl.lib){
   mhat.mat <- matrix(rep(mhat, m), byrow = TRUE, nrow = m)
   int <- rowMeans(muhat.mat - mhat.mat)
   
-  out <- list(muhat = muhat,  mhat = mhat, pihat = pihat, phat = phat, int = int,
+  out <- list(muhat = muhat, mhat = mhat, pihat = pihat, phat = phat, int = int,
               data = list(y.agg = y.agg, a.agg = a.agg, x.agg = x.agg))
   
   return(out)
   
 }
 
+# optimization used in dr_est
 opt_fun <- function(par, k.std, psi, gh) {
   
   sum(k.std*(psi - plogis(c(gh %*% par)))^2)

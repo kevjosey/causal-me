@@ -58,7 +58,7 @@ for (i in 1:n.sim){
   z_y <- dat$z_y
   a_y <- dat$a_y
   
-  out <- simex_dr(z = z, y = y, x = x, z.id = z.id, y.id = y.id, sig_epe = sig_epe, n.boot = n.boot, degree = degree,
+  out <- simex_dr(z = z, y = y, x = x, z.id = z.id, y.id = y.id, sigma = sig_epe, n.boot = n.boot, degree = degree,
                   a.vals = a.vals, lambda = lambda, span = span, span.seq = span.seq, k = k, sl.lib = sl.lib)
   
   naive <- hct_dr(y = y, a = z_y, x = x, y.id = y.id, a.vals = a.vals, span.seq = span.seq, k = k, sl.lib = sl.lib)
