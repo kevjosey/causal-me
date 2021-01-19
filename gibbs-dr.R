@@ -1,11 +1,7 @@
 
 gibbs_dr <- function(s, y, x, s.id, y.id, fmla.s, fmla.a,
-                     a.vals = seq(min(a), max(a), length.out = 20), 
                      shape = 1e-4, rate = 1e-4, scale = 1e4, 
-                     thin = 10, n.iter = 10000, n.adapt = 1000,
-                     n.boot = 100, degree = 2, lambda = seq(0.1, 2.1, by = 0.25),
-                     span = NULL, span.seq = seq(0.5, 1, by = 0.05), k = 10,
-                     sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "sL.gam")) {
+                     thin = 10, n.iter = 10000, n.adapt = 1000) {
   
   # remove any s.id not present in y.id
   id <- unique(y.id)[order(unique(y.id))]
@@ -87,8 +83,6 @@ gibbs_dr <- function(s, y, x, s.id, y.id, fmla.s, fmla.a,
   beta <- beta[keep,]
   sigma2 <- sigma2[keep]
   tau2 <- tau2[keep]
-  piSig <- piSig[keep,]
-  piHat <- piHat[keep,]
   zMat <- zMat[keep,]
   zMat_y <- zMat_y[keep,]
   
@@ -134,35 +128,9 @@ gibbs_dr <- function(s, y, x, s.id, y.id, fmla.s, fmla.a,
   # 
   # })
   
-  # estPost <- mclapply.hack(1:nrow(zMat), function(k, ...){
-  # 
-  #   a_try <- colMeans(zMat_y) + eps_y[k,]
-  #   hct_dr(y = y, a = a_try, x = x, y.id = y.id, a.vals = a.vals, span = 0.8, sl.lib = sl.lib)
-  # 
-  # })
-  # 
-  # estimate <- t(matrix(unlist(lapply(estPost, function(x) x$estimate)), ncol = length(estPost)))
-  # variance <- t(matrix(unlist(lapply(estPost, function(x) x$variance)), ncol = length(estPost)))
-  # mcmc <- list(beta = beta, sigma2 = sigma2, tau2 = tau2, estimate = estimate, variance = variance)
-  # 
-  # out <- list(est = colMeans(estimate),
-  #           se1 = apply(estimate, 2, sd),
-  #           se2 = sqrt(colMeans(variance)),
-  #           ci = apply(estimate, 2, hpd),
-  #           mcmc = mcmc)
+  mcmc <- list(beta = beta, sigma2 = sigma2, tau2 = tau2, zMat = zMat, zMat_y = zMat_y)
   
-  # estPost <- hct_dr(y = y, a = colMeans(zMat_y), x = x, y.id = y.id, a.vals = a.vals, k = 5, sl.lib = sl.lib)
-  
-  estPost <- simex_dr(z = colMeans(zMat), y = y, x = x, id = id, y.id = y.id, 
-                      sigma = sqrt(mean(sigma2)/table(s.id)), n.boot = n.boot, degree = degree,
-                      lambda = lambda, a.vals = a.vals, span = span, span.seq = span.seq, k = k, sl.lib = sl.lib)
-  
-  estimate <- estPost$estimate
-  variance <- estPost$variance
-
-  out <- list(est = estimate, se = sqrt(variance))
-
-  return(out)
+  return(mcmc)
   
 }
 

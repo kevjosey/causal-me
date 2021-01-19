@@ -188,7 +188,7 @@ predict_example <- function(a, x, id, out_scen = c("a", "b")){
   z4 <- as.numeric(scale(-abs(v3 + v4)))
   
   lvl <- unique(id)[order(unique(id))]
-  u3 <- u4 <- rep(NA, n)
+  u3 <- u4 <- rep(NA, nrow(x))
   
   for (g in lvl) {
     
