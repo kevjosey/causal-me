@@ -1,4 +1,4 @@
-mclapply.hack <- function(...) {
+mclapply.hack <- function(..., mc.cores = 1) {
   
   ## Create a cluster
   ## ... How many workers do you need?
@@ -6,7 +6,7 @@ mclapply.hack <- function(...) {
   ##          argument passed to the function. In
   ##          this case it is the list to iterate over
   size.of.list <- length(list(...)[[1]])
-  cl <- makeCluster( 3 )
+  cl <- makeCluster( mc.cores )
   
   ## Find out the names of the loaded packages
   loaded.package.names <- c(

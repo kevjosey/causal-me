@@ -1,7 +1,7 @@
 simex_dr <- function(z, y, x, id, y.id, sigma, 
                      n.boot = 100, degree = 2, lambda = seq(0.1, 2.1, by = 0.25),
-                     a.vals = seq(min(a), max(a), length.out = 20), 
-                     span = NULL, span.seq = seq(0.5, 1, by = 0.05), k = 10,
+                     a.vals = seq(min(a), max(a), length.out = 20), mc.cores = 3,
+                     span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10,
                      sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "sL.gam")){
   
   if (any(duplicated(id)))
@@ -11,21 +11,21 @@ simex_dr <- function(z, y, x, id, y.id, sigma,
   z <- z[order(id)]
   id <- id[order(id)]
   
-  eps <- replicate(n.boot, rnorm(length(id), 0, sig_epe))
+  eps <- replicate(n.boot, rnorm(length(id), 0, sigma))
   
-  l.vals <- mclapply.hack(lambda, function(lam, ...){
+  l.vals <- mclapply.hack(lambda, function(lam, z, eps, y, xmat, y.id, ...){
     
     z.mat <- z + sqrt(lam)*eps
-    a.mat <- matrix(NA, nrow = length(y.id), ncol = n.boot)
+    ex.mat <- matrix(NA, nrow = length(y.id), ncol = n.boot)
     
     for(g in id)
-      a.mat[y.id == g,] <- z.mat[id == g,]
+      ex.mat[y.id == g,] <- z.mat[id == g,]
     
-    vals <- apply(a.mat, 2, hct_dr, y = y, x = x, y.id = y.id, a.vals = a.vals, 
+    vals <- apply(ex.mat, 2, hct_dr, y = y, x = x, y.id = y.id, a.vals = a.vals, 
                   span = span, span.seq = span.seq, k = k, sl.lib = sl.lib)
     
-    mu.vals <- matrix(unlist(lapply(vals, function(x) x[1])), ncol = length(vals))
-    sig.vals <- matrix(unlist(lapply(vals, function(x) x[2])), ncol = length(vals))
+    mu.vals <- matrix(unlist(lapply(vals, function(r) r[1])), ncol = length(vals))
+    sig.vals <- matrix(unlist(lapply(vals, function(r) r[2])), ncol = length(vals))
     
     m.vals <- matrix(rep(rowMeans(mu.vals), n.boot), nrow = length(a.vals), ncol = n.boot)
     s.hat <- rowSums((mu.vals - m.vals)^2)/(n.boot - 1)
@@ -33,7 +33,7 @@ simex_dr <- function(z, y, x, id, y.id, sigma,
     
     return(list(estimate = rowMeans(mu.vals), variance = tau.hat - s.hat))
     
-  })
+  }, z = z, eps = eps, y = y, xmat = x, y.id = y.id, mc.cores = mc.cores)
   
   if (any(lambda == 0)){
     
@@ -56,3 +56,4 @@ simex_dr <- function(z, y, x, id, y.id, sigma,
   return(list(estimate = estimate, variance = variance, Psi = Psi, Phi = Phi, lambda = lambda))
   
 }
+
