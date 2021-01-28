@@ -39,12 +39,13 @@ for (i in 1:n.sim){
   dat <- gen_dr_data(n = n, m = m, sig_gps = sig_gps, gps_scen = gps_scen, out_scen = out_scen)
   
   y <- dat$y
-  a <- dat$t 
+  a <- dat$a
+  a_y <- dat$a_y
   x <- dat$x
   y.id <- dat$id
   
-  out <- hct_dr(y = y, a = a, x = x, y.id = y.id, a.vals = a.vals, span.seq = span.seq, k = k, sl.lib = sl.lib)
-  est[i,1,] <- predict_example(a = a.vals, x = x, id = y.id, out_scen = out_scen)
+  out <- hct_dr(y = y, a = a_y, x = x, y.id = y.id, a.vals = a.vals, span.seq = span.seq, k = k, sl.lib = sl.lib)
+  est[i,1,] <- predict_example(a.vals = a.vals, x = x, y.id = y.id, out_scen = out_scen)
   est[i,2,] <- out$estimate
   sd[i,] <- sqrt(out$variance)
   

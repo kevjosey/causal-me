@@ -63,7 +63,7 @@ for (i in 1:n.sim){
   
   naive <- hct_dr(y = y, a = z_y, x = x, y.id = y.id, a.vals = a.vals, span.seq = span.seq, k = k, sl.lib = sl.lib)
   
-  est[i,1,] <- predict_example(a = a.vals, x = x, id = y.id, out_scen = "a")
+  est[i,1,] <- predict_example(a.vals = a.vals, x = x, y.id = y.id, out_scen = "a")
   est[i,2,] <- naive$estimate
   est[i,3,] <- out$estimate
   se[i,] <- sqrt(out$variance)
@@ -75,7 +75,7 @@ cp <- sapply(1:n.sim, function(i,...)
 
 out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals
-rownames(out_est) <- c("TRUE SATE", "NAIVE", "DR")
+rownames(out_est) <- c("TRUE SATE", "NAIVE", "SIMEX")
 out_cp <- rowMeans(cp, na.rm = T)
 names(out_cp) <- a.vals
 

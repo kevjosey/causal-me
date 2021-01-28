@@ -16,38 +16,20 @@ source("D:/Github/causal-me/simex-dr.R")
 source("D:/Github/causal-me/hct-dr.R")
 source("D:/Github/causal-me/mclapply-hack.R")
 
-n.sim <- 100
-
-simulate <- function(scenario, n.sim){
-
-  # simulation arguments
+simulate <- function(scenario, n.sim, a.vals, sl.lib){
+  
+  # gen_data arguments
+  gps_scen <- scenario$gps_scen
+  out_scen <- scenario$out_scen
+  l <- scenario$l
+  m <- scenario$m
+  n <- scenario$n
+  
+  # for now these are fixed
   sig_epe <- sqrt(2)
   sig_gps <- 1
   
-  if(scenario == 4){
-    gps_scen = "b"
-    out_scen = "b"
-  } else if (scenario == 3){
-    gps_scen = "b"
-    out_scen = "a"
-  } else if (scenario == 2){
-    gps_scen = "a"
-    out_scen = "b"
-  } else {
-    gps_scen = "a"
-    out_scen = "a"
-  }
-  
-  # gen data arguments
-  l <- 1000 # c(500, 800)
-  m <- 200 # c(100, 200)
-  n <- 2000 # c(1000, 4000)
-  
-  # dr arguments
-  a.vals <- seq(-1, 3, by = 0.25)
-  sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction")
-  
-  # mcmc/prior values
+  # mcmc/prior arguments
   shape <- 1e-5 # gamma shape
   rate <- 1e-5 # gamma rate
   scale <- 1e5 # normal scale
@@ -58,7 +40,7 @@ simulate <- function(scenario, n.sim){
   # simex arguments
   n.boot <- 50
   degree <- 2
-  lambda <- seq(0.1, 2.1, by = 0.25)
+  lambda <- seq(0.1, 2.1, by = 0.2)
   
   # initialize output
   est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
@@ -69,8 +51,9 @@ simulate <- function(scenario, n.sim){
     print(i)
     
     # generate data
-    dat <- gen_bayes_data(l = l, m = m, n = n, sig_gps = sig_gps, sig_epe = sig_epe, 
-                          gps_scen = gps_scen, out_scen = out_scen)
+    dat <- gen_data(l = l, m = m, n = n, 
+                    sig_gps = sig_gps, sig_epe = sig_epe, 
+                    gps_scen = gps_scen, out_scen = out_scen)
     
     s.id <- dat$s.id
     y.id <- dat$y.id
@@ -79,7 +62,7 @@ simulate <- function(scenario, n.sim){
     x <- dat$x
     a <- dat$a
     
-    # remove clusters w/o exposure data
+    # remove any clusters w/o exposure data (random process)
     ungroup <- which(!(1:m %in% unique(s.id)))
     if (length(ungroup)!= 0) {
       y <- dat$y[!(y.id %in% ungroup)]
@@ -92,14 +75,15 @@ simulate <- function(scenario, n.sim){
     fmla.s <- formula("~ w1 + w2 + w3 + w4")
     fmla.a <- formula("~ x1 + x2 + x3 + x4")
     
+    # estimate parameters and generate latent variable
     mcmc <- gibbs_dr(s = s, y = y, x = x, s.id = s.id, y.id = y.id, 
-                    fmla.s = fmla.s, fmla.a = fmla.a, n.iter = n.iter, n.adapt = n.adapt,
+                    fmla.a = fmla.a, n.iter = n.iter, n.adapt = n.adapt,
                     shape = shape, rate = rate, scale = scale, thin = thin)
     
     z_list <- split(mcmc$zMat_y, seq(nrow(mcmc$zMat_y)))
     
     # multiple imputation
-    mi <- mclapply.hack(z_list, function(z, y, xmat, y.id = y.id, a.vals, sl.lib){
+    mi <- mclapply.hack(z_list, function(z, y, xmat, y.id, a.vals, sl.lib){
   
       hct_dr(y = y, a = z, x = xmat, y.id = y.id, a.vals = a.vals, k = 5, sl.lib = sl.lib)
   
@@ -115,7 +99,7 @@ simulate <- function(scenario, n.sim){
     # simulation extrapolation
     simex <- simex_dr(z = colMeans(mcmc$zMat), y = y, x = x, id = id, y.id = y.id, 
                       sigma = sqrt(mean(mcmc$tau2)/table(s.id)), n.boot = n.boot, degree = degree,
-                      lambda = lambda, a.vals = a.vals, span = 0.8, sl.lib = sl.lib, mc.cores = 2)
+                      lambda = lambda, a.vals = a.vals, k = 5, sl.lib = sl.lib, mc.cores = 2)
     
     simex_est <- simex$estimate
     simex_var <- simex$variance
@@ -140,7 +124,7 @@ simulate <- function(scenario, n.sim){
     naive_var <- naive$variance
     
     # combine output
-    est[i,1,] <- predict_example(a = a.vals, x = x, id = y.id, out_scen = "a")
+    est[i,1,] <- predict_example(a.vals = a.vals, x = x, y.id = y.id, out_scen = out_scen)
     est[i,2:5,] <- rbind(naive_est, si_est, simex_est, mi_est)
     se[i,1:4,] <- sqrt(rbind(naive_var, si_var, simex_var, mi_var))
     
@@ -173,14 +157,40 @@ simulate <- function(scenario, n.sim){
   
 }
   
-rslt <- sapply(1:4, simulate, n.sim = n.sim)
+# for replication
+set.seed(42)
 
+# simulation scenarios
 a.vals <- seq(-1, 3, by = 0.25)
+sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction")
+n.sim <- 100
 
-plot(a.vals, colMeans(out$est, na.rm = T)[1,], type = "l", col = "red", lwd = 2,
-     main = "Exposure Response Curve", xlab = "Exposure", ylab = "Probability of Event", ylim = c(0,1))
-lines(a.vals, colMeans(out$est, na.rm = T)[2,], type = "l", col = "blue", lwd = 2)
-lines(a.vals, colMeans(out$est, na.rm = T)[3,], type = "l", col = "green", lwd = 2)
-lines(a.vals, colMeans(out$est, na.rm = T)[4,], type = "l", col = "green", lwd = 2)
-lines(a.vals, colMeans(out$est, na.rm = T)[5,], type = "l", col = "green", lwd = 2)
-legend(2, 0.2, legend=c("Sample ERC", "Naive", "SI", "SIMEX", "MI"), col=c("red", "blue", "green"), lwd=2, cex=0.8)
+n <- c(2000)
+m <- c(100)
+l <- c(500)
+out_scen <- c("a", "b")
+gps_scen <- c("a", "b")
+
+scen_mat <- expand.grid(n = n, m = m, l = l, out_scen = out_scen, gps_scen = gps_scen)
+scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
+rslt <- mclapply.hack(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 2)
+rslt <- list(unlist(rslt), scen_mat)
+
+save(rslt, file = "D:/Github/causal-me/output/rslt.RData")
+
+pdf(file = "D:/Github/causal-me/output/ERC-plot.pdf")
+par(mfrow = c(2, 2))
+for (k in 1:length(rslt)) {
+  
+  plot(a.vals, rslt[[k]]$est[1,], type = "l", col = "red", lwd = 2,
+       main = paste("scenario", k), xlab = "Exposure", ylab = "Probability of Event", ylim = c(0,1))
+  lines(a.vals, rslt[[k]]$est[2,], type = "l", col = "orange", lwd = 2)
+  lines(a.vals, rslt[[k]]$est[3,], type = "l", col = "green", lwd = 2)
+  lines(a.vals, rslt[[k]]$est[4,], type = "l", col = "blue", lwd = 2)
+  lines(a.vals, rslt[[k]]$est[5,], type = "l", col = "purple", lwd = 2)
+
+  if(k == length(rslt))
+    legend(2, 0.2, legend=c("Sample ERC", "Naive", "SI", "SIMEX", "MI"), col=c("red", "orange", "green", "blue", "purple"), lwd=2, cex=0.8)
+  
+}
+dev.off()

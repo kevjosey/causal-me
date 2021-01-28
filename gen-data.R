@@ -10,18 +10,17 @@
 
 ## Output
 
-# z (or s) = observed exposure, either true or error prone
-# a (or t) = true exposures when its observed
-# y = outcome
+# s = error prone exposure (on a grid)
+# a = true exposure (on cluster)
+# y = outcome (individual)
 # y.id = cluster assignment for y
-# z.id (or s.id) = cluster assignment for z
+# s.id = cluster assignment for s
 # x = covariate matrix
-# gps = generalized propensity score of the true exposure
 
-gen_bayes_data <- function(l, m, n, sig_epe = 2, sig_gps = 1,
-                           gps_scen = c("a", "b"), out_scen = c("a", "b")) {
+gen_data <- function(l, m, n, sig_epe = sqrt(2), sig_gps = 1,
+                     gps_scen = c("a", "b"), out_scen = c("a", "b")) {
   
-  if (m > n)
+  if (m > n | l > n | m > l)
     stop("you stop that, you!")
     
   # covariates
@@ -89,13 +88,13 @@ gen_bayes_data <- function(l, m, n, sig_epe = 2, sig_gps = 1,
   y <- rbinom(n, 1, plogis(mu_out))
   
   # create simulation dataset
-  sim <- list(s = s, t = t, y = y, x = x, s.id = s.id, y.id = y.id, a = a, a_y = a_y)
+  sim <- list(s = s, y = y, x = x, s.id = s.id, y.id = y.id, a = a, a_y = a_y)
   
   return(sim)
   
 }
 
-gen_simex_data <- function(m, n, sig_epe = 2, sig_gps = 1, prob = 0.1) {
+gen_simex_data <- function(m, n, sig_epe = 2, sig_gps = 1) {
   
   if (m > n)
     stop("you stop that, you!")
@@ -108,8 +107,8 @@ gen_simex_data <- function(m, n, sig_epe = 2, sig_gps = 1, prob = 0.1) {
   x3 <- x4 <- rep(NA, n)
   
   y.id <- sample(1:m, n, replace = TRUE)
-  z.id <- 1:m
-  gamma <- unname(table(y.id))
+  id <- 1:m
+  size <- unname(table(y.id))
   
   for (g in 1:m) {
     
@@ -134,13 +133,16 @@ gen_simex_data <- function(m, n, sig_epe = 2, sig_gps = 1, prob = 0.1) {
   x <- cbind(x1, x2, x3, x4)
   
   # create simulation dataset
-  sim <- list(a = a, z = z, y = y, x = x, z.id = z.id, y.id = y.id, a_y = a_y, z_y = z_y)
+  sim <- list(a = a, z = z, y = y, x = x, id = id, y.id = y.id, a_y = a_y, z_y = z_y)
   
   return(sim)
   
 }
 
-gen_dr_data <- function(n, m, sig_gps, gps_scen = c("a", "b"), out_scen = c("a", "b")) {
+gen_dr_data <- function(n, m, sig_gps = 1, gps_scen = c("a", "b"), out_scen = c("a", "b")) {
+  
+  if (m > n)
+    stop("you stop that, you!")
   
   # covariates
   x1 <- stats::rnorm(n, 0, 1)
@@ -162,15 +164,15 @@ gen_dr_data <- function(n, m, sig_gps, gps_scen = c("a", "b"), out_scen = c("a",
   # transformed predictors
   u1 <- as.numeric(scale((x1 + x2)^2))
   u2 <- as.numeric(scale(cos(2*x2)))
-  z3 <- as.numeric(scale(sin(2*v3)))
-  z4 <- as.numeric(scale(-abs(v3 + v4)))
+  w3 <- as.numeric(scale(sin(2*v3)))
+  w4 <- as.numeric(scale(-abs(v3 + v4)))
   
   u3 <- u4 <- rep(NA, n)
   
   for (g in 1:m) {
     
-    u3[id == g] <- z3[g]
-    u4[id == g] <- z4[g]
+    u3[id == g] <- w3[g]
+    u4[id == g] <- w4[g]
     
   }
   
@@ -181,67 +183,67 @@ gen_dr_data <- function(n, m, sig_gps, gps_scen = c("a", "b"), out_scen = c("a",
     mu_gps <- 1 + 0.5*x1 - 0.5*x2 - 0.5*x3 + 0.5*x4
   }
   
-  tg <- aggregate(rnorm(n, mu_gps, sig_gps), by = list(id), mean)[,2]
-  t <- rep(NA, n)
+  a <- aggregate(rnorm(n, mu_gps, sig_gps), by = list(id), mean)[,2]
+  a_y <- rep(NA, n)
   
   for (g in 1:m)
-    t[id == g] <- tg[g]
+    a_y[id == g] <- a[g]
   
   if (out_scen == "b") {
-    mu_out <- -0.75*u1 - 0.25*u2 + 0.25*u3 + 0.75*u4 + t*(1 + 0.5*u1 - 0.5*u2 + 0.5*u3 - 0.5*u4)
+    mu_out <- -0.75*u1 - 0.25*u2 + 0.25*u3 + 0.75*u4 + a_y*(1 + 0.5*u1 - 0.5*u2 + 0.5*u3 - 0.5*u4)
   } else { # y_scen == "b"
-    mu_out <- -0.75*x1 - 0.25*x2 + 0.25*x3 + 0.75*x4 + t*(1 + 0.5*x1 - 0.5*x2 + 0.5*x3 - 0.5*x4)
+    mu_out <- -0.75*x1 - 0.25*x2 + 0.25*x3 + 0.75*x4 + a_y*(1 + 0.5*x1 - 0.5*x2 + 0.5*x3 - 0.5*x4)
   }
   
   y <- rbinom(n, 1, plogis(mu_out))
   x <- cbind(x1, x2, x3, x4)
   
   # create simulation dataset
-  sim <- list(y = y, t = t, x = x, id = id)
+  sim <- list(y = y, a = a, a_y = a_y, x = x, id = id)
   
   return(sim)
   
 }
 
-predict_example <- function(a, x, id, out_scen = c("a", "b")){
+predict_example <- function(a.vals, x, y.id, out_scen = c("a", "b")){
   
-  v3 <- unique(x[,3])[order(unique(id))]
-  v4 <- unique(x[,4])[order(unique(id))]
+  v3 <- unique(x[,3])[order(unique(y.id))]
+  v4 <- unique(x[,4])[order(unique(y.id))]
   
   # transformed predictors
   u1 <- as.numeric(scale((x[,1] + x[,2])^2))
   u2 <- as.numeric(scale(cos(2*x[,2])))
-  z3 <- as.numeric(scale(sin(2*v3)))
-  z4 <- as.numeric(scale(-abs(v3 + v4)))
+  w3 <- as.numeric(scale(sin(2*v3)))
+  w4 <- as.numeric(scale(-abs(v3 + v4)))
   
-  lvl <- unique(id)[order(unique(id))]
+  id <- unique(y.id)[order(unique(y.id))]
   u3 <- u4 <- rep(NA, nrow(x))
   
-  for (g in lvl) {
+  for (g in id) {
     
-    u3[id == g] <- z3[lvl == g]
-    u4[id == g] <- z4[lvl == g]
+    u3[y.id == g] <- w3[id == g]
+    u4[y.id == g] <- w4[id == g]
     
   }
   
   u <- cbind(u1, u2, u3, u4)
   
-  out <- rep(NA, length(a))
-  gamma <- unname(table(id))
+  out <- rep(NA, length(a.vals))
+  size <- unname(table(id))
   
-  for(i in 1:length(a)) {
+  for(i in 1:length(a.vals)) {
     
     if (out_scen == "b") {
       mu_out <- aggregate(plogis(u %*% c(-0.75,-0.25,0.25,0.75) + 
-                                   rep(a[i],nrow(x))*(1 + u %*% c(0.5, -0.5, 0.5, -0.5))),
-                          by = list(id), mean)[,2]
+                                   rep(a.vals[i],nrow(x))*(1 + u %*% c(0.5, -0.5, 0.5, -0.5))),
+                          by = list(y.id), mean)[,2]
     } else { # y_scen == "b"
       mu_out <- aggregate(plogis(x %*% c(-0.75,-0.25,0.25,0.75) + 
-                                   rep(a[i],nrow(x))*(1 + x %*% c(0.5, -0.5, 0.5, -0.5))),
-                          by = list(id), mean)[,2]
+                                   rep(a.vals[i],nrow(x))*(1 + x %*% c(0.5, -0.5, 0.5, -0.5))),
+                          by = list(y.id), mean)[,2]
     }
     
-    out[i] <- sum(gamma*mu_out)/sum(gamma)
+    out[i] <- sum(size*mu_out)/sum(size)
     
   }
   
