@@ -80,14 +80,24 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
                     fmla.a = fmla.a, n.iter = n.iter, n.adapt = n.adapt,
                     shape = shape, rate = rate, scale = scale, thin = thin)
     
-    z_list <- split(mcmc$zMat_y, seq(nrow(mcmc$zMat_y)))
     
+    # single imputation
+    si <- hct_dr(y = y, a = colMeans(mcmc$amat_y), x = x, y.id = y.id, a.vals = a.vals, k = 5, 
+                 beta = colMeans(mcmc$beta), sigma2 = mean(mcmc$sigma2), sl.lib = sl.lib)
+    
+    si_est <- si$estimate
+    si_var <- si$variance
+
     # multiple imputation
-    mi <- mclapply.hack(z_list, function(z, y, xmat, y.id, a.vals, sl.lib){
+    a_list <- split(mcmc$amat_y, seq(nrow(mcmc$amat_y)))
+    
+    mi <- mclapply.hack(1:length(a_list), function(k, a_list, y, xmat, y.id, beta, sigma2, a.vals, sl.lib){
   
-      hct_dr(y = y, a = z, x = xmat, y.id = y.id, a.vals = a.vals, k = 5, sl.lib = sl.lib)
+      hct_dr(y = y, a = a_list[[k]], x = xmat, y.id = y.id, a.vals = a.vals, k = 5,
+             beta = beta[k,], sigma2 = sigma2[k], sl.lib = sl.lib)
   
-    }, y = y, xmat = x, y.id = y.id, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 2)
+    }, y = y, a_list = a_list, xmat = x, y.id = y.id, a.vals = a.vals,
+    beta = mcmc$beta, sigma2 = mcmc$sigma2, sl.lib = sl.lib, mc.cores = 2)
     
     est_tmp <- matrix(unlist(lapply(mi, function(x) x$estimate)), ncol = length(mi))
     var_mat <- matrix(unlist(lapply(mi, function(x) x$variance)), ncol = length(mi))
@@ -95,33 +105,27 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     mi_est <- rowMeans(est_tmp)
     est_mat <- matrix(rep(mi_est, length(mi)), nrow = length(a.vals), ncol = length(mi))
     mi_var <- rowMeans(var_mat) + (1 + 1/length(mi))*rowSums((est_tmp - est_mat)^2)/(length(mi) - 1)
+
+    # naive approach
+    z <- aggregate(s, by = list(s.id), mean)[,2]
+    id <- unique(s.id)[order(unique(s.id))]
+    z_y <- rep(NA, length(y.id))
+    
+    for (g in id)
+      z_y[y.id == g] <- z[id == g]
+    
+    naive <- hct_dr(y = y, a = z_y, x = x, y.id = y.id, a.vals = a.vals, k = 5, sl.lib = sl.lib)
+    
+    naive_est <- naive$estimate
+    naive_var <- naive$variance
     
     # simulation extrapolation
-    simex <- simex_dr(z = colMeans(mcmc$zMat), y = y, x = x, id = id, y.id = y.id, 
+    simex <- simex_dr(z = z, y = y, x = x, id = id, y.id = y.id, 
                       sigma = sqrt(mean(mcmc$tau2)/table(s.id)), n.boot = n.boot, degree = degree,
                       lambda = lambda, a.vals = a.vals, k = 5, sl.lib = sl.lib, mc.cores = 2)
     
     simex_est <- simex$estimate
     simex_var <- simex$variance
-    
-    # single imputation
-    si <- hct_dr(y = y, a = colMeans(mcmc$zMat_y), x = x, y.id = y.id, a.vals = a.vals, k = 5, sl.lib = sl.lib)
-    
-    si_est <- si$estimate
-    si_var <- si$variance
-    
-    # naive approach
-    t <- aggregate(s, by = list(s.id), mean)[,2]
-    id <- unique(s.id)[order(unique(s.id))]
-    a_y <- rep(NA, length(y.id))
-    
-    for (g in id)
-      a_y[y.id == g] <- t[id == g]
-    
-    naive <- hct_dr(y = y, a = a_y, x = x, y.id = y.id, a.vals = a.vals, k = 5, sl.lib = sl.lib)
-    
-    naive_est <- naive$estimate
-    naive_var <- naive$variance
     
     # combine output
     est[i,1,] <- predict_example(a.vals = a.vals, x = x, y.id = y.id, out_scen = out_scen)
