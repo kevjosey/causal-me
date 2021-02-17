@@ -76,7 +76,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     fmla.a <- formula("~ x1 + x2 + x3 + x4")
     
     # estimate parameters and generate latent variable
-    mcmc <- gibbs_dr(s = s, y = y, x = x, s.id = s.id, y.id = y.id, 
+    mcmc <- gibbs_dr(s = s, y = y, x = x, s.id = s.id, x.id = y.id, 
                     fmla.a = fmla.a, n.iter = n.iter, n.adapt = n.adapt,
                     shape = shape, rate = rate, scale = scale, thin = thin)
     
@@ -178,23 +178,24 @@ gps_scen <- c("a", "b")
 scen_mat <- expand.grid(n = n, m = m, l = l, out_scen = out_scen, gps_scen = gps_scen)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 rslt <- mclapply.hack(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 2)
-rslt <- list(unlist(rslt), scen_mat)
+rslt <- list(rslt = rslt, scen_idx = scen_mat)
 
 save(rslt, file = "D:/Github/causal-me/output/rslt.RData")
 
 pdf(file = "D:/Github/causal-me/output/ERC-plot.pdf")
 par(mfrow = c(2, 2))
-for (k in 1:length(rslt)) {
+for (k in 1:length(rlist_est)) {
   
-  plot(a.vals, rslt[[k]]$est[1,], type = "l", col = "red", lwd = 2,
+  plot(a.vals, rslt[[1]][[k]]$est[1,], type = "l", col = "red", lwd = 2,
        main = paste("scenario", k), xlab = "Exposure", ylab = "Probability of Event", ylim = c(0,1))
-  lines(a.vals, rslt[[k]]$est[2,], type = "l", col = "orange", lwd = 2)
-  lines(a.vals, rslt[[k]]$est[3,], type = "l", col = "green", lwd = 2)
-  lines(a.vals, rslt[[k]]$est[4,], type = "l", col = "blue", lwd = 2)
-  lines(a.vals, rslt[[k]]$est[5,], type = "l", col = "purple", lwd = 2)
+  lines(a.vals, rslt[[1]][[k]]$est[2,], type = "l", col = "orange", lwd = 2)
+  lines(a.vals, rslt[[1]][[k]]$est[3,], type = "l", col = "green", lwd = 2)
+  lines(a.vals, rslt[[1]][[k]]$est[4,], type = "l", col = "blue", lwd = 2)
+  lines(a.vals, rslt[[1]][[k]]$est[5,], type = "l", col = "purple", lwd = 2)
 
-  if(k == length(rslt))
-    legend(2, 0.2, legend=c("Sample ERC", "Naive", "SI", "SIMEX", "MI"), col=c("red", "orange", "green", "blue", "purple"), lwd=2, cex=0.8)
+  if (k == length(rslt[[1]]))
+    legend(1, 0.4, legend=c("Sample ERC", "Naive", "SI", "SIMEX", "MI"), 
+           col=c("red", "orange", "green", "blue", "purple"), lwd=2, cex=0.8)
   
 }
 dev.off()

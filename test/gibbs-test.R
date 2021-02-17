@@ -20,12 +20,13 @@ source("D:/Github/causal-me/mclapply-hack.R")
 n.sim <- 100
 sig_epe <- sqrt(2)
 sig_gps <- 1
-prob <- 0.1
+out_scen <- "a"
+gps_scen <- "a"
 
 # gen data arguments
-l <- 1000 # c(500, 800)
-m <- 200 # c(100, 200)
-n <- 2000 # c(1000, 4000)
+l <- 5000 # c(500, 800)
+m <- 1000 # c(100, 200)
+n <- 20000 # c(1000, 4000)
 
 # dr arguments
 a.vals <- seq(-1, 3, by = 0.25)
@@ -40,11 +41,6 @@ thin <- 10
 n.adapt <- 100
 n.iter <- 1000
 
-# simex arguments
-n.boot <- 100
-degree <- 3
-lambda <- seq(0.1, 2.1, by = 0.25)
-
 # initialize output
 est <- array(NA, dim = c(n.sim, 3, length(a.vals)))
 se <- cp <- matrix(NA, n.sim, length(a.vals))
@@ -54,7 +50,8 @@ for (i in 1:n.sim){
   print(i)
   
   # generate data
-  dat <- gen_bayes_data(l = l, m = m, n = n, sig_gps = sig_gps, sig_epe = sig_epe, prob = prob)
+  dat <- gen_data(l = l, m = m, n = n, sig_gps = sig_gps, sig_epe = sig_epe,
+                  out_scen = out_scen, gps_scen = gps_scen)
   
   s.id <- dat$s.id
   y.id <- dat$y.id
@@ -72,14 +69,29 @@ for (i in 1:n.sim){
     y.id <- dat$y.id[!(y.id %in% ungroup)]
   }
     
-  fmla.s <- formula("~ w1 + w2 + w3 + w4")
-  fmla.a <- formula("~ x1 + x2 + x3 + x4")
+  fmla <- formula("~ x1 + x2 + x3 + x4")
   
-  out <- gibbs_dr(s = s, y = y, x = x, s.id = s.id, y.id = y.id, 
-                  fmla.s = fmla.s, fmla.a = fmla.a, sl.lib = sl.lib,
-                  shape = shape, rate = rate, scale = scale, thin = thin,
-                  n.iter = n.iter, n.adapt = n.adapt, n.boot = n.boot, 
-                  span = span, lambda = lambda, a.vals = a.vals, degree = degree)
+  mcmc <- gp_dr(s = s, x = x, s.id = s.id, y.id = y.id, fmla = fmla,
+                  shape = shape, rate = rate, scale = scale, 
+                  thin = thin, n.iter = n.iter, n.adapt = n.adapt)
+  
+  # multiple imputation
+  a_list <- split(mcmc$amat_y, seq(nrow(mcmc$amat_y)))
+  
+  mi <- mclapply.hack(1:length(a_list), function(k, a_list, y, xmat, y.id, beta, sigma2, a.vals, sl.lib){
+    
+    hct_dr(y = y, a = a_list[[k]], x = xmat, y.id = y.id, a.vals = a.vals, k = 5,
+           beta = beta[k,], sigma2 = sigma2[k], sl.lib = sl.lib)
+    
+  }, y = y, a_list = a_list, xmat = x, y.id = y.id, a.vals = a.vals,
+  beta = mcmc$beta, sigma2 = mcmc$sigma2, sl.lib = sl.lib, mc.cores = 2)
+  
+  est_tmp <- matrix(unlist(lapply(mi, function(x) x$estimate)), ncol = length(mi))
+  var_mat <- matrix(unlist(lapply(mi, function(x) x$variance)), ncol = length(mi))
+  
+  mi_est <- rowMeans(est_tmp)
+  est_mat <- matrix(rep(mi_est, length(mi)), nrow = length(a.vals), ncol = length(mi))
+  mi_var <- rowMeans(var_mat) + (1 + 1/length(mi))*rowSums((est_tmp - est_mat)^2)/(length(mi) - 1)
   
   t <- aggregate(s, by = list(s.id), mean)[,2]
   id <- unique(s.id)[order(unique(s.id))]

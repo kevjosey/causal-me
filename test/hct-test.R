@@ -30,7 +30,7 @@ gps_scen <- "a"
 out_scen <- "a"
 
 est <- array(NA, dim = c(n.sim, 2, length(a.vals)))
-sd <- matrix(NA, n.sim, length(a.vals))
+se <- matrix(NA, n.sim, length(a.vals))
 
 for (i in 1:n.sim){
   
@@ -47,12 +47,12 @@ for (i in 1:n.sim){
   out <- hct_dr(y = y, a = a_y, x = x, y.id = y.id, a.vals = a.vals, span.seq = span.seq, k = k, sl.lib = sl.lib)
   est[i,1,] <- predict_example(a.vals = a.vals, x = x, y.id = y.id, out_scen = out_scen)
   est[i,2,] <- out$estimate
-  sd[i,] <- sqrt(out$variance)
+  se[i,] <- sqrt(out$variance)
   
 }
 
 cp <- sapply(1:n.sim, function(i,...)
-  as.numeric((est[i,2,] - 1.96*sd[i,]) < colMeans(est[,1,]) & (est[i,2,] + 1.96*sd[i,]) > colMeans(est[,1,])))
+  as.numeric((est[i,2,] - 1.96*se[i,]) < colMeans(est[,1,]) & (est[i,2,] + 1.96*se[i,]) > colMeans(est[,1,])))
 
 out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals

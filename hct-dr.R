@@ -17,7 +17,6 @@ hct_dr <- function(a, y, x, y.id = NULL, beta = NULL, sigma2 = NULL, size = NULL
     w <- size
   } else
     stop("length(size) != length(unique(y.id))")
-
   
   wrap <- np_est(y = y, a = a, x = x, y.id = y.id, w = w, 
                  sl.lib = sl.lib, beta = beta, sigma2 = sigma2)
@@ -130,11 +129,10 @@ np_est <- function(a, y, x, y.id, w, sl.lib, beta = NULL, sigma2 = NULL){
     
   } else {
     
-    pimod.vals <- c(x.agg%*%beta)
+    pimod.vals <- c(cbind(rep(1, nrow(x.agg)), x.agg)%*%beta)
     pi2mod.vals <- sigma2
     
   }
-
   
   # exposure models
   pihat <- dnorm(a.agg, pimod.vals, sqrt(pi2mod.vals))

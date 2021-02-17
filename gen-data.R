@@ -5,16 +5,18 @@
 # l = total number of observations l < n
 # sig_gps = sd of the true exposure
 # sig_epe = sd of the error prone exposure
-# gps_scen = gpse exposure misspecification
+# gps_scen = gps exposure misspecification
 # out_scen = outcome misspecification
 
 ## Output
 
 # s = error prone exposure (on a grid)
 # a = true exposure (on cluster)
+# a_y = true cluster exposure expanded to individuals
 # y = outcome (individual)
 # y.id = cluster assignment for y
 # s.id = cluster assignment for s
+# id = id for a corresponding to y.id
 # x = covariate matrix
 
 gen_data <- function(l, m, n, sig_epe = sqrt(2), sig_gps = 1,
@@ -117,7 +119,10 @@ gen_simex_data <- function(m, n, sig_epe = 2, sig_gps = 1) {
     
   }
   
-  mu_gps <- 1 + 0.5*x1 - 0.5*x2 - 0.5*x3 + 0.5*x4
+  x <- cbind(x1, x2, x3, x4)
+  v <- aggregate(x, by = list(y.id), mean)[,2:(ncol(x) + 1)]
+
+  mu_gps <- 1 + 0.5*v[,1] - 0.5*v[,2] - 0.5*v[,3] + 0.5*v[,4]
   a <- aggregate(rnorm(n, mu_gps, sig_gps), by = list(y.id), mean)[,2]
   z <- rnorm(m, a, sig_epe/sqrt(unname(table(y.id))))
   a_y <- rep(NA, n)
@@ -199,7 +204,7 @@ gen_dr_data <- function(n, m, sig_gps = 1, gps_scen = c("a", "b"), out_scen = c(
   x <- cbind(x1, x2, x3, x4)
   
   # create simulation dataset
-  sim <- list(y = y, a = a, a_y = a_y, x = x, id = id)
+  sim <- list(y = y, a = a, x = x, id = id, a_y = a_y)
   
   return(sim)
   
