@@ -24,9 +24,9 @@ out_scen <- "a"
 gps_scen <- "a"
 
 # gen data arguments
-l <- 5000 # c(500, 800)
-m <- 1000 # c(100, 200)
-n <- 20000 # c(1000, 4000)
+l <- 500 # c(500, 800)
+m <- 100 # c(100, 200)
+n <- 2000 # c(1000, 4000)
 
 # dr arguments
 a.vals <- seq(-1, 3, by = 0.25)
@@ -38,8 +38,8 @@ shape <- 1e-5 # gamma shape
 rate <- 1e-5 # gamma rate
 scale <- 1e5 # normal scale
 thin <- 10
-n.adapt <- 100
-n.iter <- 1000
+n.adapt <- 1000
+n.iter <- 10000
 
 # initialize output
 est <- array(NA, dim = c(n.sim, 3, length(a.vals)))
@@ -71,9 +71,11 @@ for (i in 1:n.sim){
     
   fmla <- formula("~ x1 + x2 + x3 + x4")
   
-  mcmc <- gp_dr(s = s, x = x, s.id = s.id, y.id = y.id, fmla = fmla,
+  mcmc <- gibbs_dr(s = s, x = x, s.id = s.id, y.id = y.id, fmla = fmla,
                   shape = shape, rate = rate, scale = scale, 
                   thin = thin, n.iter = n.iter, n.adapt = n.adapt)
+  
+  bla <- blp(s = s, x = x, s.id = s.id, y.id = y.id, fmla = fmla)
   
   # multiple imputation
   a_list <- split(mcmc$amat_y, seq(nrow(mcmc$amat_y)))
