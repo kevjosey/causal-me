@@ -19,7 +19,7 @@
 # id = id for a corresponding to y.id
 # x = covariate matrix
 
-gen_data <- function(l, m, n, sig_epe = sqrt(2), sig_gps = 1,
+gen_data <- function(l, m, n, sig_epe = sqrt(2), sig_gps = 1, covars = TRUE,
                      gps_scen = c("a", "b"), out_scen = c("a", "b")) {
   
   if (m > n | l > n | m > l)
@@ -67,7 +67,11 @@ gen_data <- function(l, m, n, sig_epe = sqrt(2), sig_gps = 1,
     v <- aggregate(x, by = list(y.id), mean)[,2:(ncol(x) + 1)]
   }
   
-  mu_gps <- 1 + 0.5*v[,1] - 0.5*v[,2] - 0.5*v[,3] + 0.5*v[,4]
+  if (covars == TRUE)
+    mu_gps <- 1 + 0.5*v[,1] - 0.5*v[,2] - 0.5*v[,3] + 0.5*v[,4]
+  else 
+    mu_gps <- 1
+  
   a <- rnorm(m, mu_gps, sig_gps)
   a_y <- rep(NA, n)
   a_s <- rep(NA, l)

@@ -1,17 +1,18 @@
 
 blp <- function(s, s.id, y.id, t = NULL, x = NULL, w = NULL,  
-                sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "sL.gam")) {
+                sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "SL.gam")) {
   
   if (!is.null(w) & !is.null(t)) {
     
     # set up evaluation points & matrices for predictions
     ws <- data.frame(w, s)
-    ws.tmp <- ws[!is.na(t),]
-    t.tmp <- ws[!is.na(t)]
+    ws.tmp <- data.frame(ws[!is.na(t),])
+    t.tmp <- t[!is.na(t)]
+    colnames(ws.tmp) <- colnames(ws) <- c(colnames(w), "somename")
     
     # estimate nuisance outcome model with SuperLearner
     mumod <- SuperLearner(Y = t.tmp, X = ws.tmp, SL.library = sl.lib)
-    s <- predict(mumod, newdata = ws)
+    s <- c(predict(mumod, newdata = ws)$pred)
     
   } else if (!is.null(w) & is.null(t)) {
     
