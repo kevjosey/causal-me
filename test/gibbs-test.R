@@ -11,8 +11,8 @@ library(parallel)
 
 # Code for generating and fitting data
 source("D:/Github/causal-me/gen-data.R")
-source("D:/Github/causal-me/gibbs-dr.R")
-source("D:/Github/causal-me/simex-dr.R")
+source("D:/Github/causal-me/gibbs-sampler.R")
+source("D:/Github/causal-me/blp.R")
 source("D:/Github/causal-me/hct-dr.R")
 source("D:/Github/causal-me/mclapply-hack.R")
 
@@ -31,7 +31,7 @@ n <- 2000 # c(1000, 4000)
 # dr arguments
 a.vals <- seq(-1, 3, by = 0.25)
 sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction")
-span <- 0.9
+span <- 0.8
 
 # mcmc/prior values
 shape <- 1e-5 # gamma shape
@@ -42,8 +42,8 @@ n.adapt <- 1000
 n.iter <- 10000
 
 # initialize output
-est <- array(NA, dim = c(n.sim, 3, length(a.vals)))
-se <- cp <- matrix(NA, n.sim, length(a.vals))
+est <- array(NA, dim = c(n.sim, 4, length(a.vals)))
+se <- array(NA, dim = c(n.sim, 3, length(a.vals)))
 
 for (i in 1:n.sim){
   
@@ -69,31 +69,17 @@ for (i in 1:n.sim){
     y.id <- dat$y.id[!(y.id %in% ungroup)]
   }
     
-  fmla <- formula("~ x1 + x2 + x3 + x4")
-  
-  mcmc <- gibbs_dr(s = s, x = x, s.id = s.id, y.id = y.id, fmla = fmla,
+  mcmc <- gibbs_dr(s = s, x = x, s.id = s.id, y.id = y.id,
                   shape = shape, rate = rate, scale = scale, 
                   thin = thin, n.iter = n.iter, n.adapt = n.adapt)
   
-  bla <- blp(s = s, x = x, s.id = s.id, y.id = y.id, fmla = fmla)
+  bla <- blp(s = s, x = x, s.id = s.id, y.id = y.id)
   
-  # multiple imputation
-  a_list <- split(mcmc$amat_y, seq(nrow(mcmc$amat_y)))
+  gibbs_si <- hct_dr(y = y, a = colMeans(mcmc$amat_y), x = x, 
+                     y.id = y.id, a.vals = a.vals, span = span, sl.lib = sl.lib)
   
-  mi <- mclapply.hack(1:length(a_list), function(k, a_list, y, xmat, y.id, beta, sigma2, a.vals, sl.lib){
-    
-    hct_dr(y = y, a = a_list[[k]], x = xmat, y.id = y.id, a.vals = a.vals, k = 5,
-           beta = beta[k,], sigma2 = sigma2[k], sl.lib = sl.lib)
-    
-  }, y = y, a_list = a_list, xmat = x, y.id = y.id, a.vals = a.vals,
-  beta = mcmc$beta, sigma2 = mcmc$sigma2, sl.lib = sl.lib, mc.cores = 2)
-  
-  est_tmp <- matrix(unlist(lapply(mi, function(x) x$estimate)), ncol = length(mi))
-  var_mat <- matrix(unlist(lapply(mi, function(x) x$variance)), ncol = length(mi))
-  
-  mi_est <- rowMeans(est_tmp)
-  est_mat <- matrix(rep(mi_est, length(mi)), nrow = length(a.vals), ncol = length(mi))
-  mi_var <- rowMeans(var_mat) + (1 + 1/length(mi))*rowSums((est_tmp - est_mat)^2)/(length(mi) - 1)
+  blp_si <- hct_dr(y = y, a = bla$a_y, x = x, 
+                   y.id = y.id, a.vals = a.vals, span = span, sl.lib = sl.lib)
   
   t <- aggregate(s, by = list(s.id), mean)[,2]
   id <- unique(s.id)[order(unique(s.id))]
@@ -105,22 +91,33 @@ for (i in 1:n.sim){
   
   naive <- hct_dr(y = y, a = t_y, x = x, y.id = y.id, a.vals = a.vals, span = span, sl.lib = sl.lib)
   
-  est[i,1,] <- predict_example(a = a.vals, x = x, id = y.id, out_scen = "a")
+  est[i,1,] <- predict_example(a = a.vals, x = x, y.id = y.id, out_scen = out_scen)
   est[i,2,] <- naive$estimate
-  est[i,3,] <- out$est
-  se[i,] <- out$se
+  est[i,3,] <- blp_si$estimate
+  est[i,4,] <- gibbs_si$estimate
+  
+  se[i,1,] <- sqrt(naive$variance)
+  se[i,2,] <- sqrt(blp_si$variance)
+  se[i,3,] <- sqrt(gibbs_si$variance)
   
 }
 
 out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals
-rownames(out_est) <- c("TRUE SATE", "DR")
+rownames(out_est) <- c("SAMPLE ERC", "NAIVE", "BLP", "GIBBS")
 
-cp <- sapply(1:n.sim, function(i,...)
-  as.numeric((est[i,2,] - 1.96*se[i,]) < est[i,1,] & (est[i,2,] + 1.96*se[i,]) > est[i,1,]))
+cp_naive <- sapply(1:n.sim, function(i,...)
+  as.numeric((est[i,2,] - 1.96*se[i,1,]) < est[i,1,] & (est[i,2,] + 1.96*se[i,1,]) > est[i,1,]))
 
-out_cp <- rowMeans(cp, na.rm = T)
-names(out_cp) <- a.vals
+cp_blp <- sapply(1:n.sim, function(i,...)
+  as.numeric((est[i,3,] - 1.96*se[i,2,]) < est[i,1,] & (est[i,3,] + 1.96*se[i,2,]) > est[i,1,]))
+
+cp_gibbs <- sapply(1:n.sim, function(i,...)
+  as.numeric((est[i,4,] - 1.96*se[i,3,]) < est[i,1,] & (est[i,4,] + 1.96*se[i,3,]) > est[i,1,]))
+
+out_cp <- rbind(rowMeans(cp_naive, na.rm = T), rowMeans(cp_blp, na.rm = T), rowMeans(cp_gibbs, na.rm = T))
+colnames(out_cp) <- a.vals
+rownames(out_cp) <- c("NAIVE", "BLP", "GIBBS")
 
 out_est
 out_cp
@@ -129,4 +126,5 @@ plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "red", lwd = 2,
       main = "Exposure Response Curve", xlab = "Exposure", ylab = "Probability of Event", ylim = c(0,1))
 lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = "blue", lwd = 2)
 lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "green", lwd = 2)
-legend(2, 0.2, legend=c("Sample ERC", "Naive", "SIMEX"), col=c("red", "blue", "green"), lwd=2, cex=0.8)
+lines(a.vals, colMeans(est, na.rm = T)[4,], type = "l", col = "purple", lwd = 2)
+legend(2, 0.2, legend=c("Sample ERC", "Naive", "BLP", "Gibbs"), col=c("red", "blue", "green", "purple"), lwd=2, cex=0.8)

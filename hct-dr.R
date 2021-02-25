@@ -1,6 +1,6 @@
 
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
-hct_dr <- function(a, y, x, y.id = NULL, beta = NULL, sigma2 = NULL, size = NULL,
+hct_dr <- function(a, y, x, y.id = NULL, offset = NULL,
                    a.vals = seq(min(a), max(a), length.out = 20), 
                    span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10, 
                    sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "sL.gam")) {	
@@ -9,17 +9,16 @@ hct_dr <- function(a, y, x, y.id = NULL, beta = NULL, sigma2 = NULL, size = NULL
   if (is.null(y.id)) y.id <- 1:n
   m <- length(unique(y.id))
   
-  if (is.null(size)) {
-    size <- unname(table(y.id))
-    attributes(size) <- NULL
-    w <- size
-  } else if (length(size) == length(unique(y.id))) {
-    w <- size
+  if (is.null(offset)) {
+    offset <- unname(table(y.id))
+    attributes(offset) <- NULL
+    w <- offset
+  } else if (length(offset) == length(unique(y.id))) {
+    w <- offset
   } else
-    stop("length(size) != length(unique(y.id))")
+    stop("length(offset) != length(unique(y.id))")
   
-  wrap <- np_est(y = y, a = a, x = x, y.id = y.id, w = w, 
-                 sl.lib = sl.lib, beta = beta, sigma2 = sigma2)
+  wrap <- np_est(y = y, a = a, x = x, y.id = y.id, w = w, sl.lib = sl.lib)
   
   muhat <- wrap$muhat
   mhat <- wrap$mhat
@@ -96,7 +95,7 @@ dr_est <- function(newa, a, psi, int, w, span, se.fit = FALSE) {
 }
 
 # Nonparametric estimation
-np_est <- function(a, y, x, y.id, w, sl.lib, beta = NULL, sigma2 = NULL){
+np_est <- function(a, y, x, y.id, w, sl.lib){
   
   if (is.null(y.id))
     stop("y.id must be specified.")
@@ -120,19 +119,10 @@ np_est <- function(a, y, x, y.id, w, sl.lib, beta = NULL, sigma2 = NULL){
   x.agg <- as.matrix(df[,5:ncol(df)])
   
   # estimate nuisance GPS functions via super learner
-  if (is.null(beta) | is.null(sigma2)){
-    
-    pimod <- SuperLearner(Y = a.agg, X = as.data.frame(x.agg), SL.library = sl.lib, family = gaussian())
-    pimod.vals <- c(pimod$SL.predict)
-    pi2mod <- SuperLearner(Y = (a.agg - pimod.vals)^2, X = as.data.frame(x.agg), SL.library = "SL.mean")
-    pi2mod.vals <- c(pi2mod$SL.predict)
-    
-  } else {
-    
-    pimod.vals <- c(cbind(rep(1, nrow(x.agg)), x.agg)%*%beta)
-    pi2mod.vals <- sigma2
-    
-  }
+  pimod <- SuperLearner(Y = a.agg, X = as.data.frame(x.agg), SL.library = sl.lib, family = gaussian())
+  pimod.vals <- c(pimod$SL.predict)
+  pi2mod <- SuperLearner(Y = (a.agg - pimod.vals)^2, X = as.data.frame(x.agg), SL.library = "SL.mean")
+  pi2mod.vals <- c(pi2mod$SL.predict)
   
   # exposure models
   pihat <- dnorm(a.agg, pimod.vals, sqrt(pi2mod.vals))

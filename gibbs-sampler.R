@@ -1,7 +1,30 @@
 
-gibbs_dr <- function(s, x, s.id, y.id, fmla,
+gibbs_dr <- function(s, s.id, y.id, t = NULL, x = NULL, w = NULL, 
                      shape = 1e-4, rate = 1e-4, scale = 1e4, 
-                     thin = 10, n.iter = 10000, n.adapt = 1000) {
+                     thin = 10, n.iter = 10000, n.adapt = 1000,
+                     sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "sL.gam")) {
+  
+  if (!is.null(w) & !is.null(t)) {
+    
+    # set up evaluation points & matrices for predictions
+    ws <- data.frame(w, s)
+    ws.tmp <- ws[!is.na(t),]
+    t.tmp <- ws[!is.na(t)]
+    
+    # estimate nuisance outcome model with SuperLearner
+    mumod <- SuperLearner(Y = t.tmp, X = ws.tmp, SL.library = sl.lib)
+    s <- predict(mumod, newdata = ws)
+    
+  } else if (!is.null(w) & is.null(t)) {
+    
+    stop("!is.null(w) & is.null(t)")
+    
+  } else if (is.null(w) & !is.null(t)) {
+    
+    s[!is.na(t)] <- t[!is.na(t)]
+    warning("replaced values of s with t wherever available.")
+    
+  }
   
   # remove any s.id not present in y.id
   id <- unique(y.id)[order(unique(y.id))]
@@ -17,8 +40,16 @@ gibbs_dr <- function(s, x, s.id, y.id, fmla,
   s <- s[s.id %in% id]
   s.id <- s.id[s.id %in% id]
   
-  d <- aggregate(model.matrix(as.formula(fmla), data = data.frame(x)), by = list(y.id), mean)
-  design <- as.matrix(d[,2:ncol(d)])
+  if (is.null(x)) {
+    
+    d <- aggregate(model.matrix(~ ., data = data.frame(x)), by = list(y.id), mean)
+    design <- as.matrix(d[,2:ncol(d)])
+    
+  } else {
+    
+    design <- matrix(rep(1, length(id)), ncol = 1)
+    
+  }
   
   # dimensions
   l <- length(s.id)
@@ -43,6 +74,7 @@ gibbs_dr <- function(s, x, s.id, y.id, fmla,
   
   amat <- piHat <- piSig <- matrix(NA, nrow = n.iter + n.adapt, ncol = m)
   amat_y <- matrix(NA, nrow = n.iter + n.adapt, ncol = n)
+  amat_s <- matrix(NA, nrow = n.iter + n.adapt, ncol = l)
 
   # gibbs sampler for predictors
   for(j in 2:(n.iter + n.adapt)) {
@@ -57,7 +89,7 @@ gibbs_dr <- function(s, x, s.id, y.id, fmla,
     
     for (g in id) {
       
-      a_s[s.id == g] <- a[id == g]
+      a_s[s.id == g] <- amat_s[j,s.id == g] <- a[id == g]
       amat_y[j,y.id == g] <- amat[j,id == g] 
       
     }
@@ -80,8 +112,9 @@ gibbs_dr <- function(s, x, s.id, y.id, fmla,
   tau2 <- tau2[keep]
   amat <- amat[keep,]
   amat_y <- amat_y[keep,]
+  amat_s <- amat_s[keep,]
   
-  mcmc <- list(beta = beta, sigma2 = sigma2, tau2 = tau2, amat = amat, amat_y = amat_y)
+  mcmc <- list(beta = beta, sigma2 = sigma2, tau2 = tau2, amat = amat, amat_y = amat_y, amat_s = amat_s)
   
   return(mcmc)
   

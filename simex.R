@@ -1,13 +1,14 @@
-simex_dr <- function(z, y, x, id, y.id, sigma, 
-                     n.boot = 100, degree = 2, lambda = seq(0.1, 2.1, by = 0.25),
-                     a.vals = seq(min(a), max(a), length.out = 20), mc.cores = 3,
-                     span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10,
+
+# wrapper for hct-dr.R to allow for SIMEX correction
+simex_dr <- function(z, y, x, id, y.id, sigma, # measurement error values
+                     n.boot = 100, degree = 2, lambda = seq(0.1, 2.1, by = 0.25), # simex parameters
+                     a.vals = seq(min(a), max(a), length.out = 20), mc.cores = 3, # hct_dr() parameters
+                     span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10, # cross validation shenanigans
                      sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "sL.gam")){
   
   if (any(duplicated(id)))
     stop("duplicate id detected")
   
-  size <- unname(table(y.id))
   z <- z[order(id)]
   id <- id[order(id)]
   
@@ -53,7 +54,9 @@ simex_dr <- function(z, y, x, id, y.id, sigma,
   estimate <- c(t(chi) %*% solve(t(L) %*% L) %*% t(L) %*% Psi)
   variance <- c(t(chi) %*% solve(t(L) %*% L) %*% t(L) %*% Phi)
   
-  return(list(estimate = estimate, variance = variance, Psi = Psi, Phi = Phi, lambda = lambda))
+  out <- list(estimate = estimate, variance = variance, Psi = Psi, Phi = Phi, lambda = lambda)
+  
+  return(out)
   
 }
 
