@@ -29,8 +29,7 @@ sig_epe <- 3
 sig_gps <- 5
 prob <- 0.1
 
-# ml libraries and other preliminaries
-sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction")
+# other preliminaries
 span.seq <- seq(0.5, 1, by = 0.05)
 span <- 0.8
 k <- 5
@@ -58,8 +57,8 @@ for (i in 1:n.sim){
   z_y <- dat$z_y
   a_y <- dat$a_y
   
-  out <- simex_dr(z = z, y = y, x = x, id = id, y.id = y.id, sigma = sig_epe, n.boot = n.boot, degree = degree,
-                  a.vals = a.vals, lambda = lambda, span = span, span.seq = span.seq, k = k, sl.lib = sl.lib)
+  out <- simex_dr(z = z, y = y, x = x, id = id, y.id = y.id, sigma = sig_epe, a.vals = a.vals,
+                  n.boot = n.boot, degree = degree, lambda = lambda, span = span, span.seq = span.seq, k = k)
   
   naive <- hct_dr(y = y, a = z_y, x = x, y.id = y.id, a.vals = a.vals, span.seq = span.seq, k = k, sl.lib = sl.lib)
   

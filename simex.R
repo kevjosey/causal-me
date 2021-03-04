@@ -3,8 +3,8 @@
 simex_dr <- function(z, y, x, id, y.id, sigma, # measurement error values
                      n.boot = 100, degree = 2, lambda = seq(0.1, 2.1, by = 0.25), # simex parameters
                      a.vals = seq(min(a), max(a), length.out = 20), mc.cores = 3, # hct_dr() parameters
-                     span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10, # cross validation shenanigans
-                     sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "sL.gam")){
+                     span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10){ # cross validation shenanigans
+
   
   if (any(duplicated(id)))
     stop("duplicate id detected")
@@ -23,7 +23,7 @@ simex_dr <- function(z, y, x, id, y.id, sigma, # measurement error values
       ex.mat[y.id == g,] <- z.mat[id == g,]
     
     vals <- apply(ex.mat, 2, hct_dr, y = y, x = x, y.id = y.id, a.vals = a.vals, 
-                  span = span, span.seq = span.seq, k = k, sl.lib = sl.lib)
+                  span = span, span.seq = span.seq, k = k)
     
     mu.vals <- matrix(unlist(lapply(vals, function(r) r[1])), ncol = length(vals))
     sig.vals <- matrix(unlist(lapply(vals, function(r) r[2])), ncol = length(vals))

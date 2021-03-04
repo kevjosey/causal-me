@@ -195,7 +195,7 @@ gen_dr_data <- function(n, m, sig_gps = 1, gps_scen = c("a", "b"), out_scen = c(
   a <- aggregate(rnorm(n, mu_gps, sig_gps), by = list(id), mean)[,2]
   a_y <- rep(NA, n)
   
-  for (g in 1:m)
+  for (g in 1:length(a))
     a_y[id == g] <- a[g]
   
   if (out_scen == "b") {

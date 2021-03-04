@@ -2,23 +2,32 @@
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
 hct_dr <- function(a, y, x, y.id = NULL, offset = NULL,
                    a.vals = seq(min(a), max(a), length.out = 20), 
-                   span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10, 
-                   sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "sL.gam")) {	
+                   span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10) {	
   
-  n <- nrow(x)
-  if (is.null(y.id)) y.id <- 1:n
+  if (!is.null(y.id) & !is.null(offset)) {
+    
+    stop("Either y.id or offset can be provided, not both")
+    
+  } else if (is.null(y.id) & is.null(offset)) {
+    
+    stop("Either y.id or offset must be provided, both values are NULL")
+    
+  } else if (is.null(offset)) {
+    
+    offset <- rep(1, length(y.id))
+    w <- unname(table(y.id))
+    
+  } else {
+    
+    y.id <- 1:length(y)
+    w <- offset
+    
+  }
+  
+  n <- length(y)
   m <- length(unique(y.id))
   
-  if (is.null(offset)) {
-    offset <- unname(table(y.id))
-    attributes(offset) <- NULL
-    w <- offset
-  } else if (length(offset) == length(unique(y.id))) {
-    w <- offset
-  } else
-    stop("length(offset) != length(unique(y.id))")
-  
-  wrap <- np_est(y = y, a = a, x = x, y.id = y.id, w = w, sl.lib = sl.lib)
+  wrap <- np_est(y = y, a = a, x = x, y.id = y.id, offset = offset, w = w)
   
   muhat <- wrap$muhat
   mhat <- wrap$mhat
@@ -95,20 +104,16 @@ dr_est <- function(newa, a, psi, int, w, span, se.fit = FALSE) {
 }
 
 # Nonparametric estimation
-np_est <- function(a, y, x, y.id, w, sl.lib){
-  
-  if (is.null(y.id))
-    stop("y.id must be specified.")
-  
+np_est <- function(a, y, x, y.id, offset, w){
+    
   # set up evaluation points & matrices for predictions
   n <- nrow(x)
   m <- length(unique(y.id))
-  x <- data.frame(x)
-  xa <- data.frame(x, a)
-  
+  x <- as.matrix(x)
+
   # estimate nuisance outcome model with SuperLearner
-  mumod <- SuperLearner(Y = y, X = xa, SL.library = sl.lib, family = binomial())
-  mumod.vals <- c(mumod$SL.predict)
+  mumod <- glm(y ~ a*x, weights = offset, family = quasibinomial())
+  mumod.vals <- predict(mumod, type = "response")
 
   # aggregate data and predictions with data.table
   df.tmp <- setDT(data.frame(y.id = y.id, muhat = mumod.vals, y = y, a = a, x = x))
@@ -119,28 +124,27 @@ np_est <- function(a, y, x, y.id, w, sl.lib){
   x.agg <- as.matrix(df[,5:ncol(df)])
   
   # estimate nuisance GPS functions via super learner
-  pimod <- SuperLearner(Y = a.agg, X = as.data.frame(x.agg), SL.library = sl.lib, family = gaussian())
-  pimod.vals <- c(pimod$SL.predict)
-  pi2mod <- SuperLearner(Y = (a.agg - pimod.vals)^2, X = as.data.frame(x.agg), SL.library = "SL.mean")
-  pi2mod.vals <- c(pi2mod$SL.predict)
+  pimod <- lm(a.agg ~ x.agg, weights = w)
+  pimod.vals <- c(pimod$fitted.values)
+  pi2mod.vals <- sigma(pimod)^2
   
   # exposure models
   pihat <- dnorm(a.agg, pimod.vals, sqrt(pi2mod.vals))
-  phat <- sapply(a.agg, function(a.tmp, ...) mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
+  phat <- sapply(a.agg, function(a.tmp, ...) weighted.mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))), w = w)
   
   # predict marginal outcomes given a.vals (or a.agg)
   muhat.vals <- sapply(a.agg, function(a.tmp, ...) {
   
     xa.tmp <- data.frame(x, a = a.tmp)
-    colnames(xa.tmp) <- colnames(xa)
-    return(c(predict(mumod, newdata = xa.tmp)$pred))
+    colnames(xa.tmp)[1:ncol(x)] <- colnames(x) 
+    return(c(predict(mumod, newdata = xa.tmp, type = "response")))
     
   })
   
   # aggregate muhat.vals and integrate for influence
   dt <- setDT(data.frame(y.id = y.id, muhat = muhat.vals))
   muhat.mat <- dt[,lapply(.SD, mean), by = y.id][order(y.id)][,2:ncol(dt)]
-  mhat <- colMeans(muhat.mat)
+  mhat <- apply(muhat.mat, 2, weighted.mean, w = w)
   mhat.mat <- matrix(rep(mhat, m), byrow = TRUE, nrow = m)
   int <- rowMeans(muhat.mat - mhat.mat)
   
