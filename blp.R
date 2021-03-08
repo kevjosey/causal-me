@@ -1,29 +1,5 @@
 
-blp <- function(s, s.id, y.id, t = NULL, x = NULL, w = NULL,  
-                sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "SL.gam")) {
-  
-  if (!is.null(w) & !is.null(t)) {
-    
-    # set up evaluation points & matrices for predictions
-    ws <- data.frame(w, s)
-    ws.tmp <- data.frame(ws[!is.na(t),])
-    t.tmp <- t[!is.na(t)]
-    colnames(ws.tmp) <- colnames(ws) <- c(colnames(w), "somename")
-    
-    # estimate nuisance outcome model with SuperLearner
-    mumod <- SuperLearner(Y = t.tmp, X = ws.tmp, SL.library = sl.lib)
-    s <- c(predict(mumod, newdata = ws)$pred)
-    
-  } else if (!is.null(w) & is.null(t)) {
-    
-    stop("!is.null(w) & is.null(t)")
-    
-  } else if (is.null(w) & !is.null(t)) {
-    
-    s[!is.na(t)] <- t[!is.na(t)]
-    warning("replaced values of s with t wherever available.")
-    
-  }
+blp <- function(s, s.id, y.id, x = NULL) {
   
   # remove any s.id not present in y.id
   id <- unique(y.id)[order(unique(y.id))]
@@ -38,7 +14,7 @@ blp <- function(s, s.id, y.id, t = NULL, x = NULL, w = NULL,
   
   s <- s[s.id %in% id]
   s.id <- s.id[s.id %in% id]
-  offset <- table(s.id)
+  wts <- table(s.id)
   
   if (!is.null(x)) {
     
@@ -62,12 +38,12 @@ blp <- function(s, s.id, y.id, t = NULL, x = NULL, w = NULL,
   
   if (!is.null(x)) {
     
-    mu_z <- sum(offset*z)/l
+    mu_z <- sum(wts*z)/l
     mu_x <- colMeans(design)
-    nu <- l - sum(offset^2)/l
+    nu <- l - sum(wts^2)/l
     tau2 <- sum((s - z_s)^2)/(l - m)
-    sigma2 <- (sum(offset*(z - mu_z)^2) - (m - 1)*tau2)/nu
-    psi <- t(offset*(z - mu_z))%*%(design - matrix(rep(mu_x, m), nrow = m, byrow = TRUE))/nu
+    sigma2 <- (sum(wts*(z - mu_z)^2) - (m - 1)*tau2)/nu
+    psi <- t(wts*(z - mu_z))%*%(design - matrix(rep(mu_x, m), nrow = m, byrow = TRUE))/nu
     Omega <- cov(design)
     
     phi <- c(sigma2, psi)
@@ -77,23 +53,26 @@ blp <- function(s, s.id, y.id, t = NULL, x = NULL, w = NULL,
     
     a <- sapply(1:m, function(i, ...) {
       
-      Sigma[1,1] <- sigma2 + tau2/offset[i]
+      Sigma[1,1] <- sigma2 + tau2/wts[i]
       star <- c(z[i] - mu_z, design[i,] - mu_x)
-      c(mu_z + t(phi)%*%solve(Sigma)%*%star)
+      out <- c(mu_z + t(phi)%*%solve(Sigma)%*%star)
       
+      return(out)
       
     })
     
   } else {
     
-    mu_z <- sum(offset*z)/l
-    nu <- l - sum(offset^2)/l
+    mu_z <- sum(wts*z)/l
+    nu <- l - sum(wts^2)/l
     tau2 <- sum((s - z_s)^2)/(l - m)
-    sigma2 <- (sum(offset*(z - mu_z)^2) - (m - 1)*tau2)/nu
+    sigma2 <- (sum(wts*(z - mu_z)^2) - (m - 1)*tau2)/nu
     
     a <- sapply(1:m, function(i, ...) {
       
-      c(mu_z + sigma2/(sigma2 + tau2/offset[i])*c(z[i] - mu_z))
+      out <- c(mu_z + sigma2/(sigma2 + tau2/wts[i])*c(z[i] - mu_z))
+      
+      return(out)
       
     })
     

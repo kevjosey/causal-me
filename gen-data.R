@@ -19,7 +19,7 @@
 # id = id for a corresponding to y.id
 # x = covariate matrix
 
-gen_data <- function(l, m, n, sig_epe = sqrt(2), sig_gps = 1, covars = TRUE,
+gen_data <- function(l, m, n, sig_epe = sqrt(2), sig_gps = 1, sig_berk = 0, sig_pred = 1,
                      gps_scen = c("a", "b"), out_scen = c("a", "b")) {
   
   if (m > n | l > n | m > l)
@@ -28,121 +28,82 @@ gen_data <- function(l, m, n, sig_epe = sqrt(2), sig_gps = 1, covars = TRUE,
   # covariates
   x1 <- stats::rnorm(n, 0, 1)
   x2 <- stats::rnorm(n, 0, 1)
-  v3 <- stats::rnorm(m, 0, 1)
-  v4 <- stats::rnorm(m, 0, 1)
+  v1 <- stats::rnorm(m, 0, 1)
+  v2 <- stats::rnorm(m, 0, 1)
+  w1 <- stats::rnorm(l, 0, 1)
+  w2 <- stats::rnorm(l, 0, 1)
   
   x3 <- x4 <- rep(NA, n)
   
-  y.id <- sample(1:m, n, replace = TRUE)
   s.id <- sample(1:m, l, replace = TRUE)
+  t.id <- sample(1:l, n, replace = TRUE)
+  y.id <- rep(NA, n)
+  
+  for (h in 1:l)
+    y.id[t.id == h] <- s.id[h]
+  
   
   for (g in 1:m) {
     
-    x3[y.id == g] <- v3[g]
-    x4[y.id == g] <- v4[g]
+    x3[y.id == g] <- v1[g]
+    x4[y.id == g] <- v2[g]
     
   }
   
   # transformed predictors
   u1 <- as.numeric(scale((x1 + x2)^2))
   u2 <- as.numeric(scale(cos(2*x2)))
-  w3 <- as.numeric(scale(sin(2*v3)))
-  w4 <- as.numeric(scale(-abs(v3 + v4)))
+  v3 <- as.numeric(scale(sin(2*v1)))
+  v4 <- as.numeric(scale(-abs(v1 + v2)))
   
   u3 <- u4 <- rep(NA, n)
   
   for (g in 1:m) {
     
-    u3[y.id == g] <- w3[g]
-    u4[y.id == g] <- w4[g]
+    u3[y.id == g] <- v3[g]
+    u4[y.id == g] <- v4[g]
     
   }
   
   x <- cbind(x1, x2, x3, x4)
   u <- cbind(u1, u2, u3, u4)
+  w <- cbind(w1, w2)
   
   if(gps_scen == "b"){
-    v <- aggregate(u, by = list(y.id), mean)[,2:(ncol(u) + 1)]
+    covars <- aggregate(u, by = list(y.id), mean)[,2:(ncol(u) + 1)]
   } else {
-    v <- aggregate(x, by = list(y.id), mean)[,2:(ncol(x) + 1)]
+    covars <- aggregate(x, by = list(y.id), mean)[,2:(ncol(x) + 1)]
   }
   
-  if (covars == TRUE)
-    mu_gps <- 1 + 0.5*v[,1] - 0.5*v[,2] - 0.5*v[,3] + 0.5*v[,4]
-  else 
-    mu_gps <- 1
+  mu_gps <- 1 + 0.5*covars[,1] - 0.5*covars[,2] - 0.5*covars[,3] + 0.5*covars[,4]
   
   a <- rnorm(m, mu_gps, sig_gps)
-  a_y <- rep(NA, n)
   a_s <- rep(NA, l)
   
-  for (g in 1:m) {
-    
-    a_y[y.id == g] <- a[g]
+  for (g in 1:m)
     a_s[s.id == g] <- a[g]
     
-  }
-  
   s <- rnorm(l, a_s, sig_epe)
+  s_y <- rep(NA, n)
+  
+  for (h in 1:l)
+    s_y[t.id == h] <- a_s[h]
+  
+  t <- rnorm(n, s_y, sig_berk)
+  
+  mu_pred <- s + 0.25*s*w1 - 0.25*s*w2
+  shat <- rnorm(l, mu_pred, sig_pred)
   
   if (out_scen == "b") {
-    mu_out <- -0.75*u1 - 0.25*u2 + 0.25*u3 + 0.75*u4 + a_y*(1 + 0.5*u1 - 0.5*u2 + 0.5*u3 - 0.5*u4)
+    mu_out <- -0.75*u1 - 0.25*u2 + 0.25*u3 + 0.75*u4 + t*(1 + 0.5*u1 - 0.5*u2 + 0.5*u3 - 0.5*u4)
   } else { # y_scen == "b"
-    mu_out <- -0.75*x1 - 0.25*x2 + 0.25*x3 + 0.75*x4 + a_y*(1 + 0.5*x1 - 0.5*x2 + 0.5*x3 - 0.5*x4)
+    mu_out <- -0.75*x1 - 0.25*x2 + 0.25*x3 + 0.75*x4 + t*(1 + 0.5*x1 - 0.5*x2 + 0.5*x3 - 0.5*x4)
   }
   
   y <- rbinom(n, 1, plogis(mu_out))
   
   # create simulation dataset
-  sim <- list(s = s, y = y, x = x, s.id = s.id, y.id = y.id, a = a, a_y = a_y)
-  
-  return(sim)
-  
-}
-
-gen_simex_data <- function(m, n, sig_epe = 2, sig_gps = 1) {
-  
-  if (m > n)
-    stop("you stop that, you!")
-  
-  # covariates
-  u1 <- stats::rnorm(m, 0, 1)
-  u2 <- stats::rnorm(m, 0, 1)
-  x1 <- stats::rnorm(n, 0, 1)
-  x2 <- stats::rnorm(n, 0, 1)
-  x3 <- x4 <- rep(NA, n)
-  
-  y.id <- sample(1:m, n, replace = TRUE)
-  id <- 1:m
-  size <- unname(table(y.id))
-  
-  for (g in 1:m) {
-    
-    x3[y.id == g] <- u1[g]
-    x4[y.id == g] <- u2[g]
-    
-  }
-  
-  x <- cbind(x1, x2, x3, x4)
-  v <- aggregate(x, by = list(y.id), mean)[,2:(ncol(x) + 1)]
-
-  mu_gps <- 1 + 0.5*v[,1] - 0.5*v[,2] - 0.5*v[,3] + 0.5*v[,4]
-  a <- aggregate(rnorm(n, mu_gps, sig_gps), by = list(y.id), mean)[,2]
-  z <- rnorm(m, a, sig_epe/sqrt(unname(table(y.id))))
-  a_y <- rep(NA, n)
-  z_y <- rep(NA, n)
-  
-  for (g in 1:m){
-    a_y[y.id == g] <- a[g]
-    z_y[y.id == g] <- z[g]
-  }
-  
-  mu_out <- -0.75*x1 - 0.25*x2 + 0.25*x3 + 0.75*x4 + a_y*(1 + 0.5*x1 - 0.5*x2 + 0.5*x3 - 0.5*x4)
-  y <- rbinom(n, 1, plogis(mu_out))
-  x <- cbind(x1, x2, x3, x4)
-  
-  # create simulation dataset
-  sim <- list(a = a, z = z, y = y, x = x, id = id, y.id = y.id, a_y = a_y, z_y = z_y)
+  sim <- list(s = s, shat = shat, t = t, y = y, x = x, w = w, s.id = s.id, y.id = y.id, a = a)
   
   return(sim)
   
