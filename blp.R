@@ -1,20 +1,21 @@
 
-blp <- function(s, s.id, y.id, x = NULL) {
+blp <- function(s, s.id, x = NULL) {
   
-  # remove any s.id not present in y.id
-  id <- unique(y.id)[order(unique(y.id))]
-  su.id <- unique(s.id)[order(unique(s.id))]
-  su.id <- su.id[su.id %in% id]
+  wts <- c(unname(table(s.id)))
   
-  if(length(su.id) != length(id))
-    stop("some observations in y.id are not represented by measurements of s.id. There is no exposure data for these entries.")
+  # initialize exposures
+  z_tmp <- aggregate(s, by = list(s.id), mean)
+  id <- z_tmp[,1]
+  z <- z_tmp[,2]
   
-  if(!all(su.id == id))
-    stop("some observations in y.id are not represented by measurements of s.id. There is no exposure data for these entries.")
+  # dimensions
+  l <- length(s.id)
+  m <- length(id)
   
-  s <- s[s.id %in% id]
-  s.id <- s.id[s.id %in% id]
-  wts <- table(s.id)
+  z_s <- rep(NA, length(s.id))
+  
+  for (g in id)
+    z_s[s.id == g] <- z[id == g]
   
   if (!is.null(x)) {
     
@@ -23,18 +24,6 @@ blp <- function(s, s.id, y.id, x = NULL) {
     p <- ncol(design)
     
   }
-  
-  # dimensions
-  l <- length(s.id)
-  m <- length(id)
-  n <- length(y.id)
-
-  # initialize exposures
-  z <- aggregate(s, by = list(s.id), mean)[,2]
-  z_s <- rep(NA, length(s.id))
-  
-  for (g in id)
-    z_s[s.id == g] <- z[id == g]
   
   if (!is.null(x)) {
     
@@ -88,6 +77,67 @@ blp <- function(s, s.id, y.id, x = NULL) {
     
   }
     
-  return(list(a = a, a_y = a_y, a_s = a_s))
+  return(list(a = a, sigma2 = sigma2, a_s = a_s))
+  
+}
+
+agg <- function(x, id) {
+  
+  n <- nrow(x)
+  p <- ncol(x)
+  
+  # initialize exposures
+  z_tmp <- aggregate(x, by = list(id), mean)
+  idx <- z_tmp[,1]
+  z <- as.matrix(z_tmp[,2:(ncol(x)+1)])
+  z_y <- matrix(NA, nrow = n, ncol = p)
+  m <- nrow(z)
+  wts <- c(unname(table(id)))
+  
+  for (g in idx)
+    z_y[id == g,] <- z[idx == g,]
+  
+  mu_z <- colSums(wts*z)/n
+  nu <- n - sum(wts^2)/n
+  
+  Omega.tmp <- matrix(0, nrow = p, ncol = p)
+  Sigma.tmp <- matrix(0, nrow = p, ncol = p)
+  
+  for (i in 1:n)
+    Omega.tmp <- Omega.tmp + tcrossprod(x[i,] - z_y[i,])
+  
+  for (j in 1:m)
+    Sigma.tmp <- Sigma.tmp + wts[j]*tcrossprod(z[j,] - mu_z)
+  
+  Omega <- Omega.tmp/(n - m) 
+  Sigma <- (Sigma.tmp - (m - 1)*Omega)/nu
+  
+  a <- t(sapply(1:m, function(j, ...) {
+    
+    out <- c(mu_z + Sigma %*% solve(Sigma + Omega/wts[j])%*%c(z[j,] - mu_z))
+    return(out)
+    
+  }))
+  
+  colnames(a) <- colnames(x)
+  agg <- data.frame(id = idx, a = a)
+  
+  return(agg)
+  
+}
+
+pred <- function(s, shat, w, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "SL.gam")){
+  
+  # set up evaluation points & matrices for predictions
+  ws <- data.frame(w, shat)
+  ws.tmp <- data.frame(ws[!is.na(s),])
+  s.tmp <- s[!is.na(s)]
+  colnames(ws.tmp) <- colnames(ws) <- c(colnames(w), "expos")
+  
+  # estimate nuisance outcome model with SuperLearner
+  mumod <- SuperLearner(Y = s.tmp, X = ws.tmp, SL.library = sl.lib)
+  stilde <- c(predict(mumod, newdata = ws)$pred)
+  
+  return(stilde)
   
 }

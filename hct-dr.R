@@ -119,11 +119,12 @@ np_est <- function(a, y, x, y.id, sl.lib = c("SL.mean", "SL.glm", "SL.glm.intera
   # estimate nuisance GPS functions via super learner
   pimod <- glm(a.agg ~ x.agg, weights = wts, family = gaussian())
   pimod.vals <- c(pimod$fitted.values)
+  # pi2mod <- SuperLearner(Y = c(a.agg - pimod.vals)^2, X = x.agg, SL.library = "SL.mean", family = gaussian())
   pi2mod.vals <- sigma(pimod)^2
   
   # exposure models
   pihat <- dnorm(a.agg, pimod.vals, sqrt(pi2mod.vals))
-  phat <- sapply(a.agg, function(a.tmp, ...) weighted.mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))), w = wts)
+  phat <- sapply(a.agg, function(a.tmp, ...) mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
   
   # predict marginal outcomes given a.vals (or a.agg)
   muhat.vals <- sapply(a.agg, function(a.tmp, ...) {
