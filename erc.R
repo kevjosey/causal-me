@@ -2,9 +2,10 @@
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
 erc <- function(a, y, x, wts,
                 a.vals = seq(min(a), max(a), length.out = 20), 
-                span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10) {	
+                span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10,
+                sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {	
   
-  m <- length(a)
+  n <- length(a)
   
   wrap <- np_est(y = y, a = a, x = x, wts = wts)
   muhat <- wrap$muhat
@@ -12,11 +13,11 @@ erc <- function(a, y, x, wts,
   pihat <- wrap$pihat
   phat <- wrap$phat
   int <- wrap$int
-  psi <- (y - wts*muhat)/(pihat/phat) + mhat
+  psi <- (y/wts - muhat)/(pihat/phat) + mhat
   
   if(is.null(span)) {
     
-    folds <- sample(x = k, size = m, replace = TRUE)
+    folds <- sample(x = k, size = n, replace = TRUE)
     
     cv.mat <- sapply(span.seq, function(h, ...) {
       
@@ -69,11 +70,11 @@ dr_est <- function(newa, a, psi, int, span, se.fit = FALSE) {
   gh <- cbind(1, a.std)
   gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
   b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh)
-  mu <- plogis(b$par[1])
+  mu <- exp(b$par[1])
   
   if (se.fit){
     
-    v.inf <- (psi + int - plogis(c(gh%*%b$par)))^2
+    v.inf <- (psi + int - exp(c(gh%*%b$par)))^2
     sig <- gh.inv %*% t(gh) %*% diag(k.std) %*% diag(v.inf) %*% diag(k.std) %*% gh %*% gh.inv
     return(c(mu = mu, sig = sig[1,1]))
     
@@ -86,7 +87,7 @@ dr_est <- function(newa, a, psi, int, span, se.fit = FALSE) {
 np_est <- function(a, y, x, wts, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {
   
   # set up evaluation points & matrices for predictions
-  m <- nrow(x)
+  n <- nrow(x)
   x <- data.frame(x)
   xa <- data.frame(y = y, a = a, x = x)
   xa.new <- data.frame(a = a, x = x, wts = 1)
@@ -106,7 +107,7 @@ np_est <- function(a, y, x, wts, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interac
   
   # exposure models
   pihat <- dnorm(a, pimod.vals, sqrt(pi2mod.vals))
-  phat <- sapply(a, function(a.tmp, ...) weighted.mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))), w = wts)
+  phat <- sapply(a, function(a.tmp, ...) mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
   
   # predict marginal outcomes given a.vals (or a.agg)
   muhat.mat <- sapply(a, function(a.tmp, ...) {
@@ -119,7 +120,7 @@ np_est <- function(a, y, x, wts, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interac
   
   # aggregate muhat.vals and integrate for influence
   mhat <- colMeans(muhat.mat)
-  mhat.mat <- matrix(rep(mhat, m), byrow = TRUE, nrow = m)
+  mhat.mat <- matrix(rep(mhat, n), byrow = TRUE, nrow = n)
   int <- rowMeans(muhat.mat - mhat.mat)
   
   out <- list(muhat = muhat, mhat = mhat, pihat = pihat, phat = phat,int = int)
