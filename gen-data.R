@@ -30,21 +30,31 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   x2 <- stats::rnorm(n, 0, 1)
   x3 <- stats::rnorm(n, 0, 1)
   x4 <- stats::rnorm(n, 0, 1)
-  w1 <- stats::rnorm(m, 0, 1)
+  w1 <- stats::rnorm(m, 1, 2)
   w2 <- rep(NA, m)
   
   s.id <- sample(1:n, m, replace = TRUE)
   id <- 1:n
   wts <- floor(runif(n, 5, 25))
   
-  for (g in 1:n)
-    w2[s.id == g] <- x4[g] + rnorm(sum(s.id == g), 0, 1)
-  
   # transformed predictors
-  u1 <- as.numeric(scale((x1 + x4)^2))
+  u1 <- as.numeric(scale((x1 + x2)^2))
   u2 <- as.numeric(scale(cos(2*x2)))
-  u3 <- as.numeric(scale(sin(2*x4)))
-  u4 <- as.numeric(scale(-abs(x2 + x3)))
+  u3 <- as.numeric(scale(sin(2*x3)))
+  u4 <- as.numeric(scale(-abs(x3 + x4)))
+  
+  if (gps_scen == "b") {
+    
+    for (g in 1:n)
+      w2[s.id == g] <- u4[g] + rnorm(sum(s.id == g), 0, 1)
+    
+    
+  } else {
+    
+    for (g in 1:n)
+      w2[s.id == g] <- x4[g] + rnorm(sum(s.id == g), 0, 1)
+    
+  }
   
   x <- cbind(x1, x2, x3, x4)
   u <- cbind(u1, u2, u3, u4)
@@ -59,12 +69,16 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
     a_s[s.id == g] <- a[g]
     
   s <- rnorm(m, a_s, sig_agg)
-  star <- s + 0.5*s*w1 + - 0.5*w2 + rnorm(m, 0, sig_pred)
+  # star <- -0.5 + 1.25*s - 0.25*s*w1 + 0.5*w1 -
+  #   0.5*w2 - 0.25*(w1^2) - 0.25*(w2^2) + 
+  #   rnorm(m, 0, sig_pred)
+  
+  star <- rnorm(m, s + 1 + 0.5*w1 - 0.5*w2, sig_pred)
   
   if (out_scen == "b") {
-    mu_out <- -2 - 0.15*u1 - 0.05*u2 + 0.05*u3 + 0.15*u4 + a*(0.3 + 0.1*u1 - 0.1*u2 + 0.1*u3 - 0.1*u4)
+    mu_out <- -2 - 0.3*u1 - 0.1*u2 + 0.1*u3 + 0.3*u4 + a*(0.3 + 0.15*u1 - 0.15*u4)
   } else { # y_scen == "b"
-    mu_out <- -2 - 0.15*x1 - 0.05*x2 + 0.05*x3 + 0.15*x4 + a*(0.3 + 0.1*x1 - 0.1*x2 + 0.1*x3 - 0.1*x4)
+    mu_out <- -2 - 0.3*x1 - 0.1*x2 + 0.1*x3 + 0.3*x4 + a*(0.3 + 0.15*x1 - 0.15*x4)
   }
   
   y <- rpois(n, exp(mu_out + log(wts)))
@@ -145,10 +159,10 @@ gen_dr_data <- function(n, m, sig_gps = 1, gps_scen = c("a", "b"), out_scen = c(
 predict_example <- function(a.vals, x, id, out_scen = c("a", "b")){
   
   # transformed predictors
-  u1 <- as.numeric(scale((x[,1] + x[,4])^2))
+  u1 <- as.numeric(scale((x[,1] + x[,1])^2))
   u2 <- as.numeric(scale(cos(2*x[,2])))
-  u3 <- as.numeric(scale(sin(2*x[,4])))
-  u4 <- as.numeric(scale(-abs(x[,2] + x[,4])))
+  u3 <- as.numeric(scale(sin(2*x[,3])))
+  u4 <- as.numeric(scale(-abs(x[,3] + x[,4])))
   
   u <- cbind(u1, u2, u3, u4)
   out <- rep(NA, length(a.vals))
@@ -156,11 +170,11 @@ predict_example <- function(a.vals, x, id, out_scen = c("a", "b")){
   for(i in 1:length(a.vals)) {
     
     if (out_scen == "b") {
-      mu_out <- exp(-2 + u %*% c(-0.15,-0.05,0.05,0.15) + 
-                      rep(a.vals[i],nrow(x))*(0.3 + u %*% c(0.1, -0.1, 0.1, -0.1)))
+      mu_out <- exp(-2 + u %*% c(-0.3,-0.1,0.1,0.3) + 
+                      rep(a.vals[i],nrow(u))*(0.3 + u %*% c(0.15, 0, 0, -0.1)))
     } else { # out_scen == "a"
-      mu_out <- exp(-2 + x %*% c(-0.15,-0.05,0.05,0.15) + 
-                      rep(a.vals[i],nrow(x))*(0.3 + x %*% c(0.1, -0.1, 0.1, -0.1)))
+      mu_out <- exp(-2 + x %*% c(-0.3,-0.1,0.1,0.3) + 
+                      rep(a.vals[i],nrow(x))*(0.3 + x %*% c(0.15, 0, 0, -0.15)))
     }
     
     out[i] <- mean(mu_out)

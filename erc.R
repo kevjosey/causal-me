@@ -7,7 +7,7 @@ erc <- function(a, y, x, wts,
   
   n <- length(a)
   
-  wrap <- np_est(y = y, a = a, x = x, wts = wts)
+  wrap <- np_est(y = y, a = a, x = x, wts = wts, sl.lib = sl.lib)
   muhat <- wrap$muhat
   mhat <- wrap$mhat
   pihat <- wrap$pihat
