@@ -48,19 +48,21 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
     for (g in 1:n)
       w2[s.id == g] <- u4[g] + rnorm(sum(s.id == g), 0, 1)
     
+    mu_gps <- 1 + 0.5*u1 - 0.5*u2 - 0.5*u3 + 0.5*u4
+    
     
   } else {
     
     for (g in 1:n)
       w2[s.id == g] <- x4[g] + rnorm(sum(s.id == g), 0, 1)
     
+    mu_gps <- 1 + 0.5*x1 - 0.5*x2 - 0.5*x3 + 0.5*x4
+    
   }
   
   x <- cbind(x1, x2, x3, x4)
   u <- cbind(u1, u2, u3, u4)
   w <- cbind(w1, w2)
-  
-  mu_gps <- 1 + 0.5*x1 - 0.5*x2 - 0.5*x3 + 0.5*x4
   
   a <- rnorm(n, mu_gps, sig_gps)
   a_s <- rep(NA, m)
@@ -69,11 +71,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
     a_s[s.id == g] <- a[g]
     
   s <- rnorm(m, a_s, sig_agg)
-  # star <- -0.5 + 1.25*s - 0.25*s*w1 + 0.5*w1 -
-  #   0.5*w2 - 0.25*(w1^2) - 0.25*(w2^2) + 
-  #   rnorm(m, 0, sig_pred)
-  
-  star <- rnorm(m, s + 1 + 0.5*w1 - 0.5*w2, sig_pred)
+  star <- rnorm(m, 1.5*s - 0.5 + 0.5*w1 - 0.5*w2, sig_pred)
   
   if (out_scen == "b") {
     mu_out <- -2 - 0.3*u1 - 0.1*u2 + 0.1*u3 + 0.3*u4 + a*(0.3 + 0.15*u1 - 0.15*u4)
@@ -171,7 +169,7 @@ predict_example <- function(a.vals, x, id, out_scen = c("a", "b")){
     
     if (out_scen == "b") {
       mu_out <- exp(-2 + u %*% c(-0.3,-0.1,0.1,0.3) + 
-                      rep(a.vals[i],nrow(u))*(0.3 + u %*% c(0.15, 0, 0, -0.1)))
+                      rep(a.vals[i],nrow(u))*(0.3 + u %*% c(0.15, 0, 0, -0.15)))
     } else { # out_scen == "a"
       mu_out <- exp(-2 + x %*% c(-0.3,-0.1,0.1,0.3) + 
                       rep(a.vals[i],nrow(x))*(0.3 + x %*% c(0.15, 0, 0, -0.15)))

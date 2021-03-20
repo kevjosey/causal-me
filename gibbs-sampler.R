@@ -79,6 +79,7 @@ gibbs_dr <- function(s, star, s.id, id, w = NULL, x = NULL,
     sig <- sqrt((1/tau2[j - 1] + 1/omega2[j - 1])^(-1))
     hat <- (sig^2)*(a_s/tau2[j - 1] + w%*%alpha[j - 1,]/omega2[j - 1])
     t <- smat[j,] <- rnorm(m, hat, sig)
+    t[!is.na(s)] <- s[!is.na(s)]
     
     # set up evaluation points & matrices for predictions
 

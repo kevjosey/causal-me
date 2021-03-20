@@ -21,26 +21,20 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   # gen_data arguments
   gps_scen <- scenario$gps_scen
   out_scen <- scenario$out_scen
-  l <- scenario$l
   m <- scenario$m
   n <- scenario$n
-  
-  # for now these are fixed
-  sig_epe <- sqrt(2)
-  sig_gps <- 1
+  prob <- scenario$prob
+  sig_agg <- scenario$sig_agg
+  sig_gps <- scenario$sig_gps
+  sig_pred <- scenario$sig_pred
   
   # mcmc/prior arguments
-  shape <- 1e-5 # gamma shape
-  rate <- 1e-5 # gamma rate
+  shape <- 1e-3 # gamma shape
+  rate <- 1e-3 # gamma rate
   scale <- 1e5 # normal scale
   thin <- 20
-  n.adapt <- 1000
+  n.adapt <- 100
   n.iter <- 1000
-  
-  # simex arguments
-  n.boot <- 50
-  degree <- 2
-  lambda <- seq(0.1, 2.1, by = 0.2)
   
   # initialize output
   est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
@@ -51,92 +45,63 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     print(i)
     
     # generate data
-    dat <- gen_data(l = l, m = m, n = n, 
-                    sig_gps = sig_gps, sig_epe = sig_epe, 
-                    gps_scen = gps_scen, out_scen = out_scen)
+    dat <- gen_data(m = m, n = n, sig_gps = sig_gps, sig_agg = sig_agg,
+                    sig_pred = sig_pred, out_scen = out_scen, gps_scen = gps_scen)
     
+    # zipcode index
     s.id <- dat$s.id
-    y.id <- dat$y.id
+    id <- dat$id
+    wts <- dat$wts
+    
+    # data
     y <- dat$y
-    s <- dat$s
     x <- dat$x
     a <- dat$a
+    w <- dat$w
+    star <- dat$star
+    
+    # validation subset
+    s <- dat$s*rbinom(m, 1, prob)
+    s[s == 0] <- NA
     
     # remove any clusters w/o exposure data (random process)
-    ungroup <- which(!(1:m %in% unique(s.id)))
-    if (length(ungroup)!= 0) {
-      y <- dat$y[!(y.id %in% ungroup)]
-      x <- dat$x[!(y.id %in% ungroup),]
-      y.id <- dat$y.id[!(y.id %in% ungroup)]
+    keep <- which((id %in% unique(s.id)))
+    if (length(keep)!= 0) {
+      y <- dat$y[(id %in% keep)]
+      x <- dat$x[(id %in% keep),]
+      a <- dat$a[(id %in% keep)]
+      wts <- dat$wts[(id %in% keep)]
+      id <- dat$id[(id %in% keep)]
     }
     
-    id <- unique(y.id)[order(unique(y.id))]
+    stilde <- pred(s = s, star = star, w = w, sl.lib = sl.lib)
     
-    fmla.s <- formula("~ w1 + w2 + w3 + w4")
-    fmla.a <- formula("~ x1 + x2 + x3 + x4")
+    a_naive_wo <- aggregate(star, by = list(s.id), mean)
+    a_naive_w <- aggregate(stilde, by = list(s.id), mean)
+    a_wo <- blp(s = stilde, s.id = s.id) 
+    a_w <- blp(s = stilde, s.id = s.id)
     
-    # estimate parameters and generate latent variable
-    mcmc <- gibbs_dr(s = s, y = y, x = x, s.id = s.id, x.id = y.id, 
-                    fmla.a = fmla.a, n.iter = n.iter, n.adapt = n.adapt,
-                    shape = shape, rate = rate, scale = scale, thin = thin)
+    blp_naive_wo <- erc(y = y, a = a_naive_wo, x = x, wts = wts, a.vals = a.vals, sl.lib = sl.lib, span = span)
+    blp_naive_w <- erc(y = y, a = a_naive_w, x = x, wts = wts, a.vals = a.vals, sl.lib = sl.lib, span = span)
+    blp_wo <- erc(y = y, a = a_wo, x = x, wts = wts, a.vals = a.vals, sl.lib = sl.lib, span = span)
+    blp_w <- erc(y = y, a = a_w, x = x, wts = wts, a.vals = a.vals, sl.lib = sl.lib, span = span)
     
+    est[i,1,] <- predict_example(a = a.vals, x = x, id = id, out_scen = out_scen)
+    est[i,2,] <- blp_naive_wo$estimate
+    est[i,3,] <- blp_naive_w$estimate
+    est[i,4,] <- blp_naive_wo$estimate
+    est[i,5,] <- colMeans(gibbs_est_x)
     
-    # single imputation
-    si <- hct_dr(y = y, a = colMeans(mcmc$amat_y), x = x, y.id = y.id, a.vals = a.vals, k = 5, 
-                 beta = colMeans(mcmc$beta), sigma2 = mean(mcmc$sigma2), sl.lib = sl.lib)
-    
-    si_est <- si$estimate
-    si_var <- si$variance
-
-    # multiple imputation
-    a_list <- split(mcmc$amat_y, seq(nrow(mcmc$amat_y)))
-    
-    mi <- mclapply.hack(1:length(a_list), function(k, a_list, y, xmat, y.id, beta, sigma2, a.vals, sl.lib){
-  
-      hct_dr(y = y, a = a_list[[k]], x = xmat, y.id = y.id, a.vals = a.vals, k = 5,
-             beta = beta[k,], sigma2 = sigma2[k], sl.lib = sl.lib)
-  
-    }, y = y, a_list = a_list, xmat = x, y.id = y.id, a.vals = a.vals,
-    beta = mcmc$beta, sigma2 = mcmc$sigma2, sl.lib = sl.lib, mc.cores = 2)
-    
-    est_tmp <- matrix(unlist(lapply(mi, function(x) x$estimate)), ncol = length(mi))
-    var_mat <- matrix(unlist(lapply(mi, function(x) x$variance)), ncol = length(mi))
-    
-    mi_est <- rowMeans(est_tmp)
-    est_mat <- matrix(rep(mi_est, length(mi)), nrow = length(a.vals), ncol = length(mi))
-    mi_var <- rowMeans(var_mat) + (1 + 1/length(mi))*rowSums((est_tmp - est_mat)^2)/(length(mi) - 1)
-
-    # naive approach
-    z <- aggregate(s, by = list(s.id), mean)[,2]
-    id <- unique(s.id)[order(unique(s.id))]
-    z_y <- rep(NA, length(y.id))
-    
-    for (g in id)
-      z_y[y.id == g] <- z[id == g]
-    
-    naive <- hct_dr(y = y, a = z_y, x = x, y.id = y.id, a.vals = a.vals, k = 5, sl.lib = sl.lib)
-    
-    naive_est <- naive$estimate
-    naive_var <- naive$variance
-    
-    # simulation extrapolation
-    simex <- simex_dr(z = z, y = y, x = x, id = id, y.id = y.id, 
-                      sigma = sqrt(mean(mcmc$tau2)/table(s.id)), n.boot = n.boot, degree = degree,
-                      lambda = lambda, a.vals = a.vals, k = 5, sl.lib = sl.lib, mc.cores = 2)
-    
-    simex_est <- simex$estimate
-    simex_var <- simex$variance
-    
-    # combine output
-    est[i,1,] <- predict_example(a.vals = a.vals, x = x, y.id = y.id, out_scen = out_scen)
-    est[i,2:5,] <- rbind(naive_est, si_est, simex_est, mi_est)
-    se[i,1:4,] <- sqrt(rbind(naive_var, si_var, simex_var, mi_var))
+    se[i,1,] <- sqrt(blp_w$variance)
+    se[i,2,] <- sqrt(var_w)
+    se[i,3,] <- sqrt(blp_x$variance)
+    se[i,4,] <- sqrt(var_x)
     
   }
 
   out_est <- colMeans(est, na.rm = T)
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("TRUE SATE", "NAIVE", "SI", "SIMEX", "MI")
+  rownames(out_est) <- c("TRUE SATE", "NAIVE WO", "BLP W", "SIMEX", "MI")
   
   out_se <- colMeans(se, na.rm = T)
   colnames(out_se) <- a.vals

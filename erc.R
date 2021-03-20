@@ -94,9 +94,10 @@ np_est <- function(a, y, x, wts, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interac
   colnames(xa.new) <- c(colnames(xa)[-1], "wts")
   
   # estimate nuisance outcome model with SuperLearner
-  # mumod <- SuperLearner(Y = y, X = x, family = poisson(), SL.library = sl.lib)
-  mumod <- glm(y ~ .^2, offset = log(c(wts)), family = poisson(log), data = xa)
-  muhat <- predict(mumod, type = "response", newdata = xa.new)
+  mumod <- SuperLearner(Y = y/wts, X = xa, family = quasipoisson(), SL.library = sl.lib)
+  muhat <- c(mumod$SL.predict)
+  # mumod <- glm(y ~ .^2, offset = log(c(wts)), family = poisson(log), data = xa)
+  # muhat <- predict(mumod, type = "response", newdata = xa.new)
   
   # estimate nuisance GPS functions via super learner
   pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
@@ -114,7 +115,7 @@ np_est <- function(a, y, x, wts, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interac
     
     xa.tmp <- data.frame(a = a.tmp, x = x, wts = 1)
     colnames(xa.tmp) <- c(colnames(xa)[-1], "wts") 
-    return(c(predict(mumod, newdata = xa.tmp, type = "response")))
+    return(c(predict(mumod, newdata = xa.tmp)$pred))
     
   })
   

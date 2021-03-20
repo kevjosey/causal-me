@@ -77,6 +77,7 @@ pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction
   # estimate nuisance outcome model with SuperLearner
   mumod <- SuperLearner(Y = s.tmp, X = ws.tmp, SL.library = sl.lib)
   stilde <- c(predict(mumod, newdata = ws)$pred)
+  stilde[!is.na(s)] <- s[!is.na(s)]
   
   return(stilde)
   

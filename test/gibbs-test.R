@@ -17,13 +17,13 @@ source("D:/Github/causal-me/blp.R")
 source("D:/Github/causal-me/erc.R")
 
 # simulation arguments
-n.sim <- 100
+n.sim <- 1000
 sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
-out_scen <- "a"
 gps_scen <- "a"
-span <- NULL
+out_scen <- "a"
+span <- 0.5
 
 # gen data arguments
 m <- 1000 # c(500, 800)
@@ -36,11 +36,11 @@ n.adapt = 100
 
 # dr arguments
 a.vals <- seq(-1, 3, by = 0.25)
-sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction")
+sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam")
 
 # initialize output
-est <- array(NA, dim = c(n.sim, 3, length(a.vals)))
-se <- array(NA, dim = c(n.sim, 2, length(a.vals)))
+est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
+se <- array(NA, dim = c(n.sim, 4, length(a.vals)))
 
 for (i in 1:n.sim){
   
@@ -78,46 +78,66 @@ for (i in 1:n.sim){
   
   stilde <- pred(s = s, star = star, w = w, sl.lib = sl.lib)
   a_w <- blp(s = stilde, s.id = s.id)
+  a_x <- blp(s = stilde, s.id = s.id, x = x)
   
   w_new <- model.matrix(~ 0 + star*w)
   gibbs_w <- gibbs_dr(s = s, star = star, s.id = s.id, id = id, w = w_new,
+                      n.iter = n.iter, n.adapt = n.adapt, thin = thin)
+  
+  gibbs_x <- gibbs_dr(s = s, star = star, s.id = s.id, id = id, w = w_new, x = x,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin)
 
   # blp w/ pred
   
   blp_w <- erc(y = y, a = a_w, x = x, wts = wts, a.vals = a.vals, sl.lib = sl.lib, span = span)
-
+  blp_x <- erc(y = y, a = a_x, x = x, wts = wts, a.vals = a.vals, sl.lib = sl.lib, span = span)
+  
   # gibbs w/ pred
   
-  a_list <- split(gibbs_w$amat, seq(nrow(gibbs_w$amat)))
+  a_list_w <- split(gibbs_w$amat, seq(nrow(gibbs_w$amat)))
+  a_list_x <- split(gibbs_x$amat, seq(nrow(gibbs_x$amat)))
   
-  out_w <- mclapply.hack(1:length(a_list), function(k, ...){
+  out_w <- mclapply.hack(1:length(a_list_x), function(k, ...){
     
-    erc(y = y, a = a_list[[k]], x = x, wts = wts, a.vals = a.vals, sl.lib = sl.lib, span = span)
+    erc(y = y, a = a_list_w[[k]], x = x, wts = wts, a.vals = a.vals, sl.lib = sl.lib, span = span)
+    
+  }, mc.cores = 3)
+  
+  out_x <- mclapply.hack(1:length(a_list_x), function(k, ...){
+    
+    erc(y = y, a = a_list_x[[k]], x = x, wts = wts, a.vals = a.vals, sl.lib = sl.lib, span = span)
     
   }, mc.cores = 3)
   
   gibbs_est_w <- do.call(rbind, lapply(out_w, function(o) o$estimate))
   gibbs_var_w <- do.call(rbind, lapply(out_w, function(o) o$variance))
   
+  gibbs_est_x <- do.call(rbind, lapply(out_x, function(o) o$estimate))
+  gibbs_var_x <- do.call(rbind, lapply(out_x, function(o) o$variance))
+  
   # estimates
   
   est[i,1,] <- predict_example(a = a.vals, x = x, id = id, out_scen = out_scen)
   est[i,2,] <- blp_w$estimate
   est[i,3,] <- colMeans(gibbs_est_w)
+  est[i,4,] <- blp_x$estimate
+  est[i,5,] <- colMeans(gibbs_est_x)
 
   #standard error
   
   var_w <- colMeans(gibbs_var_w) + (1 + 1/nrow(gibbs_est_w))*apply(gibbs_est_w, 2, var)
-
+  var_x <- colMeans(gibbs_var_x) + (1 + 1/nrow(gibbs_est_x))*apply(gibbs_est_x, 2, var)
+  
   se[i,1,] <- sqrt(blp_w$variance)
   se[i,2,] <- sqrt(var_w)
+  se[i,3,] <- sqrt(blp_x$variance)
+  se[i,4,] <- sqrt(var_x)
   
 }
 
 out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals
-rownames(out_est) <- c("SAMPLE ERC", "BLP", "Gibbs")
+rownames(out_est) <- c("SAMPLE ERC","BLP W", "Gibbs W", "BLP X", "Gibbs X")
 
 cp_blp_w <- sapply(1:n.sim, function(i,...)
   as.numeric((est[i,2,] - 1.96*se[i,1,]) < est[i,1,] & (est[i,2,] + 1.96*se[i,1,]) > est[i,1,]))
@@ -125,9 +145,16 @@ cp_blp_w <- sapply(1:n.sim, function(i,...)
 cp_gibbs_w <- sapply(1:n.sim, function(i,...)
   as.numeric((est[i,3,] - 1.96*se[i,2,]) < est[i,1,] & (est[i,3,] + 1.96*se[i,2,]) > est[i,1,]))
 
-out_cp <- rbind(rowMeans(cp_blp_w, na.rm = T), rowMeans(cp_gibbs_w, na.rm = T))
+cp_blp_x <- sapply(1:n.sim, function(i,...)
+  as.numeric((est[i,4,] - 1.96*se[i,3,]) < est[i,1,] & (est[i,4,] + 1.96*se[i,3,]) > est[i,1,]))
+
+cp_gibbs_x <- sapply(1:n.sim, function(i,...)
+  as.numeric((est[i,5,] - 1.96*se[i,4,]) < est[i,1,] & (est[i,5,] + 1.96*se[i,4,]) > est[i,1,]))
+
+out_cp <- rbind(rowMeans(cp_blp_w, na.rm = T), rowMeans(cp_gibbs_w, na.rm = T),
+                rowMeans(cp_blp_x, na.rm = T), rowMeans(cp_gibbs_x, na.rm = T))
 colnames(out_cp) <- a.vals
-rownames(out_cp) <- c("BLP", "Gibbs")
+rownames(out_cp) <- c("BLP W", "Gibbs W", "BLP X", "Gibbs X")
 
 save(out_est, file = "D:/Github/causal-me/output/dr_rslt_a_a.RData")
 save(out_cp, file = "D:/Github/causal-me/output/cp_rslt_a_a.RData")
@@ -137,8 +164,10 @@ plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", ylim = c(0.1,0.5))
 lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = "red", lwd = 2, lty = 2)
 lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "blue", lwd = 2, lty = 2)
+lines(a.vals, colMeans(est, na.rm = T)[4,], type = "l", col = "red", lwd = 2, lty = 3)
+lines(a.vals, colMeans(est, na.rm = T)[5,], type = "l", col = "blue", lwd = 2, lty = 3)
 
-legend(-1, 0.5, legend=c("Sample ERC", "Single Imputation", "Multiple Imputation"),
-       col=c("darkgreen", "red", "blue"),
-       lty = c(1,2,2), lwd=2, cex=0.8)
+legend(-1, 0.5, legend=c("Sample ERC", "Single Imputation", "Multiple Imputation", "Without Covariates", "With Covariates"),
+       col=c("darkgreen", "red", "blue", "black", "black"),
+       lty = c(1,1,1,2,3), lwd=2, cex=0.8)
 dev.off()
