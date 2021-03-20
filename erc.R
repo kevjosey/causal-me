@@ -1,19 +1,19 @@
 
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
-erc <- function(a, y, x, wts,
+erc <- function(a, y, x, family = poisson(), offset = rep(0, length(a)),
                 a.vals = seq(min(a), max(a), length.out = 20), 
                 span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10,
                 sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {	
   
   n <- length(a)
   
-  wrap <- np_est(y = y, a = a, x = x, wts = wts, sl.lib = sl.lib)
+  wrap <- np_est(y = y, a = a, x = x, offset = offset, sl.lib = sl.lib)
   muhat <- wrap$muhat
   mhat <- wrap$mhat
   pihat <- wrap$pihat
   phat <- wrap$phat
   int <- wrap$int
-  psi <- (y/wts - muhat)/(pihat/phat) + mhat
+  psi <- (y/offset - muhat)/(pihat/phat) + mhat
   
   if(is.null(span)) {
     
@@ -84,19 +84,38 @@ dr_est <- function(newa, a, psi, int, span, se.fit = FALSE) {
 }
 
 # Nonparametric estimation
-np_est <- function(a, y, x, wts, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {
+np_est <- function(a, y, x, deg.gam = 2, family = poisson(), offset = rep(0, length(a)),
+                   sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {
+  
   
   # set up evaluation points & matrices for predictions
   n <- nrow(x)
   x <- data.frame(x)
-  xa <- data.frame(y = y, a = a, x = x)
-  xa.new <- data.frame(a = a, x = x, wts = 1)
-  colnames(xa.new) <- c(colnames(xa)[-1], "wts")
+  xa <- data.frame(a = a, x = x, offset = offset)
+  xa.new <- data.frame(a = a, x = x, offset = 0)
+  colnames(xa.new) <- colnames(xa)
+  
+  cts.x <- apply(xa, 2, function(x) (length(unique(x)) > 4))
+  if (sum(!cts.x) > 0) {
+    gam.model <- as.formula(paste("y~", paste(paste("s(", colnames(xa[, cts.x, drop = FALSE]), ",", deg.gam, 
+                                                    ")", sep = ""), collapse = "+"), "+", 
+                                  paste(colnames(x[, !cts.x, drop = FALSE]), collapse = "+")))
+  } else {
+    gam.model <- as.formula(paste("y~", paste(paste("s(", colnames(xa[, cts.x, drop = FALSE]),
+                                                    ",", deg.gam, 
+                                                    ")", sep = ""), collapse = "+")))
+  }
+  
+  if (sum(!cts.x) == length(cts.x)) {
+    gam.model <- as.formula(paste("Y~", paste(colnames(xa), collapse = "+"), sep = ""))
+  }
   
   # estimate nuisance outcome model with SuperLearner
-  mumod <- SuperLearner(Y = y/wts, X = xa, family = quasipoisson(), SL.library = sl.lib)
-  muhat <- c(mumod$SL.predict)
-  # mumod <- glm(y ~ .^2, offset = log(c(wts)), family = poisson(log), data = xa)
+  mumod <- gam::gam(gam.model, data = xa, family = family, 
+                    control = gam::gam.control(maxit = 50, bf.maxit = 50), 
+                    offset = offset)
+  muhat <- predict(mumod, newdata = xa.new, type = "response")
+  # mumod <- glm(y ~ .^2, offset = offset, family = poisson(log), data = xa)
   # muhat <- predict(mumod, type = "response", newdata = xa.new)
   
   # estimate nuisance GPS functions via super learner
@@ -113,9 +132,9 @@ np_est <- function(a, y, x, wts, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interac
   # predict marginal outcomes given a.vals (or a.agg)
   muhat.mat <- sapply(a, function(a.tmp, ...) {
     
-    xa.tmp <- data.frame(a = a.tmp, x = x, wts = 1)
-    colnames(xa.tmp) <- c(colnames(xa)[-1], "wts") 
-    return(c(predict(mumod, newdata = xa.tmp)$pred))
+    xa.tmp <- data.frame(a = a.tmp, x = x, offset = 0)
+    colnames(xa.tmp) <- colnames(xa) 
+    return(c(predict(mumod, newdata = xa.tmp, tupe = "response")))
     
   })
   
@@ -136,3 +155,7 @@ opt_fun <- function(par, k.std, psi, gh) {
   sum(k.std*(psi - exp(c(gh %*% par)))^2)
   
 }
+
+fun <- function(y) {substitute(y)}
+
+fun(y = n)
