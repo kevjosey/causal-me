@@ -1,6 +1,6 @@
 
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
-erc <- function(a, y, x, family = poisson(), offset = rep(0, length(a)),
+erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
                 a.vals = seq(min(a), max(a), length.out = 20), 
                 span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10,
                 sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {	
@@ -13,7 +13,8 @@ erc <- function(a, y, x, family = poisson(), offset = rep(0, length(a)),
   pihat <- wrap$pihat
   phat <- wrap$phat
   int <- wrap$int
-  psi <- (y/offset - muhat)/(pihat/phat) + mhat
+  y.new <- family$linkinv(family$linkfun(y) - offset)
+  psi <- (y.new - muhat)/(pihat/phat) + mhat
   
   if(is.null(span)) {
     
@@ -41,7 +42,8 @@ erc <- function(a, y, x, family = poisson(), offset = rep(0, length(a)),
     
   }
   
-  dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, span = span, se.fit = TRUE)
+  dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, 
+                   family = family, span = span, se.fit = TRUE)
   
   estimate <- dr_out[1,]
   variance <- dr_out[2,]
@@ -54,7 +56,7 @@ erc <- function(a, y, x, family = poisson(), offset = rep(0, length(a)),
 }
 
 # LOESS function
-dr_est <- function(newa, a, psi, int, span, se.fit = FALSE) {
+dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE) {
   
   a.std <- a - newa
   k <- floor(min(span, 1)*length(a))
@@ -69,12 +71,13 @@ dr_est <- function(newa, a, psi, int, span, se.fit = FALSE) {
   
   gh <- cbind(1, a.std)
   gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
-  b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh)
-  mu <- exp(b$par[1])
+  b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, 
+             psi = psi, gh = gh, family = family)
+  mu <- family$linkinv(b$par[1])
   
   if (se.fit){
     
-    v.inf <- (psi + int - exp(c(gh%*%b$par)))^2
+    v.inf <- (psi + int - family$linkinv(c(gh%*%b$par)))^2
     sig <- gh.inv %*% t(gh) %*% diag(k.std) %*% diag(v.inf) %*% diag(k.std) %*% gh %*% gh.inv
     return(c(mu = mu, sig = sig[1,1]))
     
@@ -84,39 +87,42 @@ dr_est <- function(newa, a, psi, int, span, se.fit = FALSE) {
 }
 
 # Nonparametric estimation
-np_est <- function(a, y, x, deg.gam = 2, family = poisson(), offset = rep(0, length(a)),
+np_est <- function(a, y, x, deg.gam = 2, family = gaussian(), offset = rep(0, length(a)),
                    sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {
-  
   
   # set up evaluation points & matrices for predictions
   n <- nrow(x)
   x <- data.frame(x)
-  xa <- data.frame(a = a, x = x, offset = offset)
-  xa.new <- data.frame(a = a, x = x, offset = 0)
+  xa <- data.frame(a = a, x = x)
+  xa.new <- data.frame(a = a, x = x)
+  colnames(xa) <- c("a", colnames(x))
   colnames(xa.new) <- colnames(xa)
   
-  cts.x <- apply(xa, 2, function(x) (length(unique(x)) > 4))
+  cts.x <- apply(x, 2, function(x) (length(unique(x)) > 4))
+  
+  cts.form <- paste(paste("s(", colnames(x[,cts.x,drop = FALSE]), ",",
+                          deg.gam, ")", sep = ""), collapse = "+")
+  
+  cat.form <- paste(colnames(x[, !cts.x, drop = FALSE]), collapse = "+")
+  
+
   if (sum(!cts.x) > 0) {
-    gam.model <- as.formula(paste("y~", paste(paste("s(", colnames(xa[, cts.x, drop = FALSE]), ",", deg.gam, 
-                                                    ")", sep = ""), collapse = "+"), "+", 
-                                  paste(colnames(x[, !cts.x, drop = FALSE]), collapse = "+")))
+    gam.model <- as.formula(paste("y ~ s(a,3) + ", cts.form , "+", cat.form ))
   } else {
-    gam.model <- as.formula(paste("y~", paste(paste("s(", colnames(xa[, cts.x, drop = FALSE]),
-                                                    ",", deg.gam, 
-                                                    ")", sep = ""), collapse = "+")))
+    gam.model <- as.formula(paste("y ~ s(a,3) + ", cts.form))
   }
   
   if (sum(!cts.x) == length(cts.x)) {
-    gam.model <- as.formula(paste("Y~", paste(colnames(xa), collapse = "+"), sep = ""))
+    gam.model <- as.formula(paste("y ~ s(a,3) + ", paste(colnames(x), collapse = "+"), sep = ""))
   }
   
   # estimate nuisance outcome model with SuperLearner
   mumod <- gam::gam(gam.model, data = xa, family = family, 
                     control = gam::gam.control(maxit = 50, bf.maxit = 50), 
                     offset = offset)
-  muhat <- predict(mumod, newdata = xa.new, type = "response")
-  # mumod <- glm(y ~ .^2, offset = offset, family = poisson(log), data = xa)
-  # muhat <- predict(mumod, type = "response", newdata = xa.new)
+  muhat <- family$linkinv(predict(mumod, newdata = xa.new, type = "link") - offset)
+  # mumod <- glm(y ~ ., offset = offset, family = family, data = xa)
+  # muhat2 <- predict(mumod, type = "response", newdata = xa.new)
   
   # estimate nuisance GPS functions via super learner
   pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
@@ -132,9 +138,9 @@ np_est <- function(a, y, x, deg.gam = 2, family = poisson(), offset = rep(0, len
   # predict marginal outcomes given a.vals (or a.agg)
   muhat.mat <- sapply(a, function(a.tmp, ...) {
     
-    xa.tmp <- data.frame(a = a.tmp, x = x, offset = 0)
+    xa.tmp <- data.frame(a = a.tmp, x = x)
     colnames(xa.tmp) <- colnames(xa) 
-    return(c(predict(mumod, newdata = xa.tmp, tupe = "response")))
+    return(family$linkinv(predict(mumod, newdata = xa.tmp, type = "link") - offset))
     
   })
   
@@ -150,12 +156,9 @@ np_est <- function(a, y, x, deg.gam = 2, family = poisson(), offset = rep(0, len
 }
 
 # optimization used in dr_est
-opt_fun <- function(par, k.std, psi, gh) {
+opt_fun <- function(par, k.std, psi, gh, family = gaussian()) {
   
-  sum(k.std*(psi - exp(c(gh %*% par)))^2)
+  sum(k.std*(psi - family$linkinv(c(gh %*% par)))^2)
   
 }
 
-fun <- function(y) {substitute(y)}
-
-fun(y = n)

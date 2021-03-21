@@ -109,6 +109,7 @@ gibbs_dr <- function(s, star, s.id, id, w = NULL, x = NULL,
     tau2[j] <- 1/rgamma(1, shape = shape + m/2, rate = rate + sum((t - a_s)^2)/2)
     
     # Sample GPS params
+    
     beta_var <- solve(t(x)%*%x + diag(sigma2[j - 1]/scale, p, p))
     beta[j,] <- rmvnorm(1, beta_var%*%t(x)%*%a, sigma2[j - 1]*beta_var)
     

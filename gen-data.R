@@ -30,6 +30,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   x2 <- stats::rnorm(n, 0, 1)
   x3 <- stats::rnorm(n, 0, 1)
   x4 <- stats::rnorm(n, 0, 1)
+  
   w1 <- stats::rnorm(m, 1, 2)
   w2 <- rep(NA, m)
   
@@ -48,7 +49,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
     for (g in 1:n)
       w2[s.id == g] <- u4[g] + rnorm(sum(s.id == g), 0, 1)
     
-    mu_gps <- 1 + 0.5*u1 - 0.5*u2 - 0.5*u3 + 0.5*u4
+    mu_gps <- 8 + 0.5*u1 - 0.5*u2 - 0.5*u3 + 0.5*u4
     
     
   } else {
@@ -56,7 +57,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
     for (g in 1:n)
       w2[s.id == g] <- x4[g] + rnorm(sum(s.id == g), 0, 1)
     
-    mu_gps <- 1 + 0.5*x1 - 0.5*x2 - 0.5*x3 + 0.5*x4
+    mu_gps <- 8 + 0.5*x1 - 0.5*x2 - 0.5*x3 + 0.5*x4
     
   }
   
@@ -74,9 +75,11 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   star <- rnorm(m, 1.5*s - 0.5 + 0.5*w1 - 0.5*w2, sig_pred)
   
   if (out_scen == "b") {
-    mu_out <- -2 - 0.3*u1 - 0.1*u2 + 0.1*u3 + 0.3*u4 + a*(0.3 + 0.15*u1 - 0.15*u4)
+    mu_out <- -2.5 - 0.3*u1 - 0.1*u2 + 0.1*u3 + 0.3*u4 + 
+      (a - 7)*0.3 - 0.15*(a - 8)^2 + 0.05*(a - 9)^3
   } else { # y_scen == "b"
-    mu_out <- -2 - 0.3*x1 - 0.1*x2 + 0.1*x3 + 0.3*x4 + a*(0.3 + 0.15*x1 - 0.15*x4)
+    mu_out <- -2.5 - 0.3*x1 - 0.1*x2 + 0.1*x3 + 0.3*x4 + 
+      (a - 7)*0.3 - 0.15*(a - 8)^2 + 0.05*(a - 9)^3
   }
   
   y <- rpois(n, exp(mu_out + log(wts)))
@@ -88,73 +91,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   
 }
 
-gen_dr_data <- function(n, m, sig_gps = 1, gps_scen = c("a", "b"), out_scen = c("a", "b")) {
-  
-  if (n > m)
-    stop("you stop that, you!")
-  
-  # covariates
-  x1 <- stats::rnorm(m, 0, 1)
-  x2 <- stats::rnorm(m, 0, 1)
-  v3 <- stats::rnorm(n, 0, 1)
-  v4 <- stats::rnorm(n, 0, 1)
-  
-  x3 <- x4 <- rep(NA, m)
-  
-  id <- sample(1:n, m, replace = TRUE)
-  
-  for (g in 1:n) {
-    
-    x3[id == g] <- v3[g]
-    x4[id == g] <- v4[g]
-    
-  }
-  
-  # transformed predictors
-  u1 <- as.numeric(scale((x1 + x2)^2))
-  u2 <- as.numeric(scale(cos(2*x2)))
-  w3 <- as.numeric(scale(sin(2*v3)))
-  w4 <- as.numeric(scale(-abs(v3 + v4)))
-  
-  u3 <- u4 <- rep(NA, n)
-  
-  for (g in 1:n) {
-    
-    u3[id == g] <- w3[g]
-    u4[id == g] <- w4[g]
-    
-  }
-  
-  # propensity score
-  if (gps_scen == "b") {
-    mu_gps <- 1 + 0.5*u1 - 0.5*u2 - 0.5*u3 + 0.5*u4
-  } else { # z_scen == "a"
-    mu_gps <- 1 + 0.5*x1 - 0.5*x2 - 0.5*x3 + 0.5*x4
-  }
-  
-  a <- aggregate(rnorm(n, mu_gps, sig_gps), by = list(id), mean)[,2]
-  a_y <- rep(NA, n)
-  
-  for (g in 1:length(a))
-    a_y[id == g] <- a[g]
-  
-  if (out_scen == "b") {
-    mu_out <- -0.75*u1 - 0.25*u2 + 0.25*u3 + 0.75*u4 + a_y*(1 + 0.5*u1 - 0.5*u2 + 0.5*u3 - 0.5*u4)
-  } else { # y_scen == "b"
-    mu_out <- -0.75*x1 - 0.25*x2 + 0.25*x3 + 0.75*x4 + a_y*(1 + 0.5*x1 - 0.5*x2 + 0.5*x3 - 0.5*x4)
-  }
-  
-  y <- rbinom(n, 1, plogis(mu_out))
-  x <- cbind(x1, x2, x3, x4)
-  
-  # create simulation dataset
-  sim <- list(y = y, a = a, x = x, id = id, a_y = a_y)
-  
-  return(sim)
-  
-}
-
-predict_example <- function(a.vals, x, id, out_scen = c("a", "b")){
+predict_example <- function(a.vals, x, out_scen = c("a", "b")){
   
   # transformed predictors
   u1 <- as.numeric(scale((x[,1] + x[,1])^2))
@@ -167,12 +104,12 @@ predict_example <- function(a.vals, x, id, out_scen = c("a", "b")){
   
   for(i in 1:length(a.vals)) {
     
+    a.vec <- rep(a.vals[i],nrow(x))
+    
     if (out_scen == "b") {
-      mu_out <- exp(-2 + u %*% c(-0.3,-0.1,0.1,0.3) + 
-                      rep(a.vals[i],nrow(u))*(0.3 + u %*% c(0.15, 0, 0, -0.15)))
+      mu_out <- exp(-2.5 + u %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 7) - 0.15*(a.vec - 8)^2 + 0.05*(a.vec - 9)^3)
     } else { # out_scen == "a"
-      mu_out <- exp(-2 + x %*% c(-0.3,-0.1,0.1,0.3) + 
-                      rep(a.vals[i],nrow(x))*(0.3 + x %*% c(0.15, 0, 0, -0.15)))
+      mu_out <- exp(-2.5 + x %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 7) - 0.15*(a.vec - 8)^2 + 0.05*(a.vec - 9)^3)
     }
     
     out[i] <- mean(mu_out)
