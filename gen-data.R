@@ -72,7 +72,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
     a_s[s.id == g] <- a[g]
     
   s <- rnorm(m, a_s, sig_agg)
-  star <- rnorm(m, 1.5*s - 0.5 + 0.5*w1 - 0.5*w2, sig_pred)
+  star <- rnorm(m, 1.25*s - 0.5 + 0.5*w1 - 0.5*w2, sig_pred)
   
   if (out_scen == "b") {
     mu_out <- -2.5 - 0.3*u1 - 0.1*u2 + 0.1*u3 + 0.3*u4 + 

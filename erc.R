@@ -7,7 +7,8 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   
   n <- length(a)
   
-  wrap <- np_est(y = y, a = a, x = x, offset = offset, sl.lib = sl.lib)
+  wrap <- np_est(y = y, a = a, x = x, offset = offset, 
+                 family = family, sl.lib = sl.lib)
   muhat <- wrap$muhat
   mhat <- wrap$mhat
   pihat <- wrap$pihat
@@ -27,7 +28,7 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
       for(j in 1:k) {
         
         preds <- sapply(a[folds == j], dr_est, psi = psi[folds != j], a = a[folds != j], 
-                        int = int[folds != j],  span = h, se.fit = FALSE)
+                        int = int[folds != j],  family = family, span = h, se.fit = FALSE)
         cv.vec[j] <- mean((psi[folds == j] - preds)^2, na.rm = TRUE)
         # some predictions result in `NA` because of the `x` ranges in each fold
         
@@ -94,9 +95,7 @@ np_est <- function(a, y, x, deg.gam = 2, family = gaussian(), offset = rep(0, le
   n <- nrow(x)
   x <- data.frame(x)
   xa <- data.frame(a = a, x = x)
-  xa.new <- data.frame(a = a, x = x)
   colnames(xa) <- c("a", colnames(x))
-  colnames(xa.new) <- colnames(xa)
   
   cts.x <- apply(x, 2, function(x) (length(unique(x)) > 4))
   
@@ -117,12 +116,11 @@ np_est <- function(a, y, x, deg.gam = 2, family = gaussian(), offset = rep(0, le
   }
   
   # estimate nuisance outcome model with SuperLearner
-  mumod <- gam::gam(gam.model, data = xa, family = family, 
-                    control = gam::gam.control(maxit = 50, bf.maxit = 50), 
-                    offset = offset)
-  muhat <- family$linkinv(predict(mumod, newdata = xa.new, type = "link") - offset)
+  mumod <- gam::gam(gam.model, data = xa, family = family, offset = offset,
+                    control = gam::gam.control(maxit = 50, bf.maxit = 50))
+  muhat <- family$linkinv(predict(mumod, newdata = xa, type = "link") - offset)
   # mumod <- glm(y ~ ., offset = offset, family = family, data = xa)
-  # muhat2 <- predict(mumod, type = "response", newdata = xa.new)
+  # muhat <- predict(mumod, type = "response", newdata = xa)
   
   # estimate nuisance GPS functions via super learner
   pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
