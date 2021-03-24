@@ -22,10 +22,8 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   sig_gps <- 1
   sig_agg <- scenario$sig_agg
   sig_pred <- scenario$sig_pred
-  gps_scen <- scenario$gps_scen
-  out_scen <- scenario$out_scen
   prob <- scenario$prob
-  span <- 0.9
+  span <- 0.8
   gps_scen <- "a"
   out_scen <- "a"
   
@@ -130,7 +128,7 @@ n <- c(200, 500)
 mult <- c(2, 4)
 sig_pred <- c(sqrt(0.5), sqrt(2)) 
 sig_agg <- c(sqrt(0.5), sqrt(2))
-prob <- c(0.1, 0.5)
+prob <- c(0.1, 0.2)
 
 scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred, prob = prob)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
@@ -139,23 +137,23 @@ rslt <- list(est = est, scen_idx = scen_mat)
 
 save(rslt, file = "D:/Github/causal-me/output/sim1_rslt.RData")
 
-for (k in 1:length(rslt$est)){
-
-  filename <- paste0("D:/Github/causal-me/output/ERC_", paste(rslt$scen_idx[k,], collapse = "_"), ".pdf")
-  pdf(file = filename)
-  plot(a.vals, rslt$est[[k]][1,], type = "l", col = "darkgreen", lwd = 2,
-       main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
-       ylim = c(0,0.1))
-  lines(a.vals, rslt$est[[k]][2,], type = "l", col = "red", lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[[k]][3,], type = "l", col = "blue", lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[[k]][4,], type = "l", col = "red", lwd = 2, lty = 3)
-  lines(a.vals, rslt$est[[k]][5,], type = "l", col = "blue", lwd = 2, lty = 3)
-  
-  legend(6, 0.1, legend=c("Sample ERC", "Without Prediction Correction",
-                          "With Prediction Correction", "Without Aggregation Correction",
-                          "With Aggregation Correction"),
-         col=c("darkgreen", "red", "blue", "black", "black"),
-         lty = c(1,1,1,2,3), lwd=2, cex=0.8)
-  
-}
-dev.off()
+# for (k in 1:length(rslt$est)){
+# 
+#   filename <- paste0("D:/Github/causal-me/output/ERC_", paste(rslt$scen_idx[k,], collapse = "_"), ".pdf")
+#   pdf(file = filename)
+#   plot(a.vals, rslt$est[[k]][1,], type = "l", col = "darkgreen", lwd = 2,
+#        main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
+#        ylim = c(0,0.1))
+#   lines(a.vals, rslt$est[[k]][2,], type = "l", col = "red", lwd = 2, lty = 2)
+#   lines(a.vals, rslt$est[[k]][3,], type = "l", col = "blue", lwd = 2, lty = 2)
+#   lines(a.vals, rslt$est[[k]][4,], type = "l", col = "red", lwd = 2, lty = 3)
+#   lines(a.vals, rslt$est[[k]][5,], type = "l", col = "blue", lwd = 2, lty = 3)
+#   
+#   legend(6, 0.1, legend=c("Sample ERC", "Without Prediction Correction",
+#                           "With Prediction Correction", "Without Aggregation Correction",
+#                           "With Aggregation Correction"),
+#          col=c("darkgreen", "red", "blue", "black", "black"),
+#          lty = c(1,1,1,2,3), lwd=2, cex=0.8)
+#   
+# }
+# dev.off()
