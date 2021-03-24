@@ -19,15 +19,16 @@ source("D:/Github/causal-me/erc.R")
 
 # simulation arguments
 n.sim <- 200
-sig_gps <- sqrt(2)
-sig_agg <- 1
+sig_gps <- 1
+sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
-span <- NULL
+pred_scen <- "b"
+span <- 0.8
 
 # gen data arguments
-m <- 2000 # c(500, 800)
+m <- 400 # c(500, 800)
 n <- 200 # c(100, 200)
 
 # gibbs sampler stuff
@@ -37,7 +38,7 @@ n.adapt = 100
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.25)
-sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam")
+sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction", "SL.gam")
 family <- poisson()
 
 # initialize output
@@ -48,13 +49,13 @@ for (i in 1:n.sim){
   print(i)
   
   # generate data
-  dat <- gen_data(m = m, n = n, sig_gps = sig_gps, sig_agg = sig_agg,
-                  sig_pred = sig_pred, out_scen = out_scen, gps_scen = gps_scen)
+  dat <- gen_data(m = m, n = n, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
+                  pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
   
   # zipcode index
   s.id <- dat$s.id
   id <- dat$id
-  offset <- log(dat$wts)
+  offset <- log(dat$offset)
   
   # data
   y <- dat$y
@@ -73,7 +74,7 @@ for (i in 1:n.sim){
     y <- dat$y[(id %in% keep)]
     x <- dat$x[(id %in% keep),]
     a <- dat$a[(id %in% keep)]
-    offset <- log(dat$wts[(id %in% keep)])
+    offset <- log(dat$offset[(id %in% keep)])
     id <- dat$id[(id %in% keep)]
   }
   
@@ -96,9 +97,9 @@ for (i in 1:n.sim){
   
   # naive
   
-  naive_tilde <- erc(y = y, a = z_tilde, x = x, offset = offset, family = poisson(),
+  naive_tilde <- erc(y = y, a = z_tilde, x = x, offset = offset, family = family,
                      a.vals = a.vals, sl.lib = sl.lib, span = span)
-  naive_hat <- erc(y = y, a = z_hat, x = x, offset = offset, family = poisson(),
+  naive_hat <- erc(y = y, a = z_hat, x = x, offset = offset, family = family,
                    a.vals = a.vals, sl.lib = sl.lib, span = span)
   
   # blp w/ pred
@@ -109,7 +110,6 @@ for (i in 1:n.sim){
                a.vals = a.vals, sl.lib = sl.lib, span = span)
   
   # estimates
-  
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
   est[i,2,] <- naive_tilde$estimate
   est[i,3,] <- naive_hat$estimate
@@ -127,13 +127,15 @@ save(out_est, file = "D:/Github/causal-me/output/bias_a_a.RData")
 pdf("D:/Github/causal-me/output/bias_a_a.pdf")
 plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 2,
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
-     ylim = c(0,0.3))
+     ylim = c(0,0.1))
 lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = "red", lwd = 2, lty = 2)
 lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "blue", lwd = 2, lty = 2)
 lines(a.vals, colMeans(est, na.rm = T)[4,], type = "l", col = "red", lwd = 2, lty = 3)
 lines(a.vals, colMeans(est, na.rm = T)[5,], type = "l", col = "blue", lwd = 2, lty = 3)
 
-legend(6, 0.3, legend=c("Sample ERC", "No Pred", "Pred", "No Agg", "Agg"),
+legend(6, 0.1, legend=c("Sample ERC", "Without Prediction Correction",
+                        "With Prediction Correction", "Without Aggregation Correction",
+                        "With Aggregation Correction"),
        col=c("darkgreen", "red", "blue", "black", "black"),
        lty = c(1,1,1,2,3), lwd=2, cex=0.8)
 dev.off()

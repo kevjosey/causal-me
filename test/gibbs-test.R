@@ -23,7 +23,7 @@ sig_gps <- sqrt(2)
 sig_agg <- 1
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
-out_scen <- "a"
+out_scen <- "b"
 span <- NULL
 
 # gen data arguments
@@ -55,7 +55,7 @@ for (i in 1:n.sim){
   # zipcode index
   s.id <- dat$s.id
   id <- dat$id
-  offset <- log(dat$wts)
+  offset <- log(dat$offset)
   
   # data
   y <- dat$y
@@ -74,11 +74,11 @@ for (i in 1:n.sim){
     y <- dat$y[(id %in% keep)]
     x <- dat$x[(id %in% keep),]
     a <- dat$a[(id %in% keep)]
-    offset <- log(dat$wts[(id %in% keep)])
+    offset <- log(dat$offset[(id %in% keep)])
     id <- dat$id[(id %in% keep)]
   }
   
-  stilde <- pred(s = s, star = star, w = w, sl.lib = sl.lib)
+  stilde <- pred(s = s, star = star, w = w)
   a_w <- blp(s = stilde, s.id = s.id)
   a_x <- blp(s = stilde, s.id = s.id, x = x)
   

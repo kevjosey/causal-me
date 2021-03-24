@@ -20,7 +20,7 @@
 # x = covariate matrix
 
 gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
-                     gps_scen = c("a", "b"), out_scen = c("a", "b")) {
+                     gps_scen = c("a", "b"), out_scen = c("a", "b"), pred_scen = c("a", "b")) {
   
   if (n > m)
     stop("you stop that, you!")
@@ -34,9 +34,9 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   w1 <- stats::rnorm(m, 1, 2)
   w2 <- rep(NA, m)
   
-  s.id <- sample(1:n, m, replace = TRUE)
   id <- 1:n
-  wts <- floor(runif(n, 5, 25))
+  s.id <- sample(id, m, replace = TRUE)
+  offset <- runif(n, 5, 50)
   
   # transformed predictors
   u1 <- as.numeric(scale((x1 + x2)^2))
@@ -72,26 +72,29 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
     a_s[s.id == g] <- a[g]
     
   s <- rnorm(m, a_s, sig_agg)
-  star <- rnorm(m, 1.25*s - 0.5 + 0.5*w1 - 0.5*w2, sig_pred)
   
-  if (out_scen == "b") {
-    mu_out <- -2.5 - 0.3*u1 - 0.1*u2 + 0.1*u3 + 0.3*u4 + 
-      (a - 7)*0.3 - 0.15*(a - 8)^2 + 0.05*(a - 9)^3
-  } else { # y_scen == "b"
-    mu_out <- -2.5 - 0.3*x1 - 0.1*x2 + 0.1*x3 + 0.3*x4 + 
-      (a - 7)*0.3 - 0.15*(a - 8)^2 + 0.05*(a - 9)^3
+  if (pred_scen == "b"){
+    star <- rnorm(m, s - 0.5 + 0.5*w1 - 0.5*w2, sig_pred)
+  } else {
+    star <- rnorm(m, s, sig_pred)
   }
   
-  y <- rpois(n, exp(mu_out + log(wts)))
+  if (out_scen == "b") {
+    mu_out <- -3 - 0.3*u1 - 0.1*u2 + 0.1*u3 + 0.3*u4 + 0.3*(a - 8) - 0.1*(a - 8)^2
+  } else { # y_scen == "b"
+    mu_out <- -3 - 0.3*x1 - 0.1*x2 + 0.1*x3 + 0.3*x4 + 0.3*(a - 8) - 0.1*(a - 8)^2
+  }
+  
+  y <- rpois(n, exp(mu_out + log(offset)))
   
   # create simulation dataset
-  sim <- list(a = a, s = s, star = star, y = y, x = x, w = w, s.id = s.id, id = id, wts = wts)
-  
+  sim <- list(a = a, s = s, star = star, y = y, x = x, w = w, 
+              id = id, s.id = s.id, offset = offset)
   return(sim)
   
 }
 
-predict_example <- function(a.vals, x, out_scen = c("a", "b")){
+predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
   
   # transformed predictors
   u1 <- as.numeric(scale((x[,1] + x[,1])^2))
@@ -107,9 +110,9 @@ predict_example <- function(a.vals, x, out_scen = c("a", "b")){
     a.vec <- rep(a.vals[i],nrow(x))
     
     if (out_scen == "b") {
-      mu_out <- exp(-2.5 + u %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 7) - 0.15*(a.vec - 8)^2 + 0.05*(a.vec - 9)^3)
+      mu_out <- exp(-3 + u %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
     } else { # out_scen == "a"
-      mu_out <- exp(-2.5 + x %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 7) - 0.15*(a.vec - 8)^2 + 0.05*(a.vec - 9)^3)
+      mu_out <- exp(-3 + x %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
     }
     
     out[i] <- mean(mu_out)

@@ -25,7 +25,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   gps_scen <- scenario$gps_scen
   out_scen <- scenario$out_scen
   prob <- scenario$prob
-  span <- 0.9
+  span <- 0.8
   gps_scen <- "a"
   out_scen <- "a"
   
@@ -113,18 +113,18 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   out_est <- colMeans(est, na.rm = T)
   colnames(out_est) <- a.vals
   rownames(out_est) <- c("SAMPLE ERC","Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
-
+  
   return(out_est)
   
 }
-  
+
 # for replication
 set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.25)
 sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.gam")
-n.sim <- 1000
+n.sim <- 2
 
 n <- c(200, 500)
 mult <- c(2, 4)
@@ -136,26 +136,3 @@ scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pr
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 est <- mclapply.hack(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 3)
 rslt <- list(est = est, scen_idx = scen_mat)
-
-save(rslt, file = "D:/Github/causal-me/output/sim1_rslt.RData")
-
-for (k in 1:length(rslt$est)){
-
-  filename <- paste0("D:/Github/causal-me/output/ERC_", paste(rslt$scen_idx[k,], collapse = "_"), ".pdf")
-  pdf(file = filename)
-  plot(a.vals, rslt$est[[k]][1,], type = "l", col = "darkgreen", lwd = 2,
-       main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
-       ylim = c(0,0.1))
-  lines(a.vals, rslt$est[[k]][2,], type = "l", col = "red", lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[[k]][3,], type = "l", col = "blue", lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[[k]][4,], type = "l", col = "red", lwd = 2, lty = 3)
-  lines(a.vals, rslt$est[[k]][5,], type = "l", col = "blue", lwd = 2, lty = 3)
-  
-  legend(6, 0.1, legend=c("Sample ERC", "Without Prediction Correction",
-                          "With Prediction Correction", "Without Aggregation Correction",
-                          "With Aggregation Correction"),
-         col=c("darkgreen", "red", "blue", "black", "black"),
-         lty = c(1,1,1,2,3), lwd=2, cex=0.8)
-  
-}
-dev.off()

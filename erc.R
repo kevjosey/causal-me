@@ -2,7 +2,7 @@
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
 erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
                 a.vals = seq(min(a), max(a), length.out = 20), 
-                span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 10,
+                span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 5,
                 sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {	
   
   n <- length(a)
@@ -88,7 +88,7 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
 }
 
 # Nonparametric estimation
-np_est <- function(a, y, x, deg.gam = 2, family = gaussian(), offset = rep(0, length(a)),
+np_est <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)), deg.gam = 1,
                    sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {
   
   # set up evaluation points & matrices for predictions
@@ -106,13 +106,13 @@ np_est <- function(a, y, x, deg.gam = 2, family = gaussian(), offset = rep(0, le
   
 
   if (sum(!cts.x) > 0) {
-    gam.model <- as.formula(paste("y ~ s(a,3) + ", cts.form , "+", cat.form ))
+    gam.model <- as.formula(paste("y ~ s(a,2) + ", cts.form , "+", cat.form ))
   } else {
-    gam.model <- as.formula(paste("y ~ s(a,3) + ", cts.form))
+    gam.model <- as.formula(paste("y ~ s(a,2) + ", cts.form))
   }
   
   if (sum(!cts.x) == length(cts.x)) {
-    gam.model <- as.formula(paste("y ~ s(a,3) + ", paste(colnames(x), collapse = "+"), sep = ""))
+    gam.model <- as.formula(paste("y ~ s(a,2) + ", paste(colnames(x), collapse = "+"), sep = ""))
   }
   
   # estimate nuisance outcome model with SuperLearner
@@ -120,13 +120,20 @@ np_est <- function(a, y, x, deg.gam = 2, family = gaussian(), offset = rep(0, le
                     control = gam::gam.control(maxit = 50, bf.maxit = 50))
   muhat <- family$linkinv(predict(mumod, newdata = xa, type = "link") - offset)
   # mumod <- glm(y ~ ., offset = offset, family = family, data = xa)
-  # muhat <- predict(mumod, type = "response", newdata = xa)
+  # muhat <- family$linkinv(predict(mumod, type = "link", newdata = xa) - offset)
   
   # estimate nuisance GPS functions via super learner
   pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
   pimod.vals <- c(pimod$SL.predict)
-  pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
-                         family = gaussian(), SL.library = "SL.mean")
+  
+  pi2mod <- try(SuperLearner(Y = (a - pimod.vals)^2, X = x, 
+                             family = gaussian(), SL.library = sl.lib), 
+                silent = TRUE)
+  
+  if (any(pi2mod$SL.predict <= 0) | inherits(pi2mod, "try-error"))
+    pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
+                           family = gaussian(), SL.library = "SL.mean")
+  
   pi2mod.vals <- c(pi2mod$SL.predict)
   
   # exposure models
@@ -147,7 +154,7 @@ np_est <- function(a, y, x, deg.gam = 2, family = gaussian(), offset = rep(0, le
   mhat.mat <- matrix(rep(mhat, n), byrow = TRUE, nrow = n)
   int <- rowMeans(muhat.mat - mhat.mat)
   
-  out <- list(muhat = muhat, mhat = mhat, pihat = pihat, phat = phat,int = int)
+  out <- list(muhat = muhat, mhat = mhat, pihat = pihat, phat = phat, int = int)
   
   return(out)
   
