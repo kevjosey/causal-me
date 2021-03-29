@@ -75,7 +75,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
       id <- dat$id[(id %in% keep)]
     }
     
-    stilde <- pred(s = s, star = star, w = w)
+    stilde <- pred(s = s, star = star, w = w, sl.lib = sl.lib)
     a_w <- blp(s = stilde, s.id = s.id)
     a_x <- blp(s = stilde, s.id = s.id, x = x)
     

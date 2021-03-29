@@ -19,25 +19,26 @@ source("D:/Github/causal-me/erc.R")
 
 # simulation arguments
 n.sim <- 200
-sig_gps <- sqrt(2)
-sig_agg <- 1
+sig_gps <- 1
+sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
-out_scen <- "b"
-span <- NULL
+out_scen <- "a"
+pred_scen <- "b"
+span <- 0.6
 
 # gen data arguments
-m <- 2000 # c(500, 800)
+m <- 400 # c(500, 800)
 n <- 200 # c(100, 200)
 
 # gibbs sampler stuff
-thin = 20
-n.iter = 1000
-n.adapt = 100
+thin <- 20
+n.iter <- 1000
+n.adapt <- 100
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.25)
-sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam")
+sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction")
 family <- poisson()
 
 # initialize output
@@ -49,8 +50,8 @@ for (i in 1:n.sim){
   print(i)
   
   # generate data
-  dat <- gen_data(m = m, n = n, sig_gps = sig_gps, sig_agg = sig_agg,
-                  sig_pred = sig_pred, out_scen = out_scen, gps_scen = gps_scen)
+  dat <- gen_data(m = m, n = n, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
+                  pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
   
   # zipcode index
   s.id <- dat$s.id
@@ -78,9 +79,9 @@ for (i in 1:n.sim){
     id <- dat$id[(id %in% keep)]
   }
   
-  stilde <- pred(s = s, star = star, w = w)
-  a_w <- blp(s = stilde, s.id = s.id)
-  a_x <- blp(s = stilde, s.id = s.id, x = x)
+  s_hat <- pred(s = s, star = star, w = w, sl.lib = sl.lib)
+  a_w <- blp(s = s_hat, s.id = s.id)
+  a_x <- blp(s = s_hat, s.id = s.id, x = x)
   
   w_new <- model.matrix(~ 0 + star*w)
   gibbs_w <- gibbs_dr(s = s, star = star, s.id = s.id, id = id, w = w_new,
@@ -111,7 +112,8 @@ for (i in 1:n.sim){
   out_x <- mclapply.hack(1:length(a_list_x), function(k, ...){
     
     erc(y = y, a = a_list_x[[k]], x = x, offset = offset, family = family,
-        a.vals = a.vals, sl.lib = sl.lib, span = span)
+        a.vals = a.vals, sl.lib = sl.lib, span = span, beta = gibbs_x$beta[k,], 
+        sigma2 = gibbs_x$sigma2[k])
     
   }, mc.cores = 4)
   
@@ -172,13 +174,13 @@ save(out_cp, file = "D:/Github/causal-me/output/cp_rslt_a_a.RData")
 pdf("D:/Github/causal-me/output/rslt_a_a.pdf")
 plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 2,
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
-     ylim = c(0,0.3))
+     ylim = c(0,0.1))
 lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = "red", lwd = 2, lty = 2)
 lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "blue", lwd = 2, lty = 2)
 lines(a.vals, colMeans(est, na.rm = T)[4,], type = "l", col = "red", lwd = 2, lty = 3)
 lines(a.vals, colMeans(est, na.rm = T)[5,], type = "l", col = "blue", lwd = 2, lty = 3)
 
-legend(6, 0.3, legend=c("Sample ERC", "Single Imputation", "Multiple Imputation", "Without Covariates", "With Covariates"),
+legend(6, 0.1, legend=c("Sample ERC", "Single Imputation", "Multiple Imputation", "Without Covariates", "With Covariates"),
        col=c("darkgreen", "red", "blue", "black", "black"),
        lty = c(1,1,1,2,3), lwd=2, cex=0.8)
 dev.off()

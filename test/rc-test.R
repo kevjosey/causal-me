@@ -17,28 +17,25 @@ source("D:/Github/causal-me/mclapply-hack.R")
 source("D:/Github/causal-me/blp.R")
 source("D:/Github/causal-me/erc.R")
 
+
 # simulation arguments
 n.sim <- 200
 sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
-gps_scen <- "a"
-out_scen <- "a"
+gps_scen <- "b"
+out_scen <- "b"
 pred_scen <- "b"
-span <- 0.8
+span <- NULL
 
 # gen data arguments
 m <- 400 # c(500, 800)
 n <- 200 # c(100, 200)
 
-# gibbs sampler stuff
-thin = 20
-n.iter = 1000
-n.adapt = 100
-
 # dr arguments
 a.vals <- seq(6, 10, by = 0.25)
-sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction", "SL.gam")
+sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction")
+# sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "SL.ranger")
 family <- poisson()
 
 # initialize output
@@ -80,8 +77,8 @@ for (i in 1:n.sim){
   
   s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
   
-  a_tilde <- blp(s = s_tilde, s.id = s.id)
-  a_hat <- blp(s = s_hat, s.id = s.id)
+  a_tilde <- blp(s = s_tilde, s.id = s.id, x = x)
+  a_hat <- blp(s = s_hat, s.id = s.id, x = x)
   
   z_tilde_tmp <- aggregate(s_tilde, by = list(s.id), mean)
   z_hat_tmp <- aggregate(s_hat, by = list(s.id), mean)

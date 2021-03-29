@@ -66,7 +66,7 @@ blp <- function(s, s.id, x = NULL) {
   
 }
 
-pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "SL.gam")){
+pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "SL.ranger")){
   
   # set up evaluation points & matrices for predictions
   ws <- data.frame(w, star)

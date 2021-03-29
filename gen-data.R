@@ -105,19 +105,21 @@ predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
   u <- cbind(u1, u2, u3, u4)
   out <- rep(NA, length(a.vals))
   
-  for(i in 1:length(a.vals)) {
-    
-    a.vec <- rep(a.vals[i],nrow(x))
-    
-    if (out_scen == "b") {
-      mu_out <- exp(-3 + u %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
-    } else { # out_scen == "a"
-      mu_out <- exp(-3 + x %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
-    }
-    
-    out[i] <- mean(mu_out)
-    
-  }
+  # for(i in 1:length(a.vals)) {
+  #   
+  #   a.vec <- rep(a.vals[i],nrow(x))
+  #   
+  #   if (out_scen == "b") {
+  #     mu_out <- exp(-3 + u %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
+  #   } else { # out_scen == "a"
+  #     mu_out <- exp(-3 + x %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
+  #   }
+  #   
+  #   out[i] <- exp(mean(log(mu_out)))
+  #   
+  # }
+  
+  out <- exp(-3 + 0.2/2 + 0.3*(a.vals - 8) - 0.1*(a.vals - 8)^2 )
   
   return(out)
   

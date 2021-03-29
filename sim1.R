@@ -37,6 +37,8 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   for (i in 1:n.sim){
     
+    print(i)
+    
     # generate data
     dat <- gen_data(m = m, n = n, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
                     pred_scen = "b", out_scen = out_scen, gps_scen = gps_scen)
@@ -67,7 +69,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
       id <- dat$id[(id %in% keep)]
     }
     
-    s_hat <- pred(s = s, star = s_tilde, w = w)
+    s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
     
     a_tilde <- blp(s = s_tilde, s.id = s.id)
     a_hat <- blp(s = s_hat, s.id = s.id)
@@ -121,7 +123,7 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.25)
-sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.gam")
+sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction")
 n.sim <- 1000
 
 n <- c(200, 500)
@@ -137,23 +139,27 @@ rslt <- list(est = est, scen_idx = scen_mat)
 
 save(rslt, file = "D:/Github/causal-me/output/sim1_rslt.RData")
 
-# for (k in 1:length(rslt$est)){
-# 
-#   filename <- paste0("D:/Github/causal-me/output/ERC_", paste(rslt$scen_idx[k,], collapse = "_"), ".pdf")
-#   pdf(file = filename)
-#   plot(a.vals, rslt$est[[k]][1,], type = "l", col = "darkgreen", lwd = 2,
-#        main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
-#        ylim = c(0,0.1))
-#   lines(a.vals, rslt$est[[k]][2,], type = "l", col = "red", lwd = 2, lty = 2)
-#   lines(a.vals, rslt$est[[k]][3,], type = "l", col = "blue", lwd = 2, lty = 2)
-#   lines(a.vals, rslt$est[[k]][4,], type = "l", col = "red", lwd = 2, lty = 3)
-#   lines(a.vals, rslt$est[[k]][5,], type = "l", col = "blue", lwd = 2, lty = 3)
-#   
-#   legend(6, 0.1, legend=c("Sample ERC", "Without Prediction Correction",
-#                           "With Prediction Correction", "Without Aggregation Correction",
-#                           "With Aggregation Correction"),
-#          col=c("darkgreen", "red", "blue", "black", "black"),
-#          lty = c(1,1,1,2,3), lwd=2, cex=0.8)
-#   
-# }
-# dev.off()
+for (k in 1:length(rslt$est)){
+
+  filename <- paste0("D:/Github/causal-me/output/ERC_", paste(rslt$scen_idx[k,], collapse = "_"), ".pdf")
+  pdf(file = filename)
+  plotname <- paste(rslt$scen_idx[k,], collapse = "_")
+
+  plot(a.vals, rslt$est[[k]][1,], type = "l", col = "darkgreen", lwd = 2,
+       main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event",
+       ylim = c(0,0.1))
+  lines(a.vals, rslt$est[[k]][2,], type = "l", col = "red", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[k]][3,], type = "l", col = "blue", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[k]][4,], type = "l", col = "red", lwd = 2, lty = 3)
+  lines(a.vals, rslt$est[[k]][5,], type = "l", col = "blue", lwd = 2, lty = 3)
+
+  legend(6, 0.1, legend=c("Sample ERC", "Without Prediction Correction",
+                          "With Prediction Correction", "Without Aggregation Correction",
+                          "With Aggregation Correction"),
+         col=c("darkgreen", "red", "blue", "black", "black"),
+         lty = c(1,1,1,2,3), lwd=2, cex=0.8)
+
+  dev.off()
+  
+}
+
