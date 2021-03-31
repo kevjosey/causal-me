@@ -3,13 +3,12 @@
 erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
                 a.vals = seq(min(a), max(a), length.out = 20), 
                 span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 5,
-                sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth"),
-                beta = NULL, sigma2 = NULL){	
+                sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){	
   
   n <- length(a)
   
   wrap <- np_est(y = y, a = a, x = x, offset = offset, 
-                 family = family, sl.lib = sl.lib, beta = beta, sigma2 = sigma2)
+                 family = family, sl.lib = sl.lib)
   muhat <- wrap$muhat
   mhat <- wrap$mhat
   pihat <- wrap$pihat
@@ -58,6 +57,70 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   
 }
 
+erc2 <- function(amat, y, x, family = gaussian(), offset = rep(0, length(a)),
+                a.vals = seq(min(a), max(a), length.out = 20), 
+                span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 5,
+                sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){	
+  
+  n <- ncol(amat)
+  
+  wrap <- apply(amat, 1, function (a, ...) np_est2(y = y, a = a, x = x, offset = offset, 
+                 family = family, sl.lib = sl.lib))
+  
+  y.new <- family$linkinv(family$linkfun(y) - offset)
+  
+  psi <- apply(amat, 1, function(a, ...) {
+    
+    x <- data.frame(x)
+    xa <- data.frame(a = a, x = x)
+    colnames(xa) <- c("a", colnames(x))
+    
+    psiMat <- sapply(wrap, function(wrp, ...) {
+      
+      pimod.vals <- c(predict(wrp$pimod, xa)$pred)
+      pi2mod.vals <- c(predict(wrp$pi2mod, xa)$pred)
+    
+      # exposure models
+      pihat <- dnorm(a, pimod.vals, sqrt(pi2mod.vals))
+      phat <- sapply(a, function(a.tmp, ...) mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
+      muhat <- predict(wrp$mumod, newdata = xa, type = "response")
+    
+      muhat.mat <- sapply(a, function(a.tmp, ...) {
+      
+        xa.tmp <- data.frame(a = a.tmp, x = x)
+        colnames(xa.tmp) <- colnames(xa) 
+        return(predict(wrp$mumod, newdata = xa.tmp, type = "response"))
+      
+      })
+    
+      # aggregate muhat.vals and integrate for influence
+      mhat <- colMeans(muhat.mat)
+      mhat.mat <- matrix(rep(mhat, n), byrow = TRUE, nrow = n)
+      int <- rowMeans(muhat.mat - mhat.mat)
+      
+      psi <- (y.new - muhat)/(pihat/phat) + mhat
+      return(psi)
+      
+    })
+    
+    rowMeans(psiMat)
+    
+  })
+  
+  dr_out <- apply(psi, 2, function(p, ...) sapply(a.vals, dr_est, psi = p, a = a, int = int, 
+                   family = family, span = span, se.fit = TRUE))
+  
+  estimate <- dr_out[1,]
+  variance <- dr_out[2,]
+  
+  names(estimate) <- names(variance) <- a.vals
+  out <- list(estimate = estimate, variance = variance)	
+  
+  return(out)
+  
+}
+
+
 # LOESS function
 dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE) {
   
@@ -91,8 +154,7 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
 
 # Nonparametric estimation
 np_est <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
-                   sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth"),
-                   beta = NULL, sigma2 = NULL) {
+                   sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {
   
   # set up evaluation points & matrices for predictions
   n <- nrow(x)
@@ -124,33 +186,32 @@ np_est <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   # muhat <- family$linkinv(predict(mumod, type = "link", newdata = xa))
 
   # estimate nuisance GPS functions via super learner
+    
+  pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
+  pimod.vals <- c(pimod$SL.predict)
   
-  if (!is.null(beta) & !is.null(sigma2)) {
+  pi2mod <- try(SuperLearner(Y = (a - pimod.vals)^2, X = x, 
+                             family = gaussian(), SL.library = sl.lib), silent = TRUE)
+  
+  if (inherits(pi2mod, "try-error")) {
     
-    pihat <- dnorm(a, c(as.matrix(cbind(1, x))%*%beta), sqrt(sigma2))
-    phat <- sapply(a, function(a.tmp, ...) mean(dnorm(a.tmp, c(as.matrix(cbind(1, x))%*%c(beta)),
-                                                      sqrt(sigma2))))
+    pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
+                           family = gaussian(), SL.library = "SL.mean")
     
-  } else {
+  } else if (any(pi2mod$SL.predict <= 0)) {
     
-    pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
-    pimod.vals <- c(pimod$SL.predict)
-    
-    pi2mod <- try(SuperLearner(Y = (a - pimod.vals)^2, X = x, 
-                               family = gaussian(), SL.library = sl.lib), 
-                  silent = TRUE)
-    
-    if (any(pi2mod$SL.predict <= 0) | inherits(pi2mod, "try-error"))
-      pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
-                             family = gaussian(), SL.library = "SL.mean")
-    
-    pi2mod.vals <- c(pi2mod$SL.predict)
-    
-    # exposure models
-    pihat <- dnorm(a, pimod.vals, sqrt(pi2mod.vals))
-    phat <- sapply(a, function(a.tmp, ...) mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
+    pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
+                           family = gaussian(), SL.library = "SL.mean")
     
   }
+  
+  
+  pi2mod.vals <- c(pi2mod$SL.predict)
+  
+  # exposure models
+  pihat <- dnorm(a, pimod.vals, sqrt(pi2mod.vals))
+  phat <- sapply(a, function(a.tmp, ...) mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
+    
   
   # predict marginal outcomes given a.vals (or a.agg)
   muhat.mat <- sapply(a, function(a.tmp, ...) {
@@ -167,6 +228,60 @@ np_est <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   int <- rowMeans(muhat.mat - mhat.mat)
   
   out <- list(muhat = muhat, mhat = mhat, pihat = pihat, phat = phat, int = int)
+  
+  return(out)
+  
+}
+
+# Nonparametric estimation
+np_est2 <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
+                   sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {
+  
+  # set up evaluation points & matrices for predictions
+  n <- nrow(x)
+  x <- data.frame(x)
+  xa <- data.frame(a = a, x = x)
+  colnames(xa) <- c("a", colnames(x))
+  
+  cts.x <- apply(x, 2, function(x) (length(unique(x)) > 4))
+  
+  cts.form <- paste(paste("s(", colnames(x[,cts.x,drop = FALSE]), ")",
+                          sep = ""), collapse = "+")
+  
+  cat.form <- paste(colnames(x[, !cts.x, drop = FALSE]), collapse = "+")
+  
+  if (sum(!cts.x) > 0) {
+    gam.model <- formula(paste("y ~ s(a) + ", cts.form , "+", cat.form ))
+  } else {
+    gam.model <- formula(paste("y ~ s(a) + ", cts.form))
+  }
+  
+  if (sum(!cts.x) == length(cts.x)) {
+    gam.model <- formula(paste("y ~ s(a) + ", paste(colnames(x), collapse = "+"), sep = ""))
+  }
+  
+  # estimate nuisance outcome model with SuperLearner
+  mumod <- mgcv::gam(gam.model, data = xa, family = family, offset = offset)
+  
+  # estimate nuisance GPS functions via super learner
+  
+  pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
+  pi2mod <- try(SuperLearner(Y = (a - c(pimod$SL.predict))^2, X = x, 
+                             family = gaussian(), SL.library = sl.lib), silent = TRUE)
+  
+  if (inherits(pi2mod, "try-error")) {
+    
+    pi2mod <- SuperLearner(Y = (a - c(pimod$SL.predict))^2, X = x, 
+                           family = gaussian(), SL.library = "SL.mean")
+    
+  } else if (any(pi2mod$SL.predict <= 0)) {
+    
+    pi2mod <- SuperLearner(Y = (a - c(pimod$SL.predict))^2, X = x, 
+                           family = gaussian(), SL.library = "SL.mean")
+    
+  }
+  
+  out <- list(mumod = mumod, pimod = pimod, pi2mod = pi2mod)
   
   return(out)
   

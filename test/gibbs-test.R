@@ -25,10 +25,10 @@ sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.6
+span <- 0.25
 
 # gen data arguments
-m <- 400 # c(500, 800)
+m <- 1000 # c(500, 800)
 n <- 200 # c(100, 200)
 
 # gibbs sampler stuff
@@ -99,23 +99,25 @@ for (i in 1:n.sim){
   
   # gibbs w/ pred
   
-  a_list_w <- split(gibbs_w$amat, seq(nrow(gibbs_w$amat)))
-  a_list_x <- split(gibbs_x$amat, seq(nrow(gibbs_x$amat)))
-  
-  out_w <- mclapply.hack(1:length(a_list_x), function(k, ...){
-    
-    erc(y = y, a = a_list_w[[k]], x = x, offset = offset, family = family,
+  out_w <- mclapply.hack(1:nrow(gibbs_w$amat), function(k, ...){
+
+    erc(y = y, a = gibbs_w$amat[k,], x = x, offset = offset, family = family,
         a.vals = a.vals, sl.lib = sl.lib, span = span)
-    
+
+  }, mc.cores = 4)
+
+  out_x <- mclapply.hack(1:nrow(gibbs_x$amat), function(k, ...){
+
+    erc(y = y, a = gibbs_x$amat[k,], x = x, offset = offset, family = family,
+        a.vals = a.vals, sl.lib = sl.lib, span = span)
+
   }, mc.cores = 4)
   
-  out_x <- mclapply.hack(1:length(a_list_x), function(k, ...){
-    
-    erc(y = y, a = a_list_x[[k]], x = x, offset = offset, family = family,
-        a.vals = a.vals, sl.lib = sl.lib, span = span, beta = gibbs_x$beta[k,], 
-        sigma2 = gibbs_x$sigma2[k])
-    
-  }, mc.cores = 4)
+  # out_w <- erc(y = y, a = colMeans(gibbs_w$amat), x = x, offset = offset, family = family,
+  #       a.vals = a.vals, sl.lib = sl.lib, span = span)
+  # 
+  # out_x <- erc(y = y, a = colMeans(gibbs_x$amat), x = x, offset = offset, family = family,
+  #                a.vals = a.vals, sl.lib = sl.lib, span = span)
   
   gibbs_est_w <- do.call(rbind, lapply(out_w, function(o) o$estimate))
   gibbs_var_w <- do.call(rbind, lapply(out_w, function(o) o$variance))
@@ -131,7 +133,7 @@ for (i in 1:n.sim){
   est[i,4,] <- blp_x$estimate
   est[i,5,] <- colMeans(gibbs_est_x)
 
-  #standard error
+  # standard error
   
   var_w <- colMeans(gibbs_var_w) + (1 + 1/nrow(gibbs_est_w))*apply(gibbs_est_w, 2, var)
   var_x <- colMeans(gibbs_var_x) + (1 + 1/nrow(gibbs_est_x))*apply(gibbs_est_x, 2, var)
