@@ -11,11 +11,12 @@ library(gam)
 library(parallel)
 
 # Code for generating and fitting data
-source("D:/Github/causal-me/gen-data.R")
-source("D:/Github/causal-me/gibbs-sampler.R")
-source("D:/Github/causal-me/mclapply-hack.R")
-source("D:/Github/causal-me/blp.R")
-source("D:/Github/causal-me/erc.R")
+source("~/Github/causal-me/gen-data.R")
+source("~/Github/causal-me/gibbs-sampler.R")
+source("~/Github/causal-me/mclapply-hack.R")
+source("~/Github/causal-me/blp.R")
+source("~/Github/causal-me/erc.R")
+source("~/Github/causal-me/erc2.R")
 
 # simulation arguments
 n.sim <- 200
@@ -92,36 +93,30 @@ for (i in 1:n.sim){
 
   # blp w/ pred
   
-  blp_w <- erc(y = y, a = a_w, x = x, offset = offset, family = family,
-               a.vals = a.vals, sl.lib = sl.lib, span = span)
-  blp_x <- erc(y = y, a = a_x, x = x, offset = offset, family = family,
-               a.vals = a.vals, sl.lib = sl.lib, span = span)
+  blp_w <- fast(y = y, a = a_w, x = x, offset = offset, family = family,
+               a.vals = a.vals, sl.lib = sl.lib)
+  blp_x <- fast(y = y, a = a_x, x = x, offset = offset, family = family,
+               a.vals = a.vals, sl.lib = sl.lib)
   
   # gibbs w/ pred
   
   out_w <- mclapply.hack(1:nrow(gibbs_w$amat), function(k, ...){
 
-    erc(y = y, a = gibbs_w$amat[k,], x = x, offset = offset, family = family,
-        a.vals = a.vals, sl.lib = sl.lib, span = span)
+    fast(y = y, a = gibbs_w$amat[k,], x = x, offset = offset, 
+        family = family, a.vals = a.vals, sl.lib = sl.lib)
 
   }, mc.cores = 4)
 
   out_x <- mclapply.hack(1:nrow(gibbs_x$amat), function(k, ...){
 
-    erc(y = y, a = gibbs_x$amat[k,], x = x, offset = offset, family = family,
-        a.vals = a.vals, sl.lib = sl.lib, span = span)
+    fast(y = y, a = gibbs_x$amat[k,], x = x, offset = offset,
+            family = family, a.vals = a.vals, sl.lib = sl.lib)
 
   }, mc.cores = 4)
   
-  # out_w <- erc(y = y, a = colMeans(gibbs_w$amat), x = x, offset = offset, family = family,
-  #       a.vals = a.vals, sl.lib = sl.lib, span = span)
-  # 
-  # out_x <- erc(y = y, a = colMeans(gibbs_x$amat), x = x, offset = offset, family = family,
-  #                a.vals = a.vals, sl.lib = sl.lib, span = span)
-  
   gibbs_est_w <- do.call(rbind, lapply(out_w, function(o) o$estimate))
   gibbs_var_w <- do.call(rbind, lapply(out_w, function(o) o$variance))
-  
+
   gibbs_est_x <- do.call(rbind, lapply(out_x, function(o) o$estimate))
   gibbs_var_x <- do.call(rbind, lapply(out_x, function(o) o$variance))
   
@@ -141,7 +136,7 @@ for (i in 1:n.sim){
   se[i,1,] <- sqrt(blp_w$variance)
   se[i,2,] <- sqrt(var_w)
   se[i,3,] <- sqrt(blp_x$variance)
-  se[i,4,] <- sqrt(var_x)
+  se[i,4,] <- sqrt(var_w)
   
 }
 
@@ -170,10 +165,10 @@ out_cp <- rbind(rowMeans(cp_blp_w, na.rm = T), rowMeans(cp_gibbs_w, na.rm = T),
 colnames(out_cp) <- a.vals
 rownames(out_cp) <- c("BLP W", "Gibbs W", "BLP X", "Gibbs X")
 
-save(out_est, file = "D:/Github/causal-me/output/dr_rslt_a_a.RData")
-save(out_cp, file = "D:/Github/causal-me/output/cp_rslt_a_a.RData")
+save(out_est, file = "~/Github/causal-me/output/dr_rslt_a_a.RData")
+save(out_cp, file = "~/Github/causal-me/output/cp_rslt_a_a.RData")
 
-pdf("D:/Github/causal-me/output/rslt_a_a.pdf")
+pdf("~/Github/causal-me/output/rslt_a_a.pdf")
 plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 2,
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
      ylim = c(0,0.1))

@@ -44,12 +44,15 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   u3 <- as.numeric(scale(sin(2*x3)))
   u4 <- as.numeric(scale(-abs(x3 + x4)))
   
+  u <- cbind(u1, u2, u3, u4)
+  u <- u%*%solve(chol(cov(u)))
+  
   if (gps_scen == "b") {
     
     for (g in 1:n)
-      w2[s.id == g] <- u4[g] + rnorm(sum(s.id == g), 0, 1)
+      w2[s.id == g] <- u[g,4] + rnorm(sum(s.id == g), 0, 1)
     
-    mu_gps <- 8 + 0.5*u1 - 0.5*u2 - 0.5*u3 + 0.5*u4
+    mu_gps <- 8 + 0.5*u[,1] - 0.5*u[,2] - 0.5*u[,3] + 0.5*u[,4]
     
     
   } else {
@@ -64,6 +67,8 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   x <- cbind(x1, x2, x3, x4)
   u <- cbind(u1, u2, u3, u4)
   w <- cbind(w1, w2)
+  
+  u <- u%*%solve(chol(cov(u)))
   
   a <- rnorm(n, mu_gps, sig_gps)
   a_s <- rep(NA, m)
@@ -80,7 +85,8 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   }
   
   if (out_scen == "b") {
-    mu_out <- -3 - 0.3*u1 - 0.1*u2 + 0.1*u3 + 0.3*u4 + 0.3*(a - 8) - 0.1*(a - 8)^2
+    mu_out <- -3 - 0.3*u[,1] - 0.1*u[,2] + 0.1*u[,3] + 0.3*u[,4] +
+      0.3*(a - 8) - 0.1*(a - 8)^2
   } else { # y_scen == "b"
     mu_out <- -3 - 0.3*x1 - 0.1*x2 + 0.1*x3 + 0.3*x4 + 0.3*(a - 8) - 0.1*(a - 8)^2
   }
@@ -106,17 +112,17 @@ predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
   out <- rep(NA, length(a.vals))
   
   # for(i in 1:length(a.vals)) {
-  #   
+  # 
   #   a.vec <- rep(a.vals[i],nrow(x))
-  #   
+  # 
   #   if (out_scen == "b") {
   #     mu_out <- exp(-3 + u %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
   #   } else { # out_scen == "a"
   #     mu_out <- exp(-3 + x %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
   #   }
-  #   
+  # 
   #   out[i] <- exp(mean(log(mu_out)))
-  #   
+  # 
   # }
   
   out <- exp(-3 + 0.2/2 + 0.3*(a.vals - 8) - 0.1*(a.vals - 8)^2 )

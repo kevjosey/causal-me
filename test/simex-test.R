@@ -11,12 +11,12 @@ library(data.table)
 library(parallel)
 
 # Code for generating and fitting data
-source("D:/Github/causal-me/gen-data.R")
-source("D:/Github/causal-me/simex.R")
-source("D:/Github/causal-me/blp.R")
-source("D:/Github/causal-me/gibbs-sampler.R")
-source("D:/Github/causal-me/erc.R")
-source("D:/Github/causal-me/mclapply-hack.R")
+source("~/Github/causal-me/gen-data.R")
+source("~/Github/causal-me/simex.R")
+source("~/Github/causal-me/blp.R")
+source("~/Github/causal-me/gibbs-sampler.R")
+source("~/Github/causal-me/erc.R")
+source("~/Github/causal-me/mclapply-hack.R")
 
 n.sim <- 100
 n.boot <- 50
@@ -36,7 +36,7 @@ pred_scen <- "b"
 
 # other preliminaries
 span <- 0.5
-degree <- 2
+degree <- 3
 lambda <- seq(0.1, 2.1, by = 0.25)
 
 # gibbs sampler stuff
@@ -104,28 +104,13 @@ for (i in 1:n.sim){
   blp_hat <- erc(y = y, a = a_hat, x = x, offset = offset, family = family,
                  a.vals = a.vals, sl.lib = sl.lib, span = span)
   
-  w_new <- model.matrix(~ 0 + star*w)
-
-  gibbs_hat <- gibbs_dr(s = s, star = star, s.id = s.id, id = id, w = w_new, x = x,
-                      n.iter = n.iter, n.adapt = n.adapt, thin = thin)
-  
-  out_gibbs <- mclapply.hack(1:nrow(gibbs_hat$amat), function(k, ...){
-    
-    erc(y = y, a = gibbs_hat$amat[k,], x = x, offset = offset, family = family,
-        a.vals = a.vals, sl.lib = sl.lib, span = span)
-    
-  }, mc.cores = 4)
-  
   out <- simex(s = s_hat, y = y, x = x, id = id, s.id = s.id, family = family,
                offset = offset, a.vals = a.vals, n.boot = n.boot,
                degree = degree, lambda = lambda, span = span, mc.cores = 4)
-  
-  gibbs_est <- do.call(rbind, lapply(out_gibbs, function(o) o$estimate))
 
   est[i,1,] <- predict_example(a.vals = a.vals, x = x, out_scen = "a")
   est[i,2,] <- naive$estimate
   est[i,3,] <- blp_hat$estimate
-  est[i,4,] <- colMeans(gibbs_est)
   est[i,5,] <- out$estimate
   
 }

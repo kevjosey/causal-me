@@ -14,30 +14,30 @@ simex <- function(s, y, x, id, s.id, family = gaussian(), offset = rep(0, length
     z.mat <- replicate(n.boot, sapply(id, function(i, ...)
       mean(s[s.id == i]) + sqrt(lam/sum(s.id == i))*contr(s[s.id == i])))
     
-    vals <- apply(z.mat, 2, erc, y = y, x = x.mat, offset = offset, family = family,
-                  a.vals = a.vals, sl.lib = sl.lib, span = span, span.seq = span.seq, k = k)
+    vals <- apply(z.mat, 2, fast, y = y, x = x.mat, offset = offset, 
+                  family = family, a.vals = a.vals, sl.lib = sl.lib)
     
-    mu.vals <- matrix(unlist(lapply(vals, function(r) r[1])), ncol = length(vals))
-    sig.vals <- matrix(unlist(lapply(vals, function(r) r[2])), ncol = length(vals))
+    mu.vals <- do.call(rbind, lapply(vals, function(o) o$estimate))
+    sig.vals <- do.call(rbind, lapply(vals, function(o) o$variance))
     
-    m.vals <- matrix(rep(rowMeans(mu.vals), n.boot), nrow = length(a.vals), ncol = n.boot)
-    s.hat <- rowSums((mu.vals - m.vals)^2)/(n.boot - 1)
-    tau.hat <- rowMeans(sig.vals)
+    m.vals <- matrix(rep(colMeans(mu.vals), n.boot), byrow = TRUE,
+                     ncol = length(a.vals), nrow = n.boot)
+    s.hat <- colSums((mu.vals - m.vals)^2)/(n.boot - 1)
+    tau.hat <- colMeans(sig.vals)
     
-    return(list(estimate = rowMeans(mu.vals), variance = tau.hat - s.hat))
+    return(list(estimate = colMeans(mu.vals), variance = tau.hat - s.hat))
     
   }, s = s, y = y, x.mat = x, id = id, s.id = s.id, mc.cores = mc.cores)
   
   if (any(lambda == 0)){
     
-    Psi <- t(matrix(unlist(lapply(l.vals, function(x) x$estimate)), ncol = length(l.vals)))[,-which(lambda == 0)]
-    Phi <- t(matrix(unlist(lapply(l.vals, function(x) x$variance)), ncol = length(l.vals)))[,-which(lambda == 0)]
-    
+    Psi <- do.call(rbind, lapply(l.vals, function(o) o$estimate))[,-which(lambda == 0)]
+    Phi <- do.call(rbind, lapply(l.vals, function(o) o$variance))[,-which(lambda == 0)]
     
   } else {
     
-    Psi <- t(matrix(unlist(lapply(l.vals, function(x) x$estimate)), ncol = length(l.vals)))
-    Phi <- t(matrix(unlist(lapply(l.vals, function(x) x$variance)), ncol = length(l.vals)))
+    Psi <- do.call(rbind, lapply(l.vals, function(o) o$estimate))
+    Phi <- do.call(rbind, lapply(l.vals, function(o) o$estimate))
     
   }
   

@@ -1,14 +1,24 @@
 
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
 erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
-                a.vals = seq(min(a), max(a), length.out = 20), 
-                span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 5,
+                a.vals = seq(min(a), max(a), length.out = 20), fast = FALSE,
+                span = NULL, span.seq = seq(0.05, 1, by = 0.05), k = 5,
                 sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){	
   
   n <- length(a)
   
-  wrap <- np_est(y = y, a = a, x = x, offset = offset, 
-                 family = family, sl.lib = sl.lib)
+  if (fast) {
+    
+    wrap <- np_est_fast(y = y, a = a, x = x, a.vals = a.vals, offset = offset, 
+                   family = family, sl.lib = sl.lib)
+    
+  } else {
+    
+    wrap <- np_est(y = y, a = a, x = x, offset = offset, 
+                   family = family, sl.lib = sl.lib)
+    
+  }
+  
   muhat <- wrap$muhat
   mhat <- wrap$mhat
   pihat <- wrap$pihat
@@ -20,7 +30,13 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   
   if(is.null(span)) {
     
-    folds <- sample(x = k, size = n, replace = TRUE)
+    idx <- sample(x = n, size = min(n, 1000), replace = FALSE)
+    
+    a.sub <- a[idx]
+    psi.sub <- psi[idx]
+    int.sub <- int[idx]
+    
+    folds <- sample(x = k, size = min(n, 1000), replace = TRUE)
     
     cv.mat <- sapply(span.seq, function(h, ...) {
       
@@ -28,9 +44,9 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
       
       for(j in 1:k) {
         
-        preds <- sapply(a[folds == j], dr_est, psi = psi[folds != j], a = a[folds != j], 
-                        int = int[folds != j],  family = family, span = h, se.fit = FALSE)
-        cv.vec[j] <- mean((psi[folds == j] - preds)^2, na.rm = TRUE)
+        preds <- sapply(a.sub[folds == j], dr_est, psi = psi.sub[folds != j], a = a.sub[folds != j], 
+                        int = int.sub[folds != j], family = family, span = h, se.fit = FALSE)
+        cv.vec[j] <- mean((psi.sub[folds == j] - preds)^2, na.rm = TRUE)
         # some predictions result in `NA` because of the `x` ranges in each fold
         
       }
@@ -57,69 +73,25 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   
 }
 
-erc2 <- function(amat, y, x, family = gaussian(), offset = rep(0, length(a)),
-                a.vals = seq(min(a), max(a), length.out = 20), 
-                span = NULL, span.seq = seq(0.15, 1, by = 0.05), k = 5,
+# wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
+fast <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
+                a.vals = seq(min(a), max(a), length.out = 20), fast = FALSE,
                 sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){	
   
-  n <- ncol(amat)
+  n <- length(a)
   
-  wrap <- apply(amat, 1, function (a, ...) np_est2(y = y, a = a, x = x, offset = offset, 
-                 family = family, sl.lib = sl.lib))
+  wrap <- np_est_fast(y = y, a = a, x = x, a.vals = a.vals, offset = offset,
+                      family = family, sl.lib = sl.lib)
   
-  y.new <- family$linkinv(family$linkfun(y) - offset)
+  estimate <- wrap$mhat.vals
+  variance <- c(wrap$int.vals^2)
   
-  psi <- apply(amat, 1, function(a, ...) {
-    
-    x <- data.frame(x)
-    xa <- data.frame(a = a, x = x)
-    colnames(xa) <- c("a", colnames(x))
-    
-    psiMat <- sapply(wrap, function(wrp, ...) {
-      
-      pimod.vals <- c(predict(wrp$pimod, xa)$pred)
-      pi2mod.vals <- c(predict(wrp$pi2mod, xa)$pred)
-    
-      # exposure models
-      pihat <- dnorm(a, pimod.vals, sqrt(pi2mod.vals))
-      phat <- sapply(a, function(a.tmp, ...) mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
-      muhat <- predict(wrp$mumod, newdata = xa, type = "response")
-    
-      muhat.mat <- sapply(a, function(a.tmp, ...) {
-      
-        xa.tmp <- data.frame(a = a.tmp, x = x)
-        colnames(xa.tmp) <- colnames(xa) 
-        return(predict(wrp$mumod, newdata = xa.tmp, type = "response"))
-      
-      })
-    
-      # aggregate muhat.vals and integrate for influence
-      mhat <- colMeans(muhat.mat)
-      mhat.mat <- matrix(rep(mhat, n), byrow = TRUE, nrow = n)
-      int <- rowMeans(muhat.mat - mhat.mat)
-      
-      psi <- (y.new - muhat)/(pihat/phat) + mhat
-      return(psi)
-      
-    })
-    
-    rowMeans(psiMat)
-    
-  })
-  
-  dr_out <- apply(psi, 2, function(p, ...) sapply(a.vals, dr_est, psi = p, a = a, int = int, 
-                   family = family, span = span, se.fit = TRUE))
-  
-  estimate <- dr_out[1,]
-  variance <- dr_out[2,]
-  
-  names(estimate) <- names(variance) <- a.vals
+  names(estimate) <- a.vals
   out <- list(estimate = estimate, variance = variance)	
   
   return(out)
   
 }
-
 
 # LOESS function
 dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE) {
@@ -182,8 +154,6 @@ np_est <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   # estimate nuisance outcome model with SuperLearner
   mumod <- mgcv::gam(gam.model, data = xa, family = family, offset = offset)
   muhat <- predict(mumod, newdata = xa, type = "response")
-  # mumod <- glm(y ~ . + I(a^2), offset = offset, family = family, data = xa)
-  # muhat <- family$linkinv(predict(mumod, type = "link", newdata = xa))
 
   # estimate nuisance GPS functions via super learner
     
@@ -205,13 +175,11 @@ np_est <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
     
   }
   
-  
   pi2mod.vals <- c(pi2mod$SL.predict)
   
   # exposure models
   pihat <- dnorm(a, pimod.vals, sqrt(pi2mod.vals))
   phat <- sapply(a, function(a.tmp, ...) mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
-    
   
   # predict marginal outcomes given a.vals (or a.agg)
   muhat.mat <- sapply(a, function(a.tmp, ...) {
@@ -233,8 +201,7 @@ np_est <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   
 }
 
-# Nonparametric estimation
-np_est2 <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
+np_est_fast <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0, length(a)),
                    sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {
   
   # set up evaluation points & matrices for predictions
@@ -262,26 +229,60 @@ np_est2 <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   
   # estimate nuisance outcome model with SuperLearner
   mumod <- mgcv::gam(gam.model, data = xa, family = family, offset = offset)
+  muhat <- c(predict(mumod, newdata = xa, type = "response"))
   
   # estimate nuisance GPS functions via super learner
-  
   pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
-  pi2mod <- try(SuperLearner(Y = (a - c(pimod$SL.predict))^2, X = x, 
+  pimod.vals <- c(pimod$SL.predict)
+  
+  pi2mod <- try(SuperLearner(Y = (a - pimod.vals)^2, X = x, 
                              family = gaussian(), SL.library = sl.lib), silent = TRUE)
   
   if (inherits(pi2mod, "try-error")) {
     
-    pi2mod <- SuperLearner(Y = (a - c(pimod$SL.predict))^2, X = x, 
+    pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
                            family = gaussian(), SL.library = "SL.mean")
     
   } else if (any(pi2mod$SL.predict <= 0)) {
     
-    pi2mod <- SuperLearner(Y = (a - c(pimod$SL.predict))^2, X = x, 
+    pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
                            family = gaussian(), SL.library = "SL.mean")
     
   }
   
-  out <- list(mumod = mumod, pimod = pimod, pi2mod = pi2mod)
+  pi2mod.vals <- c(pi2mod$SL.predict)
+  
+  # exposure models
+  pihat <- dnorm(a, pimod.vals, sqrt(pi2mod.vals))
+  phat.vals <- sapply(a.vals, function(a.tmp, ...) 
+    mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
+  phat <- predict(smooth.spline(a.vals, phat.vals), x = a)$y
+  phat[which(phat < 0)] <- 1e-5
+  phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
+  
+  # predict marginal outcomes given a.vals (or a.agg)
+  muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
+    
+    xa.tmp <- data.frame(a = a.tmp, x = x)
+    colnames(xa.tmp) <- colnames(xa) 
+    return(predict(mumod, newdata = xa.tmp, type = "response"))
+    
+  })
+  
+  # aggregate muhat.vals and integrate for influence function
+  mhat.vals <- colMeans(muhat.mat)
+  mhat <- predict(smooth.spline(a.vals, mhat.vals), x = a)$y
+  mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
+  
+  # integrate
+  intfn <- (muhat.mat - mhat.mat) * phat.mat
+  int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
+                 (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
+  
+  int.vals <- predict(smooth.spline(a, int), x = a.vals)$y
+  
+  out <- list(muhat = muhat, mhat = mhat, pihat = pihat, phat = phat, int = int, 
+              mhat.vals = mhat.vals, phat.vals = phat.vals, int.vals = int.vals)
   
   return(out)
   
