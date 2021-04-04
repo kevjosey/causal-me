@@ -74,8 +74,8 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
 }
 
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
-fast <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
-                a.vals = seq(min(a), max(a), length.out = 20), fast = FALSE,
+erc_fast <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
+                a.vals = seq(min(a), max(a), length.out = 20),
                 sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){	
   
   n <- length(a)

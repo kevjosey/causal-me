@@ -10,11 +10,11 @@ library(SuperLearner)
 library(parallel)
 
 # Code for generating and fitting data
-source("D:/Github/causal-me/gen-data.R")
-source("D:/Github/causal-me/gibbs-sampler.R")
-source("D:/Github/causal-me/mclapply-hack.R")
-source("D:/Github/causal-me/blp.R")
-source("D:/Github/causal-me/erc.R")
+source("~Github/causal-me/gen-data.R")
+source("~Github/causal-me/gibbs-sampler.R")
+source("~/Github/causal-me/mclapply-hack.R")
+source("~/Github/causal-me/blp.R")
+source("~/Github/causal-me/erc.R")
 
 simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
@@ -189,4 +189,4 @@ scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 est <- mclapply.hack(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 3)
 rslt <- list(est = est, scen_idx = scen_mat)
 
-save(rslt, file = "D:/Github/causal-me/output/sim1_rslt.RData")
+save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim2_rslt.RData")

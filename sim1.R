@@ -142,11 +142,11 @@ scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 est <- mclapply.hack(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 4)
 rslt <- list(est = est, scen_idx = scen_mat)
 
-save(rslt, file = "~/Github/causal-me/output/sim1_rslt.RData")
+save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim1_rslt.RData")
 
 for (k in 1:length(rslt$est)){
 
-  filename <- paste0("~/Github/causal-me/output/ERC_", paste(rslt$scen_idx[k,], collapse = "_"), ".pdf")
+  filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/ERC_", paste(rslt$scen_idx[k,], collapse = "_"), ".pdf")
   pdf(file = filename)
   plotname <- paste(rslt$scen_idx[k,], collapse = "_")
 

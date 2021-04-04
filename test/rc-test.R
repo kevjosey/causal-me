@@ -141,9 +141,9 @@ out_cp <- rbind(rowMeans(cp_hat, na.rm = T), rowMeans(cp_x, na.rm = T))
 colnames(out_cp) <- a.vals
 rownames(out_cp) <- c("BLP", "BLP X")
 
-save(out_est, file = "~/Github/causal-me/output/bias_a_a.RData")
+save(out_est, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/bias_a_a.RData")
 
-pdf("~/Github/causal-me/output/bias_a_a.pdf")
+pdf("~/Dropbox (Personal)/Projects/ERC-EPE/Output/bias_a_a.pdf")
 plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 2,
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
      ylim = c(0,0.1))

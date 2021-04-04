@@ -33,12 +33,12 @@ m <- 1000 # c(500, 800)
 n <- 200 # c(100, 200)
 
 # gibbs sampler stuff
-thin <- 20
-n.iter <- 1000
-n.adapt <- 100
+thin <- 100
+n.iter <- 5000
+n.adapt <- 1000
 
 # dr arguments
-a.vals <- seq(6, 10, by = 0.25)
+a.vals <- seq(6, 10, by = 0.1)
 sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction")
 family <- poisson()
 
@@ -84,33 +84,36 @@ for (i in 1:n.sim){
   a_w <- blp(s = s_hat, s.id = s.id)
   a_x <- blp(s = s_hat, s.id = s.id, x = x)
   
-  w_new <- model.matrix(~ 0 + star*w)
-  gibbs_w <- gibbs_dr(s = s, star = star, s.id = s.id, id = id, w = w_new,
-                      n.iter = n.iter, n.adapt = n.adapt, thin = thin)
+  gibbs_w <- gibbs_dr(s = s, star = star,  y = y, offset = offset,
+                      s.id = s.id, id = id, w = w,
+                      n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
+                      h.a = 1, h.gamma = 0.3, deg.num = 3)
   
-  gibbs_x <- gibbs_dr(s = s, star = star, s.id = s.id, id = id, w = w_new, x = x,
-                      n.iter = n.iter, n.adapt = n.adapt, thin = thin)
+  gibbs_x <- gibbs_dr(s = s, star = star, y = y, offset = offset,
+                      s.id = s.id, id = id, w = w, x = x,
+                      n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
+                      h.a = 1, h.gamma = 0.3)
 
   # blp w/ pred
   
-  blp_w <- fast(y = y, a = a_w, x = x, offset = offset, family = family,
-               a.vals = a.vals, sl.lib = sl.lib)
-  blp_x <- fast(y = y, a = a_x, x = x, offset = offset, family = family,
-               a.vals = a.vals, sl.lib = sl.lib)
+  blp_w <- erc(y = y, a = a_w, x = x, offset = offset, family = family,
+               a.vals = a.vals, sl.lib = sl.lib, span = span, fast = TRUE)
+  blp_x <- erc(y = y, a = a_x, x = x, offset = offset, family = family,
+               a.vals = a.vals, sl.lib = sl.lib, span = span, fast = TRUE)
   
   # gibbs w/ pred
   
   out_w <- mclapply.hack(1:nrow(gibbs_w$amat), function(k, ...){
 
-    fast(y = y, a = gibbs_w$amat[k,], x = x, offset = offset, 
-        family = family, a.vals = a.vals, sl.lib = sl.lib)
+    erc(y = y, a = gibbs_w$amat[k,], x = x, offset = offset, span = span,
+        family = family, a.vals = a.vals, sl.lib = sl.lib, fast = TRUE)
 
   }, mc.cores = 4)
 
   out_x <- mclapply.hack(1:nrow(gibbs_x$amat), function(k, ...){
 
-    fast(y = y, a = gibbs_x$amat[k,], x = x, offset = offset,
-            family = family, a.vals = a.vals, sl.lib = sl.lib)
+    erc(y = y, a = gibbs_x$amat[k,], x = x, offset = offset, span = span,
+            family = family, a.vals = a.vals, sl.lib = sl.lib, fast = TRUE)
 
   }, mc.cores = 4)
   
@@ -124,9 +127,9 @@ for (i in 1:n.sim){
   
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
   est[i,2,] <- blp_w$estimate
-  est[i,3,] <- colMeans(gibbs_est_w)
+  est[i,3,] <- exp(colMeans(log(gibbs_est_w)))
   est[i,4,] <- blp_x$estimate
-  est[i,5,] <- colMeans(gibbs_est_x)
+  est[i,5,] <- exp(colMeans(log(gibbs_est_x)))
 
   # standard error
   
@@ -165,10 +168,10 @@ out_cp <- rbind(rowMeans(cp_blp_w, na.rm = T), rowMeans(cp_gibbs_w, na.rm = T),
 colnames(out_cp) <- a.vals
 rownames(out_cp) <- c("BLP W", "Gibbs W", "BLP X", "Gibbs X")
 
-save(out_est, file = "~/Github/causal-me/output/dr_rslt_a_a.RData")
-save(out_cp, file = "~/Github/causal-me/output/cp_rslt_a_a.RData")
+save(out_est, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/dr_rslt_a_a.RData")
+save(out_cp, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/cp_rslt_a_a.RData")
 
-pdf("~/Github/causal-me/output/rslt_a_a.pdf")
+pdf("~/Dropbox (Personal)/Projects/ERC-EPE/Output/rslt_a_a.pdf")
 plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 2,
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
      ylim = c(0,0.1))

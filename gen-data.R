@@ -30,9 +30,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   x2 <- stats::rnorm(n, 0, 1)
   x3 <- stats::rnorm(n, 0, 1)
   x4 <- stats::rnorm(n, 0, 1)
-  
-  w1 <- stats::rnorm(m, 1, 2)
-  w2 <- rep(NA, m)
+  x <- cbind(x1, x2, x3, x4)
   
   id <- 1:n
   s.id <- sample(id, m, replace = TRUE)
@@ -47,29 +45,20 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   u <- cbind(u1, u2, u3, u4)
   u <- u%*%solve(chol(cov(u)))
   
+  w1 <- stats::rnorm(m, 1, 2)
+  w2 <- stats::rnorm(m, 0, 1)
+  w <- cbind(w1, w2)
+  
   if (gps_scen == "b") {
-    
-    for (g in 1:n)
-      w2[s.id == g] <- u[g,4] + rnorm(sum(s.id == g), 0, 1)
     
     mu_gps <- 8 + 0.5*u[,1] - 0.5*u[,2] - 0.5*u[,3] + 0.5*u[,4]
     
-    
   } else {
-    
-    for (g in 1:n)
-      w2[s.id == g] <- x4[g] + rnorm(sum(s.id == g), 0, 1)
     
     mu_gps <- 8 + 0.5*x1 - 0.5*x2 - 0.5*x3 + 0.5*x4
     
   }
-  
-  x <- cbind(x1, x2, x3, x4)
-  u <- cbind(u1, u2, u3, u4)
-  w <- cbind(w1, w2)
-  
-  u <- u%*%solve(chol(cov(u)))
-  
+
   a <- rnorm(n, mu_gps, sig_gps)
   a_s <- rep(NA, m)
   

@@ -22,8 +22,8 @@ n.sim <- 100
 n.boot <- 50
 
 # dimensions
-m <- 500 # c(100, 200)
-n <- 100 # c(1000, 4000)
+m <- 1000 # c(100, 200)
+n <- 200 # c(1000, 4000)
 
 # simulation arguments
 n.sim <- 200
@@ -37,14 +37,14 @@ pred_scen <- "b"
 # other preliminaries
 span <- 0.5
 degree <- 3
-lambda <- seq(0.1, 2.1, by = 0.25)
+lambda <- seq(0.1, 2.1, by = 0.1)
 
 # gibbs sampler stuff
 thin <- 20
 n.iter <- 1000
 n.adapt <- 100
 
-a.vals <- seq(6, 10, by = 0.5)
+a.vals <- seq(6, 10, by = 0.25)
 sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction")
 family <- poisson()
 
@@ -97,7 +97,6 @@ for (i in 1:n.sim){
   
   naive <- erc(y = y, a = z_hat, x = x, offset = offset, family = family,
                a.vals = a.vals, sl.lib = sl.lib, span = span)
-  
   
   a_hat <- blp(s = s_hat, s.id = s.id, x = x)
   
