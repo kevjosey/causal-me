@@ -33,13 +33,12 @@ n <- 200 # c(100, 200)
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.1)
-# sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction")
-sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction")
+sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam")
 family <- poisson()
 
 # initialize output
-est <- array(NA, dim = c(n.sim, 6, length(a.vals)))
-se <- array(NA, dim = c(n.sim, 5, length(a.vals)))
+est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
+se <- array(NA, dim = c(n.sim, 4, length(a.vals)))
 
 for (i in 1:n.sim){
   
@@ -77,9 +76,8 @@ for (i in 1:n.sim){
   
   s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
   
-  a_tilde <- blp(s = s_tilde, s.id = s.id)
-  a_hat <- blp(s = s_hat, s.id = s.id)
-  a_x <- blp(s = s_hat, s.id = s.id, x = x)
+  a_tilde <- blp(s = s_tilde, s.id = s.id, x = x)
+  a_hat <- blp(s = s_hat, s.id = s.id, x = x)
   
   z_tilde_tmp <- aggregate(s_tilde, by = list(s.id), mean)
   z_hat_tmp <- aggregate(s_hat, by = list(s.id), mean)
@@ -94,20 +92,16 @@ for (i in 1:n.sim){
   }
   
   # naive
-  
   naive_tilde <- erc(y = y, a = z_tilde, x = x, offset = offset, family = family,
                      a.vals = a.vals, sl.lib = sl.lib, span = span)
   naive_hat <- erc(y = y, a = z_hat, x = x, offset = offset, family = family,
                    a.vals = a.vals, sl.lib = sl.lib, span = span)
   
-  # blp w/ pred
-  
+  # blp 
   blp_tilde <- erc(y = y, a = a_tilde, x = x, offset = offset, family = family,
                a.vals = a.vals, sl.lib = sl.lib, span = span)
   blp_hat <- erc(y = y, a = a_hat, x = x, offset = offset, family = family,
                a.vals = a.vals, sl.lib = sl.lib, span = span)
-  blp_x <- fast(y = y, a = a_x, x = x, offset = offset, family = family,
-                 a.vals = a.vals, sl.lib = sl.lib)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
@@ -115,13 +109,11 @@ for (i in 1:n.sim){
   est[i,3,] <- naive_hat$estimate
   est[i,4,] <- blp_tilde$estimate
   est[i,5,] <- blp_hat$estimate
-  est[i,6,] <- blp_x$estimate
   
   se[i,1,] <- sqrt(naive_tilde$variance)
   se[i,2,] <- sqrt(naive_hat$variance)
   se[i,3,] <- sqrt(blp_tilde$variance)
   se[i,4,] <- sqrt(blp_hat$variance)
-  se[i,5,] <- sqrt(blp_x$variance)
   
 }
 
@@ -129,21 +121,6 @@ out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals
 rownames(out_est) <- c("SAMPLE ERC","Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat", "BLP X")
 
-cp_hat <- sapply(1:n.sim, function(i,...)
-  as.numeric((est[i,5,] - 1.96*se[i,4,]) < colMeans(est[,1,],na.rm = TRUE) & 
-               (est[i,5,] + 1.96*se[i,4,]) > colMeans(est[,1,],na.rm = TRUE)))
-
-cp_x <- sapply(1:n.sim, function(i,...)
-  as.numeric((est[i,6,] - 1.96*se[i,5,]) < colMeans(est[,1,],na.rm = TRUE) & 
-               (est[i,6,] + 1.96*se[i,5,]) > colMeans(est[,1,],na.rm = TRUE)))
-
-out_cp <- rbind(rowMeans(cp_hat, na.rm = T), rowMeans(cp_x, na.rm = T))
-colnames(out_cp) <- a.vals
-rownames(out_cp) <- c("BLP", "BLP X")
-
-save(out_est, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/bias_a_a.RData")
-
-pdf("~/Dropbox (Personal)/Projects/ERC-EPE/Output/bias_a_a.pdf")
 plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 2,
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
      ylim = c(0,0.1))
@@ -151,11 +128,10 @@ lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = "red", lwd = 2, lt
 lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "blue", lwd = 2, lty = 2)
 lines(a.vals, colMeans(est, na.rm = T)[4,], type = "l", col = "red", lwd = 2, lty = 3)
 lines(a.vals, colMeans(est, na.rm = T)[5,], type = "l", col = "blue", lwd = 2, lty = 3)
-lines(a.vals, colMeans(est, na.rm = T)[6,], type = "l", col = "purple", lwd = 2, lty = 1)
 
 legend(6, 0.1, legend=c("Sample ERC", "Without Prediction Correction",
                         "With Prediction Correction", "Without Aggregation Correction",
-                        "With Aggregation Correction", "Include GPS"),
-       col=c("darkgreen", "red", "blue", "black", "black", "purple"),
-       lty = c(1,1,1,2,3,1), lwd=2, cex=0.8)
-dev.off()
+                        "With Aggregation Correction"),
+       col=c("darkgreen", "red", "blue", "black", "black"),
+       lty = c(1,1,1,2,3), lwd=2, cex=0.8)
+

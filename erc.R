@@ -1,23 +1,14 @@
 
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
 erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
-                a.vals = seq(min(a), max(a), length.out = 20), fast = FALSE,
+                a.vals = seq(min(a), max(a), length.out = 20),
                 span = NULL, span.seq = seq(0.05, 1, by = 0.05), k = 5,
                 sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){	
   
   n <- length(a)
   
-  if (fast) {
-    
-    wrap <- np_est_fast(y = y, a = a, x = x, a.vals = a.vals, offset = offset, 
-                   family = family, sl.lib = sl.lib)
-    
-  } else {
-    
-    wrap <- np_est(y = y, a = a, x = x, offset = offset, 
-                   family = family, sl.lib = sl.lib)
-    
-  }
+  wrap <- np_est(y = y, a = a, x = x, offset = offset, 
+                 a.vals = a.vals, family = family, sl.lib = sl.lib)
   
   muhat <- wrap$muhat
   mhat <- wrap$mhat
@@ -25,8 +16,7 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   phat <- wrap$phat
   int <- wrap$int
   y.new <- family$linkinv(family$linkfun(y) - offset)
-  # psi <- (y.new - muhat)/(pihat/phat) + mhat
-  psi <- mhat
+  psi <- (y.new - muhat)/(pihat/phat) + mhat
   
   if(is.null(span)) {
     
@@ -73,26 +63,6 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   
 }
 
-# wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
-erc_fast <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
-                a.vals = seq(min(a), max(a), length.out = 20),
-                sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){	
-  
-  n <- length(a)
-  
-  wrap <- np_est_fast(y = y, a = a, x = x, a.vals = a.vals, offset = offset,
-                      family = family, sl.lib = sl.lib)
-  
-  estimate <- wrap$mhat.vals
-  variance <- c(wrap$int.vals^2)
-  
-  names(estimate) <- a.vals
-  out <- list(estimate = estimate, variance = variance)	
-  
-  return(out)
-  
-}
-
 # LOESS function
 dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE) {
   
@@ -124,84 +94,7 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
   
 }
 
-# Nonparametric estimation
-np_est <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
-                   sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {
-  
-  # set up evaluation points & matrices for predictions
-  n <- nrow(x)
-  x <- data.frame(x)
-  xa <- data.frame(a = a, x = x)
-  colnames(xa) <- c("a", colnames(x))
-  
-  cts.x <- apply(x, 2, function(x) (length(unique(x)) > 4))
-  
-  cts.form <- paste(paste("s(", colnames(x[,cts.x,drop = FALSE]), ")",
-                          sep = ""), collapse = "+")
-  
-  cat.form <- paste(colnames(x[, !cts.x, drop = FALSE]), collapse = "+")
-
-  if (sum(!cts.x) > 0) {
-    gam.model <- formula(paste("y ~ s(a) + ", cts.form , "+", cat.form ))
-  } else {
-    gam.model <- formula(paste("y ~ s(a) + ", cts.form))
-  }
-  
-  if (sum(!cts.x) == length(cts.x)) {
-    gam.model <- formula(paste("y ~ s(a) + ", paste(colnames(x), collapse = "+"), sep = ""))
-  }
-  
-  # estimate nuisance outcome model with SuperLearner
-  mumod <- mgcv::gam(gam.model, data = xa, family = family, offset = offset)
-  muhat <- predict(mumod, newdata = xa, type = "response")
-
-  # estimate nuisance GPS functions via super learner
-    
-  pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
-  pimod.vals <- c(pimod$SL.predict)
-  
-  pi2mod <- try(SuperLearner(Y = (a - pimod.vals)^2, X = x, 
-                             family = gaussian(), SL.library = sl.lib), silent = TRUE)
-  
-  if (inherits(pi2mod, "try-error")) {
-    
-    pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
-                           family = gaussian(), SL.library = "SL.mean")
-    
-  } else if (any(pi2mod$SL.predict <= 0)) {
-    
-    pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
-                           family = gaussian(), SL.library = "SL.mean")
-    
-  }
-  
-  pi2mod.vals <- c(pi2mod$SL.predict)
-  
-  # exposure models
-  pihat <- dnorm(a, pimod.vals, sqrt(pi2mod.vals))
-  phat <- sapply(a, function(a.tmp, ...) mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
-  
-  # predict marginal outcomes given a.vals (or a.agg)
-  muhat.mat <- sapply(a, function(a.tmp, ...) {
-    
-    xa.tmp <- data.frame(a = a.tmp, x = x)
-    colnames(xa.tmp) <- colnames(xa) 
-    return(predict(mumod, newdata = xa.tmp, type = "response"))
-    
-  })
-  
-  # aggregate muhat.vals and integrate for influence
-  mhat <- colMeans(muhat.mat)
-  mhat.mat <- matrix(rep(mhat, n), byrow = TRUE, nrow = n)
-  int <- rowMeans(muhat.mat - mhat.mat)
-  
-  out <- list(muhat = muhat, mhat = mhat, pihat = pihat, phat = phat, int = int)
-  
-  return(out)
-  
-}
-
-np_est_fast <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0, length(a)),
+np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0, length(a)),
                    sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {
   
   # set up evaluation points & matrices for predictions
@@ -279,10 +172,8 @@ np_est_fast <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = 
   int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
                  (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
   
-  int.vals <- predict(smooth.spline(a, int), x = a.vals)$y
-  
   out <- list(muhat = muhat, mhat = mhat, pihat = pihat, phat = phat, int = int, 
-              mhat.vals = mhat.vals, phat.vals = phat.vals, int.vals = int.vals)
+              mhat.vals = mhat.vals, phat.vals = phat.vals)
   
   return(out)
   
@@ -294,4 +185,3 @@ opt_fun <- function(par, k.std, psi, gh, family = gaussian()) {
   sum(k.std*(psi - family$linkinv(c(gh %*% par)))^2)
   
 }
-

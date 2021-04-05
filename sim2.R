@@ -10,8 +10,8 @@ library(SuperLearner)
 library(parallel)
 
 # Code for generating and fitting data
-source("~Github/causal-me/gen-data.R")
-source("~Github/causal-me/gibbs-sampler.R")
+source("~/Github/causal-me/gen-data.R")
+source("~/Github/causal-me/gibbs-sampler.R")
 source("~/Github/causal-me/mclapply-hack.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
@@ -29,7 +29,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   # gen data arguments
   n <- scenario$n # c(500, 800)
-  m <- n*scenario$mult# c(100, 200)
+  m <- n*scenario$mult # c(100, 200)
   
   # gibbs sampler stuff
   thin <- 20
@@ -75,16 +75,10 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
       id <- dat$id[(id %in% keep)]
     }
     
+    # exposure predictions
     stilde <- pred(s = s, star = star, w = w, sl.lib = sl.lib)
     a_w <- blp(s = stilde, s.id = s.id)
     a_x <- blp(s = stilde, s.id = s.id, x = x)
-    
-    w_new <- model.matrix(~ 0 + star*w)
-    gibbs_w <- gibbs_dr(s = s, star = star, s.id = s.id, id = id, w = w_new,
-                        n.iter = n.iter, n.adapt = n.adapt, thin = thin)
-    
-    gibbs_x <- gibbs_dr(s = s, star = star, s.id = s.id, id = id, w = w_new, x = x,
-                        n.iter = n.iter, n.adapt = n.adapt, thin = thin)
     
     # blp w/ pred
     
@@ -93,48 +87,32 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     blp_x <- erc(y = y, a = a_x, x = x, offset = offset, family = family,
                  a.vals = a.vals, sl.lib = sl.lib, span = span)
     
-    # gibbs w/ pred
+    # Bayesian Approach
     
-    a_list_w <- split(gibbs_w$amat, seq(nrow(gibbs_w$amat)))
-    a_list_x <- split(gibbs_x$amat, seq(nrow(gibbs_x$amat)))
+    gibbs_w <- gibbs_dr(s = s, star = star, y = y, offset = offset,
+                        s.id = s.id, id = id, w = w, family = family,
+                        n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
+                        h.a = 1, h.gamma = 0.3, deg.num = 2,
+                        a.vals = a.vals, span = span, mc.cores = 4)
     
-    out_w <- mclapply.hack(1:length(a_list_x), function(k, ...){
-      
-      erc(y = y, a = a_list_w[[k]], x = x, offset = offset, family = family,
-          a.vals = a.vals, sl.lib = sl.lib, span = span)
-      
-    }, mc.cores = 4)
-    
-    out_x <- mclapply.hack(1:length(a_list_x), function(k, ...){
-      
-      erc(y = y, a = a_list_x[[k]], x = x, offset = offset, family = family,
-          a.vals = a.vals, sl.lib = sl.lib, span = span)
-      
-    }, mc.cores = 4)
-    
-    gibbs_est_w <- do.call(rbind, lapply(out_w, function(o) o$estimate))
-    gibbs_var_w <- do.call(rbind, lapply(out_w, function(o) o$variance))
-    
-    gibbs_est_x <- do.call(rbind, lapply(out_x, function(o) o$estimate))
-    gibbs_var_x <- do.call(rbind, lapply(out_x, function(o) o$variance))
+    gibbs_x <- gibbs_dr(s = s, star = star, y = y, offset = offset,
+                        s.id = s.id, id = id, w = w, x = x, family = family,
+                        n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
+                        h.a = 1, h.gamma = 0.3, deg.num = 2,
+                        a.vals = a.vals, span = span, mc.cores = 4)
     
     # estimates
-    
     est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
     est[i,2,] <- blp_w$estimate
-    est[i,3,] <- colMeans(gibbs_est_w)
+    est[i,3,] <- gibbs_w$estimate
     est[i,4,] <- blp_x$estimate
-    est[i,5,] <- colMeans(gibbs_est_x)
+    est[i,5,] <- gibbs_x$estimate
     
     #standard error
-    
-    var_w <- colMeans(gibbs_var_w) + (1 + 1/nrow(gibbs_est_w))*apply(gibbs_est_w, 2, var)
-    var_x <- colMeans(gibbs_var_x) + (1 + 1/nrow(gibbs_est_x))*apply(gibbs_est_x, 2, var)
-    
     se[i,1,] <- sqrt(blp_w$variance)
-    se[i,2,] <- sqrt(var_w)
+    se[i,2,] <- sqrt(gibbs_w$variance)
     se[i,3,] <- sqrt(blp_x$variance)
-    se[i,4,] <- sqrt(var_x)
+    se[i,4,] <- sqrt(gibbs_x$variance)
     
   }
   
@@ -179,8 +157,8 @@ a.vals <- seq(6, 10, by = 0.25)
 sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.gam")
 n.sim <- 1000
 
-n <- c(500)
-mult <- c(4)
+n <- c(200,500)
+mult <- c(2,5)
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
 
