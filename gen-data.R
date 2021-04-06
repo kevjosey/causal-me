@@ -37,28 +37,31 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   offset <- runif(n, 5, 50)
   
   # transformed predictors
-  u1 <- as.numeric(scale((x1 + x2)^2))
-  u2 <- as.numeric(scale(cos(2*x2)))
-  u3 <- as.numeric(scale(sin(2*x3)))
-  u4 <- as.numeric(scale(-abs(x3 + x4)))
+  u1 <- as.numeric(scale(exp(x1/2)))
+  u2 <- as.numeric(scale(x2/(1 + exp(x1)) + 10))
+  u3 <- as.numeric(scale((x1*x3/25 + 0.6)^3))
+  u4 <- as.numeric(scale((x2 + x4 + 20)^2))
   
   u <- cbind(u1, u2, u3, u4)
-  u <- u%*%solve(chol(cov(u)))
-  
-  w1 <- stats::rnorm(m, 1, 2)
-  w2 <- stats::rnorm(m, 0, 1)
-  w <- cbind(w1, w2)
+  # u <- u%*%solve(chol(cov(u)))
+  w2 <- rep(NA, m)
   
   if (gps_scen == "b") {
     
     mu_gps <- 8 + 0.5*u[,1] - 0.5*u[,2] - 0.5*u[,3] + 0.5*u[,4]
+    for (g in 1:n)
+      w2[s.id == g] <- rnorm(sum(s.id == g), u[id == g,2], 1)
     
   } else {
     
     mu_gps <- 8 + 0.5*x1 - 0.5*x2 - 0.5*x3 + 0.5*x4
+    for (g in 1:n)
+      w2[s.id == g] <- rnorm(sum(s.id == g), x2[id == g], 1)
     
   }
 
+  w1 <- stats::rnorm(m, 1, 2)
+  w <- cbind(w1, w2)
   a <- rnorm(n, mu_gps, sig_gps)
   a_s <- rep(NA, m)
   
@@ -68,7 +71,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   s <- rnorm(m, a_s, sig_agg)
   
   if (pred_scen == "b"){
-    star <- rnorm(m, s - 0.1 + 0.5*w1 - 0.5*w2, sig_pred)
+    star <- rnorm(m, s - 0.25 + 0.5*w1 - 0.5*w2, sig_pred)
   } else {
     star <- rnorm(m, s, sig_pred)
   }
@@ -92,29 +95,29 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
 predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
   
   # transformed predictors
-  u1 <- as.numeric(scale((x[,1] + x[,1])^2))
-  u2 <- as.numeric(scale(cos(2*x[,2])))
-  u3 <- as.numeric(scale(sin(2*x[,3])))
-  u4 <- as.numeric(scale(-abs(x[,3] + x[,4])))
+  u1 <- as.numeric(scale(exp(x[,1]/2)))
+  u2 <- as.numeric(scale(x[,2]/(1 + exp(x[,1])) + 10))
+  u3 <- as.numeric(scale((x[,1]*x[,3]/25 + 0.6)^3))
+  u4 <- as.numeric(scale((x[,2] + x[,4] + 20)^2))
   
   u <- cbind(u1, u2, u3, u4)
   out <- rep(NA, length(a.vals))
   
-  # for(i in 1:length(a.vals)) {
-  # 
-  #   a.vec <- rep(a.vals[i],nrow(x))
-  # 
-  #   if (out_scen == "b") {
-  #     mu_out <- exp(-3 + u %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
-  #   } else { # out_scen == "a"
-  #     mu_out <- exp(-3 + x %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
-  #   }
-  # 
-  #   out[i] <- exp(mean(log(mu_out)))
-  # 
-  # }
+  for(i in 1:length(a.vals)) {
+
+    a.vec <- rep(a.vals[i],nrow(x))
+
+    if (out_scen == "b") {
+      mu_out <- exp(-3 + u %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
+    } else { # out_scen == "a"
+      mu_out <- exp(-3 + x %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
+    }
+
+    out[i] <- exp(mean(log(mu_out)))
+
+  }
   
-  out <- exp(-3 + 0.2/2 + 0.3*(a.vals - 8) - 0.1*(a.vals - 8)^2 )
+  # out <- exp(-3 + 0.2/2 + 0.3*(a.vals - 8) - 0.1*(a.vals - 8)^2 )
   
   return(out)
   

@@ -25,7 +25,7 @@ sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.75
+span <- NULL
 
 # gen data arguments
 m <- 1000 # c(500, 800)
@@ -33,7 +33,7 @@ n <- 200 # c(100, 200)
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.1)
-sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam")
+sl.lib <- c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth")
 family <- poisson()
 
 # initialize output
@@ -75,7 +75,6 @@ for (i in 1:n.sim){
   }
   
   s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
-  
   a_tilde <- blp(s = s_tilde, s.id = s.id, x = x)
   a_hat <- blp(s = s_hat, s.id = s.id, x = x)
   
@@ -119,7 +118,7 @@ for (i in 1:n.sim){
 
 out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals
-rownames(out_est) <- c("SAMPLE ERC","Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat", "BLP X")
+rownames(out_est) <- c("SAMPLE ERC","Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
 
 plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 2,
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
@@ -134,4 +133,3 @@ legend(6, 0.1, legend=c("Sample ERC", "Without Prediction Correction",
                         "With Aggregation Correction"),
        col=c("darkgreen", "red", "blue", "black", "black"),
        lty = c(1,1,1,2,3), lwd=2, cex=0.8)
-

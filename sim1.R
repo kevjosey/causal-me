@@ -12,7 +12,6 @@ library(parallel)
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/gibbs-sampler.R")
-source("~/Github/causal-me/mclapply-hack.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -23,7 +22,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   sig_agg <- scenario$sig_agg
   sig_pred <- scenario$sig_pred
   prob <- scenario$prob
-  span <- NULL
+  span <- 0.75
   gps_scen <- "a"
   out_scen <- "a"
   
@@ -34,7 +33,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   # initialize output
   est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
-  se <- array(NA, dim = c(n.sim, 5, length(a.vals)))
+  se <- array(NA, dim = c(n.sim, 4, length(a.vals)))
   
   for (i in 1:n.sim){
     
@@ -151,12 +150,12 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
 set.seed(42)
 
 # simulation scenarios
-a.vals <- seq(6, 10, by = 0.25)
-sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction")
+a.vals <- seq(6, 10, by = 0.1)
+sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
 n.sim <- 1000
 
 n <- c(200, 500)
-mult <- c(2,5)
+mult <- c(5, 10)
 sig_pred <- c(sqrt(0.5), sqrt(2)) 
 sig_agg <- c(sqrt(0.5), sqrt(2))
 prob <- c(0.1, 0.2)
@@ -164,7 +163,7 @@ prob <- c(0.1, 0.2)
 scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred, prob = prob)
 scen_mat <- round(scen_mat, 3)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
-est <- mclapply.hack(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 4)
+est <- mclapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 4)
 rslt <- list(est = est, scen_idx = scen_mat)
 
 save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim1_rslt.RData")
@@ -191,4 +190,3 @@ save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim1_rslt.RData"
 #   dev.off()
 #   
 # }
-

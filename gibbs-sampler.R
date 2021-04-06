@@ -41,7 +41,7 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   # initialize exposures
   a.tmp <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
   a <- aggregate(a.tmp, by = list(s.id), mean)[,2]
-  nsa <- ns(a, deg.num)
+  nsa <- ns(a, deg.num, Boundary.knots = c(min(a) - sd(a)/sqrt(n), max(a) + sd(a)/sqrt(n)))
   xa <- as.matrix(cbind(x, nsa))
   a.s <- rep(NA, length(s.id))
   
@@ -203,7 +203,8 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     # predict marginal outcomes given a.vals (or a.agg)
     muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
 
-      xa.tmp <- cbind(x = x, matrix(rep(c(predict(nsa, a.tmp)), n),byrow = TRUE, nrow = n))
+      xa.tmp <- cbind(x = x, matrix(rep(c(predict(nsa, a.tmp)), n), 
+                                    byrow = TRUE, nrow = n))
       return(exp(c(xa.tmp %*% gamma[k,])))
 
     })

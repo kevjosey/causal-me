@@ -72,7 +72,7 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
   knn <- rep(0, length(a))
   knn[idx] <- 1
   max.a.std <- max(abs(a.std*knn))
-  k.std <- ((70/81)*(1 - abs(a.std/max.a.std)^3)^3)*knn
+  k.std <- c((70/81)*(1 - abs(a.std/max.a.std)^3)^3)*knn
   
   # a.std <- (a - newa) / h
   # k.std <- dnorm(a.std) / h
