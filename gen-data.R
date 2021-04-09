@@ -43,7 +43,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   u4 <- as.numeric(scale((x2 + x4 + 20)^2))
   
   u <- cbind(u1, u2, u3, u4)
-  # u <- u%*%solve(chol(cov(u)))
+  u <- u%*%solve(chol(cov(u)))
   w2 <- rep(NA, m)
   
   if (gps_scen == "b") {
@@ -71,7 +71,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   s <- rnorm(m, a_s, sig_agg)
   
   if (pred_scen == "b"){
-    star <- rnorm(m, s - 0.25 + 0.5*w1 - 0.5*w2, sig_pred)
+    star <- rnorm(m, s - 0.5 + 0.5*w1 - 0.5*w2, sig_pred)
   } else {
     star <- rnorm(m, s, sig_pred)
   }

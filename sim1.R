@@ -7,13 +7,14 @@ rm(list = ls())
 library(data.table)
 library(mvtnorm)
 library(SuperLearner)
+library(earth)
 library(parallel)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/gibbs-sampler.R")
-source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/gen-data.R")
+source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/gibbs-sampler.R")
+source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/blp.R")
+source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/erc.R")
 
 simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
@@ -116,7 +117,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   out_est <- colMeans(est, na.rm = T)
   colnames(out_est) <- a.vals
   rownames(out_est) <- c("SAMPLE ERC", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
-
+  
   out_se <- colMeans(se, na.rm = T)
   colnames(out_se) <- a.vals
   rownames(out_se) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
@@ -145,7 +146,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   return(list(est = out_est, se = out_se, cp = out_cp))
   
 }
-  
+
 # for replication
 set.seed(42)
 
@@ -156,37 +157,37 @@ n.sim <- 1000
 
 n <- c(200, 500)
 mult <- c(5, 10)
-sig_pred <- c(sqrt(0.5), sqrt(2)) 
-sig_agg <- c(sqrt(0.5), sqrt(2))
+sig_pred <- c(0,sqrt(0.5)) 
+sig_agg <- c(0,sqrt(2))
 prob <- c(0.1, 0.2)
 
 scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred, prob = prob)
 scen_mat <- round(scen_mat, 3)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
-est <- mclapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 4)
+est <- mclapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 16)
 rslt <- list(est = est, scen_idx = scen_mat)
 
-save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim1_rslt.RData")
+save(rslt, file = "~/shared_space/ci3_analysis/josey_causal_me/Output/sim1_rslt.RData")
 
-# for (k in 1:length(rslt$est)){
-# 
-#   filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/ERC_", paste(rslt$scen_idx[k,], collapse = "_"), ".pdf")
-#   pdf(file = filename)
-#   plotname <- paste(rslt$scen_idx[k,], collapse = "_")
-# 
-#   plot(a.vals, rslt$est[[k]][1,], type = "l", col = "darkgreen", lwd = 2,
-#        main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event",
-#        ylim = c(0,0.1))
-#   lines(a.vals, rslt$est[[k]][2,], type = "l", col = "red", lwd = 2, lty = 2)
-#   lines(a.vals, rslt$est[[k]][3,], type = "l", col = "blue", lwd = 2, lty = 2)
-#   lines(a.vals, rslt$est[[k]][4,], type = "l", col = "red", lwd = 2, lty = 3)
-#   lines(a.vals, rslt$est[[k]][5,], type = "l", col = "blue", lwd = 2, lty = 3)
-# 
-#   legend(6, 0.1, legend=c("Sample ERC", "Without Prediction Correction",
-#                           "With Prediction Correction", "Without Aggregation Correction"),
-#          col=c("darkgreen", "red", "blue", "black", "black"),
-#          lty = c(1,1,1,2,3), lwd=2, cex=0.8)
-# 
-#   dev.off()
-#   
-# }
+for (k in 1:length(rslt$est)){
+  
+  filename <- paste0("~/shared_space/ci3_analysis/josey_causal_me/Output/", paste(rslt$scen_idx[k,], collapse = "_"), ".pdf")
+  pdf(file = filename)
+  plotname <- paste(rslt$scen_idx[k,], collapse = "_")
+  
+  plot(a.vals, rslt$est[[k]]$est[1,], type = "l", col = "darkgreen", lwd = 2,
+       xlab = "Exposure", ylab = "Rate of Event",
+       ylim = c(0,0.1))
+  lines(a.vals, rslt$est[[k]]$est[2,], type = "l", col = "red", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[k]]$est[3,], type = "l", col = "blue", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[k]]$est[4,], type = "l", col = "red", lwd = 2, lty = 3)
+  lines(a.vals, rslt$est[[k]]$est[5,], type = "l", col = "blue", lwd = 2, lty = 3)
+  
+  legend(6, 0.1, legend=c("Sample ERC", "Without Prediction Correction",
+                          "With Prediction Correction", "Without Aggregation Correction"),
+         col=c("darkgreen", "red", "blue", "black", "black"),
+         lty = c(1,1,1,2,3), lwd=2, cex=0.8)
+  
+  dev.off()
+  
+}

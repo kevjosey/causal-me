@@ -7,7 +7,7 @@ rm(list = ls())
 library(data.table)
 library(mvtnorm)
 library(SuperLearner)
-library(gam)
+library(splines)
 library(parallel)
 
 # Code for generating and fitting data
@@ -17,7 +17,7 @@ source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
 # simulation arguments
-n.sim <- 100
+n.sim <- 200
 sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
@@ -40,7 +40,7 @@ deg.num <- 4
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.1)
-sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
+sl.lib <- c("SL.glm")
 family <- poisson()
 
 # initialize output
@@ -92,7 +92,7 @@ for (i in 1:n.sim){
   gibbs_x <- gibbs_dr(s = s, star = star, y = y, offset = offset,
                       s.id = s.id, id = id, w = w, x = x, family = family,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-                      h.a = 1, h.gamma = 0.3, deg.num = 2,
+                      h.a = 1, h.gamma = 0.3, deg.num = deg.num,
                       a.vals = a.vals, span = span, mc.cores = 4)
   
   # estimates
@@ -129,5 +129,5 @@ lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = "red", lwd = 2, lt
 lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "blue", lwd = 2, lty = 1)
 
 legend(6, 0.1, legend=c("Sample ERC", "Single Imputation", "Bayesian"),
-       col=c("darkgreen", "red", "blue", "black", "black"),
+       col=c("darkgreen", "red", "blue"),
        lty = c(1,1,1), lwd=2, cex=0.8)

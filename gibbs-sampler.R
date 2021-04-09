@@ -23,6 +23,9 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   w <- w[s.id %in% id,]
   s.id <- s.id[s.id %in% id]
   
+  m <- length(s.id)
+  n <- length(id)
+  
   if (is.null(x)) {
     x <- matrix(1, nrow = length(id), ncol = 1)
   } else {
@@ -49,8 +52,6 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     a.s[s.id == g] <- a[id == g]
   
   # dimensions
-  m <- length(s.id)
-  n <- length(id)
   p <- ncol(x)
   q <- ncol(ws)
   o <- ncol(xa)

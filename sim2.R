@@ -7,13 +7,14 @@ rm(list = ls())
 library(data.table)
 library(mvtnorm)
 library(SuperLearner)
+library(splines)
 library(parallel)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/gibbs-sampler.R")
-source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/gen-data.R")
+source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/gibbs-sampler.R")
+source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/blp.R")
+source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/erc.R")
 
 simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
@@ -95,8 +96,8 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     est[i,3,] <- gibbs_x$estimate
     
     #standard error
-    se[i,2,] <- sqrt(blp_x$variance)
-    se[i,3,] <- sqrt(gibbs_x$variance)
+    se[i,1,] <- sqrt(blp_x$variance)
+    se[i,2,] <- sqrt(gibbs_x$variance)
     
   }
   
@@ -129,8 +130,8 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.1)
-sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
-n.sim <- 1000
+sl.lib <- c("SL.glm")
+n.sim <- 200
 
 n <- c(200,500)
 mult <- c(5,10)
@@ -139,7 +140,7 @@ out_scen <- c("a", "b")
 
 scen_mat <- expand.grid(n = n, mult = mult, gps_scen = gps_scen, out_scen = out_scen)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
-est <- mclapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 4)
+est <- lapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib)
 rslt <- list(est = est, scen_idx = scen_mat)
 
-save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim2_rslt.RData")
+save(rslt, file = "~/shared_space/ci3_analysis/josey_causal_me/Output/sim2_rslt.RData")
