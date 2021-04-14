@@ -36,7 +36,7 @@ n.iter <- 5000
 n.adapt <- 500
 h.a <- 1
 h.gamma <- 0.3
-deg.num <- 4
+deg.num <- 2
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.1)

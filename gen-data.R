@@ -95,29 +95,29 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
 predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
   
   # transformed predictors
-  u1 <- as.numeric(scale(exp(x[,1]/2)))
-  u2 <- as.numeric(scale(x[,2]/(1 + exp(x[,1])) + 10))
-  u3 <- as.numeric(scale((x[,1]*x[,3]/25 + 0.6)^3))
-  u4 <- as.numeric(scale((x[,2] + x[,4] + 20)^2))
+  # u1 <- as.numeric(scale(exp(x[,1]/2)))
+  # u2 <- as.numeric(scale(x[,2]/(1 + exp(x[,1])) + 10))
+  # u3 <- as.numeric(scale((x[,1]*x[,3]/25 + 0.6)^3))
+  # u4 <- as.numeric(scale((x[,2] + x[,4] + 20)^2))
+  # 
+  # u <- cbind(u1, u2, u3, u4)
+  # out <- rep(NA, length(a.vals))
+  # 
+  # for(i in 1:length(a.vals)) {
+  # 
+  #   a.vec <- rep(a.vals[i],nrow(x))
+  # 
+  #   if (out_scen == "b") {
+  #     mu_out <- exp(-3 + u %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
+  #   } else { # out_scen == "a"
+  #     mu_out <- exp(-3 + x %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
+  #   }
+  # 
+  #   out[i] <- exp(mean(log(mu_out)))
+  # 
+  # }
   
-  u <- cbind(u1, u2, u3, u4)
-  out <- rep(NA, length(a.vals))
-  
-  for(i in 1:length(a.vals)) {
-
-    a.vec <- rep(a.vals[i],nrow(x))
-
-    if (out_scen == "b") {
-      mu_out <- exp(-3 + u %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
-    } else { # out_scen == "a"
-      mu_out <- exp(-3 + x %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
-    }
-
-    out[i] <- exp(mean(log(mu_out)))
-
-  }
-  
-  # out <- exp(-3 + 0.2/2 + 0.3*(a.vals - 8) - 0.1*(a.vals - 8)^2 )
+  out <- exp(-3 + 0.2/2 + 0.3*(a.vals - 8) - 0.1*(a.vals - 8)^2 )
   
   return(out)
   

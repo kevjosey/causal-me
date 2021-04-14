@@ -88,35 +88,35 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     }
     
     # naive
-    naive_tilde <- erc(y = y, a = z_tilde, x = x, offset = offset, family = family,
-                       a.vals = a.vals, sl.lib = sl.lib, span = span)
-    naive_hat <- erc(y = y, a = z_hat, x = x, offset = offset, family = family,
-                     a.vals = a.vals, sl.lib = sl.lib, span = span)
+    naive_tilde <- try(erc(y = y, a = z_tilde, x = x, offset = offset, family = family,
+                           a.vals = a.vals, sl.lib = sl.lib, span = span), silent = TRUE)
+    naive_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, family = family,
+                         a.vals = a.vals, sl.lib = sl.lib, span = span), silent = TRUE)
     
     # blp approach
-    blp_tilde <- erc(y = y, a = a_tilde, x = x, offset = offset, family = family,
-                     a.vals = a.vals, sl.lib = sl.lib, span = span)
-    blp_hat <- erc(y = y, a = a_hat, x = x, offset = offset, family = family,
-                   a.vals = a.vals, sl.lib = sl.lib, span = span)
+    blp_tilde <- try(erc(y = y, a = a_tilde, x = x, offset = offset, family = family,
+                         a.vals = a.vals, sl.lib = sl.lib, span = span), silent = TRUE)
+    blp_hat <- try(erc(y = y, a = a_hat, x = x, offset = offset, family = family,
+                       a.vals = a.vals, sl.lib = sl.lib, span = span), silent = TRUE)
     
     # estimates
     est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
-    est[i,2,] <- naive_tilde$estimate
-    est[i,3,] <- naive_hat$estimate
-    est[i,4,] <- blp_tilde$estimate
-    est[i,5,] <- blp_hat$estimate
+    est[i,2,] <- if (!inherits(naive_tilde, "try-error")) {naive_tilde$estimate} else {rep(NA, length(a.vals))}
+    est[i,3,] <- if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))}
+    est[i,4,] <- if (!inherits(blp_tilde, "try-error")) {blp_tilde$estimate} else {rep(NA, length(a.vals))}
+    est[i,5,] <- if (!inherits(blp_hat, "try-error")) {blp_hat$estimate} else {rep(NA, length(a.vals))}
     
     # standard errors
-    se[i,1,] <- sqrt(naive_tilde$variance)
-    se[i,2,] <- sqrt(naive_hat$variance)
-    se[i,3,] <- sqrt(blp_tilde$variance)
-    se[i,4,] <- sqrt(blp_hat$variance)
+    se[i,1,] <- if (!inherits(naive_tilde, "try-error")) {sqrt(naive_tilde$variance)} else {rep(NA, length(a.vals))}
+    se[i,2,] <- if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))}
+    se[i,3,] <- if (!inherits(blp_tilde, "try-error")) {sqrt(blp_tilde$variance)} else {rep(NA, length(a.vals))}
+    se[i,4,] <- if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))}
     
   }
   
   out_est <- colMeans(est, na.rm = T)
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("SAMPLE ERC", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
+  rownames(out_est) <- c("ERC", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
   out_se <- colMeans(se, na.rm = T)
   colnames(out_se) <- a.vals
@@ -157,8 +157,8 @@ n.sim <- 1000
 
 n <- c(200, 500)
 mult <- c(5, 10)
-sig_pred <- c(0,sqrt(0.5)) 
-sig_agg <- c(0,sqrt(2))
+sig_pred <- c(0, sqrt(0.5)) 
+sig_agg <- c(0, sqrt(2))
 prob <- c(0.1, 0.2)
 
 scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred, prob = prob)
@@ -183,8 +183,9 @@ for (k in 1:length(rslt$est)){
   lines(a.vals, rslt$est[[k]]$est[4,], type = "l", col = "red", lwd = 2, lty = 3)
   lines(a.vals, rslt$est[[k]]$est[5,], type = "l", col = "blue", lwd = 2, lty = 3)
   
-  legend(6, 0.1, legend=c("Sample ERC", "Without Prediction Correction",
-                          "With Prediction Correction", "Without Aggregation Correction"),
+  legend(6, 0.1, legend=c("True ERC", "Without Prediction Correction",
+                          "With Prediction Correction", "Without Aggregation Correction",
+                          "With Aggregation Correction"),
          col=c("darkgreen", "red", "blue", "black", "black"),
          lty = c(1,1,1,2,3), lwd=2, cex=0.8)
   
