@@ -24,7 +24,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   sig_pred <- sqrt(0.5)
   gps_scen <- scenario$gps_scen
   out_scen <- scenario$out_scen
-  prob <- 0.1
+  prob <- 0.2
   span <- 0.75
   
   # gen data arguments

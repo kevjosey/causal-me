@@ -9,7 +9,7 @@ simex <- function(s, y, x, id, s.id, family = gaussian(), offset = rep(0, length
   if (any(duplicated(id)))
     stop("duplicate id detected")
   
-  l.vals <- mclapply.hack(lambda, function(lam, s, y, x.mat, id, s.id, ...){
+  l.vals <- mclapply(lambda, function(lam, s, y, x.mat, id, s.id, ...){
     
     z.mat <- replicate(n.boot, sapply(id, function(i, ...)
       mean(s[s.id == i]) + sqrt(lam/sum(s.id == i))*contr(s[s.id == i])))

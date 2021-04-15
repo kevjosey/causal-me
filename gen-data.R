@@ -60,7 +60,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
     
   }
 
-  w1 <- stats::rnorm(m, 1, 2)
+  w1 <- stats::rnorm(m, 1, 1)
   w <- cbind(w1, w2)
   a <- rnorm(n, mu_gps, sig_gps)
   a_s <- rep(NA, m)
@@ -101,6 +101,7 @@ predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
   # u4 <- as.numeric(scale((x[,2] + x[,4] + 20)^2))
   # 
   # u <- cbind(u1, u2, u3, u4)
+  # u <- u%*%solve(chol(cov(u)))
   # out <- rep(NA, length(a.vals))
   # 
   # for(i in 1:length(a.vals)) {
@@ -113,7 +114,7 @@ predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
   #     mu_out <- exp(-3 + x %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
   #   }
   # 
-  #   out[i] <- exp(mean(log(mu_out)))
+  #   out[i] <- mean(mu_out)
   # 
   # }
   

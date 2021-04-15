@@ -93,7 +93,7 @@ for (i in 1:n.sim){
                       s.id = s.id, id = id, w = w, x = x, family = family,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
                       h.a = 1, h.gamma = 0.3, deg.num = deg.num,
-                      a.vals = a.vals, span = span, mc.cores = 4)
+                      a.vals = a.vals, span = span, mc.cores = 1)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
