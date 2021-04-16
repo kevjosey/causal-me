@@ -155,7 +155,7 @@ a.vals <- seq(6, 10, by = 0.1)
 sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
 n.sim <- 1000
 
-n <- c(200, 500)
+n <- c(500, 1000)
 mult <- c(5, 10)
 sig_pred <- c(0, sqrt(0.5)) 
 sig_agg <- c(0, sqrt(2))
