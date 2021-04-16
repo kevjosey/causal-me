@@ -220,13 +220,10 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
                    (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
 
-    psi <-c((y.new - muhat)/(pihat/phat) + mhat)
-
-    dr_mod <- loess(psi ~ a, span = span, family = "symmetric")
-    dr_out <- predict(dr_mod, newdata = data.frame(a = a.vals))
+    psi <- c((y.new - muhat)/(pihat/phat) + mhat)
     
-    # dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int,
-    #                  family = family, span = span, se.fit = FALSE)
+    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int,
+                     family = family, span = span, se.fit = FALSE)
 
     return(dr_out)
            
