@@ -23,7 +23,6 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   sig_agg <- scenario$sig_agg
   sig_pred <- scenario$sig_pred
   prob <- scenario$prob
-  span <- 0.75
   gps_scen <- "a"
   out_scen <- "a"
   
@@ -31,6 +30,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   n <- scenario$n
   m <- scenario$mult*n
   family <- poisson()
+  span <- ifelse(n > 250, 0.5, 0.75)
   
   # initialize output
   est <- array(NA, dim = c(n.sim, 5, length(a.vals)))

@@ -18,18 +18,18 @@ source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
 # simulation arguments
-n.sim <- 200
+n.sim <- 1000
 sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.75
+span <- 0.5
 
 # gen data arguments
-m <- 1000 # c(500, 800)
-n <- 200 # c(100, 200)
+m <- 2000 # c(500, 800)
+n <- 500 # c(100, 200)
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.1)

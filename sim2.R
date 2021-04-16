@@ -25,11 +25,11 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   gps_scen <- scenario$gps_scen
   out_scen <- scenario$out_scen
   prob <- 0.2
-  span <- 0.75
   
   # gen data arguments
   n <- scenario$n # c(500, 800)
   m <- n*scenario$mult # c(100, 200)
+  span <- ifelse(n > 250, 0.5, 0.75)
   
   # gibbs sampler stuff
   thin <- 50

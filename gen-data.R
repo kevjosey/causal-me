@@ -71,7 +71,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   s <- rnorm(m, a_s, sig_agg)
   
   if (pred_scen == "b"){
-    star <- rnorm(m, s - 0.5 + 0.5*w1 - 0.5*w2, sig_pred)
+    star <- rnorm(m, s - 1 + 0.5*w1 - 0.5*w2, sig_pred)
   } else {
     star <- rnorm(m, s, sig_pred)
   }
