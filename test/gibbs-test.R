@@ -11,10 +11,10 @@ library(splines)
 library(parallel)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/gibbs-sampler.R")
-source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("D:/Github/causal-me/gen-data.R")
+source("D:/Github/causal-me/gibbs-sampler.R")
+source("D:/Github/causal-me/blp.R")
+source("D:/Github/causal-me/erc.R")
 
 # simulation arguments
 n.sim <- 200
@@ -24,11 +24,11 @@ sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.75
+span <- 0.5
 
 # gen data arguments
 m <- 1000 # c(500, 800)
-n <- 200 # c(100, 200)
+n <- 100 # c(100, 200)
 
 # gibbs sampler stuff
 thin <- 50
@@ -40,7 +40,7 @@ deg.num <- 2
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.1)
-sl.lib <- c("SL.glm")
+sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
 family <- poisson()
 
 # initialize output

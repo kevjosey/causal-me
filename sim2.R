@@ -130,10 +130,10 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.1)
-sl.lib <- c("SL.glm")
-n.sim <- 200
+sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
+n.sim <- 1000
 
-n <- c(200,500)
+n <- c(100,200)
 mult <- c(5,10)
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")

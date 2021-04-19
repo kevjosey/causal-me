@@ -101,34 +101,31 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   # set up evaluation points & matrices for predictions
   n <- nrow(x)
   x <- data.frame(x)
-  xa <- data.frame(a = poly(a, 2, raw = TRUE), x = x)
-  
-  # colnames(xa) <- c("a", colnames(x))
-  # 
-  # cts.x <- apply(x, 2, function(x) (length(unique(x)) > 4))
-  # 
-  # cts.form <- paste(paste("s(", colnames(x[,cts.x,drop = FALSE]), ")",
-  #                         sep = ""), collapse = "+")
-  # 
-  # cat.form <- paste(colnames(x[, !cts.x, drop = FALSE]), collapse = "+")
-  # 
-  # if (sum(!cts.x) > 0) {
-  #   gam.model <- formula(paste("y ~ s(a) + ", cts.form , "+", cat.form ))
-  # } else {
-  #   gam.model <- formula(paste("y ~ s(a) + ", cts.form))
-  # }
-  # 
-  # if (sum(!cts.x) == length(cts.x)) {
-  #   gam.model <- formula(paste("y ~ s(a) + ", paste(colnames(x), collapse = "+"), sep = ""))
-  # }
+  xa <- data.frame(a = a, x = x)
+  colnames(xa) <- c("a", colnames(x))
+
+  cts.x <- apply(x, 2, function(x) (length(unique(x)) > 4))
+
+  cts.form <- paste(paste("s(", colnames(x[,cts.x,drop = FALSE]), ")",
+                          sep = ""), collapse = "+")
+
+  cat.form <- paste(colnames(x[, !cts.x, drop = FALSE]), collapse = "+")
+
+  if (sum(!cts.x) > 0 & sum(!cts.x) != length(cts.x)) {
+    gam.model <- formula(paste("y ~ s(a) + ", cts.form , "+", cat.form ))
+  } else if (sum(!cts.x) != length(cts.x)) {
+    gam.model <- formula(paste("y ~ s(a) + ", paste(colnames(x), collapse = "+"), sep = ""))
+  } else {
+    gam.model <- formula(paste("y ~ s(a) + ", cts.form))
+  }
 
   # estimate nuisance outcome model with SuperLearner
-  # mumod <- mgcv::gam(gam.model, data = xa, family = family, offset = offset)
-  # muhat <- c(predict(mumod, newdata = xa, type = "response"))
+  mumod <- mgcv::gam(gam.model, data = xa, family = family, offset = offset)
+  muhat <- c(predict(mumod, newdata = xa, type = "response"))
   
   # estimate nuisance outcome model with SuperLearner
-  mumod <- glm(y ~ ., data = xa, family = family, offset = offset)
-  muhat <- predict(mumod, newdata = xa, type = "response")
+  # mumod <- glm(y ~ ., data = xa, family = family, offset = offset)
+  # muhat <- predict(mumod, newdata = xa, type = "response")
   
   # estimate nuisance GPS functions via super learner
   pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
@@ -162,7 +159,7 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   # predict marginal outcomes given a.vals (or a.agg)
   muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
     
-    xa.tmp <- data.frame(a = poly(a.tmp, 2, raw = TRUE), x = x)
+    xa.tmp <- data.frame(a = a.tmp, x = x)
     colnames(xa.tmp) <- colnames(xa) 
     return(predict(mumod, newdata = xa.tmp, type = "response"))
     

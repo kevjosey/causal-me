@@ -11,11 +11,11 @@ library(gam)
 library(parallel)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/gibbs-sampler.R")
-source("~/Github/causal-me/mclapply-hack.R")
-source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("D:/Github/causal-me/gen-data.R")
+source("D:/Github/causal-me/gibbs-sampler.R")
+source("D:/Github/causal-me/mclapply-hack.R")
+source("D:/Github/causal-me/blp.R")
+source("D:/Github/causal-me/erc.R")
 
 # simulation arguments
 n.sim <- 200
@@ -28,12 +28,12 @@ pred_scen <- "b"
 span <- 0.5
 
 # gen data arguments
-m <- 5000 # c(500, 800)
-n <- 500 # c(100, 200)
+m <- 500 # c(500, 800)
+n <- 100 # c(100, 200)
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.1)
-sl.lib <- c("SL.mean","SL.glm", "SL.glm.interaction", "SL.earth")
+sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
 family <- poisson()
 
 # initialize output
