@@ -11,10 +11,10 @@ library(splines)
 library(parallel)
 
 # Code for generating and fitting data
-source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/gen-data.R")
-source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/gibbs-sampler.R")
-source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/blp.R")
-source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/erc.R")
+source("~/Github/causal-me/gen-data.R")
+source("~/Github/causal-me/gibbs-sampler.R")
+source("~/Github/causal-me/blp.R")
+source("~/Github/causal-me/erc.R")
 
 simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
@@ -29,7 +29,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   # gen data arguments
   n <- scenario$n # c(500, 800)
   m <- n*scenario$mult # c(100, 200)
-  span <- ifelse(n > 250, 0.5, 0.75)
+  span <- 0.5
   
   # gibbs sampler stuff
   thin <- 50
@@ -143,4 +143,37 @@ scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 est <- mclapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 16)
 rslt <- list(est = est, scen_idx = scen_mat)
 
-save(rslt, file = "~/shared_space/ci3_analysis/josey_causal_me/Output/sim2_rslt.RData")
+save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim2_rslt.RData")
+
+# Summary Plot
+
+plotnames <- c("GPS scenario: \"a\"; Outcome scenario \"a\"",
+               "GPS scenario: \"b\"; Outcome scenario \"a\"",
+               "GPS scenario: \"a\"; Outcome scenario \"b\"",
+               "GPS scenario: \"b\"; Outcome scenario \"b\"")
+
+filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_2.pdf")
+pdf(file = filename)
+par(mfrow = c(2,2))
+
+for (k in 1:4){
+  
+  plot(a.vals, rslt$est[[idx[k]]]$est[1,], type = "l", col = "darkgreen", lwd = 2,
+       xlab = "Exposure", ylab = "Rate of Event", main = plotnames[k],
+       ylim = c(0,0.1))
+  lines(a.vals, rslt$est[[idx[k]]]$est[2,], type = "l", col = "red", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[idx[k]]]$est[3,], type = "l", col = "blue", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[idx[k]]]$est[4,], type = "l", col = "red", lwd = 2, lty = 3)
+  lines(a.vals, rslt$est[[idx[k]]]$est[5,], type = "l", col = "blue", lwd = 2, lty = 3)
+  
+  if (k == 1){
+    
+    legend("topleft", legend=c("True ERC", "Without Prediction Correction",
+                               "With Prediction Correction", "Without Aggregation Correction",
+                               "With Aggregation Correction"),
+           col=c("darkgreen", "red", "blue", "black", "black"),
+           lty = c(1,1,1,2,3), lwd=2, cex=0.8)
+    
+  }
+  
+}

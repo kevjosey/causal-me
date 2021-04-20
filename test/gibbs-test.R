@@ -11,10 +11,10 @@ library(splines)
 library(parallel)
 
 # Code for generating and fitting data
-source("D:/Github/causal-me/gen-data.R")
-source("D:/Github/causal-me/gibbs-sampler.R")
-source("D:/Github/causal-me/blp.R")
-source("D:/Github/causal-me/erc.R")
+source("~/Github/causal-me/gen-data.R")
+source("~/Github/causal-me/gibbs-sampler.R")
+source("~/Github/causal-me/blp.R")
+source("~/Github/causal-me/erc.R")
 
 # simulation arguments
 n.sim <- 200
@@ -28,7 +28,7 @@ span <- 0.5
 
 # gen data arguments
 m <- 1000 # c(500, 800)
-n <- 100 # c(100, 200)
+n <- 200 # c(100, 200)
 
 # gibbs sampler stuff
 thin <- 50
@@ -93,7 +93,7 @@ for (i in 1:n.sim){
                       s.id = s.id, id = id, w = w, x = x, family = family,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
                       h.a = 1, h.gamma = 0.3, deg.num = deg.num,
-                      a.vals = a.vals, span = span, mc.cores = 1)
+                      a.vals = a.vals, span = span, mc.cores = 8)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)

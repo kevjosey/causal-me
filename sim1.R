@@ -11,10 +11,10 @@ library(earth)
 library(parallel)
 
 # Code for generating and fitting data
-source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/gen-data.R")
-source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/gibbs-sampler.R")
-source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/blp.R")
-source("~/shared_space/ci3_analysis/josey_causal_me/causal-me/erc.R")
+source("~/Github/causal-me/gen-data.R")
+source("~/Github/causal-me/gibbs-sampler.R")
+source("~/Github/causal-me/blp.R")
+source("~/Github/causal-me/erc.R")
 
 simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
@@ -25,12 +25,13 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   prob <- scenario$prob
   gps_scen <- "a"
   out_scen <- "a"
+  pred_scen <- "b"
   
   # gen data arguments
   n <- scenario$n
   m <- scenario$mult*n
   family <- poisson()
-  span <- ifelse(n > 250, 0.5, 0.75)
+  span <- ifelse(n == 200, 0.4, 0.2)
   
   # initialize output
   est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
@@ -42,7 +43,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     # generate data
     dat <- gen_data(m = m, n = n, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
-                    pred_scen = "b", out_scen = out_scen, gps_scen = gps_scen)
+                    pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
     
     # zipcode index
     s.id <- dat$s.id
@@ -70,7 +71,6 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
       id <- dat$id[(id %in% keep)]
     }
     
-    # exposure predictions
     s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
     a_tilde <- blp(s = s_tilde, s.id = s.id, x = x)
     a_hat <- blp(s = s_hat, s.id = s.id, x = x)
@@ -155,7 +155,7 @@ a.vals <- seq(6, 10, by = 0.1)
 sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
 n.sim <- 1000
 
-n <- c(200, 500)
+n <- c(200, 400)
 mult <- c(5, 10)
 sig_pred <- c(0, sqrt(0.5)) 
 sig_agg <- c(0, sqrt(2))
@@ -164,31 +164,42 @@ prob <- c(0.1, 0.2)
 scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred, prob = prob)
 scen_mat <- round(scen_mat, 3)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
-est <- mclapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 16)
+est <- mclapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 8)
 rslt <- list(est = est, scen_idx = scen_mat)
 
-save(rslt, file = "~/shared_space/ci3_analysis/josey_causal_me/Output/sim1_rslt.RData")
+save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim1_rslt.RData")
 
-for (k in 1:length(rslt$est)){
+# Summary Plot
+
+plotnames <- c("No Measurement Error",
+               "Prediction Error but No Replication Error",
+               "Replication Error but No Prediction Error",
+               "Both Replication and Prediction Error")
+
+filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_1.pdf")
+pdf(file = filename)
+par(mfrow = c(2,2))
+
+for (k in 1:4){
   
-  filename <- paste0("~/shared_space/ci3_analysis/josey_causal_me/Output/", paste(rslt$scen_idx[k,], collapse = "_"), ".pdf")
-  pdf(file = filename)
-  plotname <- paste(rslt$scen_idx[k,], collapse = "_")
-  
-  plot(a.vals, rslt$est[[k]]$est[1,], type = "l", col = "darkgreen", lwd = 2,
-       xlab = "Exposure", ylab = "Rate of Event",
+  plot(a.vals, rslt$est[[idx[k]]]$est[1,], type = "l", col = "darkgreen", lwd = 2,
+       xlab = "Exposure", ylab = "Rate of Event", main = plotname[k],
        ylim = c(0,0.1))
-  lines(a.vals, rslt$est[[k]]$est[2,], type = "l", col = "red", lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[[k]]$est[3,], type = "l", col = "blue", lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[[k]]$est[4,], type = "l", col = "red", lwd = 2, lty = 3)
-  lines(a.vals, rslt$est[[k]]$est[5,], type = "l", col = "blue", lwd = 2, lty = 3)
+  lines(a.vals, rslt$est[[idx[k]]]$est[2,], type = "l", col = "red", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[idx[k]]]$est[3,], type = "l", col = "blue", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[idx[k]]]$est[4,], type = "l", col = "red", lwd = 2, lty = 3)
+  lines(a.vals, rslt$est[[idx[k]]]$est[5,], type = "l", col = "blue", lwd = 2, lty = 3)
   
-  legend(6, 0.1, legend=c("True ERC", "Without Prediction Correction",
-                          "With Prediction Correction", "Without Aggregation Correction",
-                          "With Aggregation Correction"),
-         col=c("darkgreen", "red", "blue", "black", "black"),
-         lty = c(1,1,1,2,3), lwd=2, cex=0.8)
-  
-  dev.off()
+  if (k == 1){
+    
+    legend("topleft", legend=c("True ERC", "Without Prediction Correction",
+                               "With Prediction Correction", "Without Aggregation Correction",
+                               "With Aggregation Correction"),
+           col=c("darkgreen", "red", "blue", "black", "black"),
+           lty = c(1,1,1,2,3), lwd=2, cex=0.8)
+    
+  }
   
 }
+
+dev.off()

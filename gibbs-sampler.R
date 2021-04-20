@@ -44,7 +44,7 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   # initialize exposures
   a.tmp <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
   a <- aggregate(a.tmp, by = list(s.id), mean)[,2]
-  nsa <- ns(a, deg.num, Boundary.knots = c(min(a) - sd(a)/sqrt(n), max(a) + sd(a)/sqrt(n)))
+  nsa <- ns(a, deg.num, Boundary.knots = c(min(a) - 2*sd(a)/sqrt(n), max(a) + 2*sd(a)/sqrt(n)))
   xa <- as.matrix(cbind(x, nsa))
   a.s <- rep(NA, length(s.id))
   
@@ -60,8 +60,8 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   # initialize parameters
   gamma <- matrix(NA, nrow = n.adapt + n.iter, ncol = o)
   beta <- matrix(NA, nrow = n.adapt + n.iter, ncol = p)
-  sigma2 <- rep(NA, n.adapt + n.iter)
   alpha <- matrix(NA, nrow = n.adapt + n.iter, ncol = q)
+  sigma2 <- rep(NA, n.adapt + n.iter)
   tau2 <- rep(NA, n.adapt + n.iter)
   omega2 <- rep(NA, n.adapt + n.iter)
   
@@ -69,8 +69,8 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   beta[1,] <- coef(lm(a ~ 0 + x))
   alpha[1,] <- coef(lm(s.tmp ~ 0 + ws.tmp))
   sigma2[1] <- sigma(lm(a ~ 0 + x))^2
-  tau2[1] <- var(star - a.s)
-  omega2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
+  tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
+  omega2[1] <- var(star - a.s)
   
   amat <- matrix(NA, nrow = n.iter + n.adapt, ncol = n)
   smat <- matrix(NA, nrow = n.iter + n.adapt, ncol = m)
@@ -78,22 +78,14 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   # gibbs sampler for predictors
   for(j in 2:(n.iter + n.adapt)) {
     
-    sig <- sqrt((1/tau2[j - 1] + 1/omega2[j - 1])^(-1))
-    hat <- (sig^2)*(a.s/tau2[j - 1] + ws %*% alpha[j - 1,]/omega2[j - 1])
-    t <- smat[j,] <- rnorm(m, hat, sig)
-    t[!is.na(s)] <- s[!is.na(s)]
+    # sample S
+    
+    sig <- sqrt((1/omega2[j - 1] + 1/tau2[j - 1])^(-1))
+    hat <- (sig^2)*(a.s/omega2[j - 1] + ws %*% alpha[j - 1,]/tau2[j - 1])
+    s.hat <- smat[j,] <- rnorm(m, hat, sig)
+    s.hat[!is.na(s)] <- s[!is.na(s)]
 
-    # set up evaluation points & matrices for predictions
-
-    # a <- amat[j,] <- sapply(id, function(g, ...) {
-    #   
-    #   idx <- s.id == g
-    #   sig <- sqrt((sum(idx)/tau2[j - 1] + 1/sigma2[j - 1])^(-1))
-    #   hat <- (sig^2)*(sum(t[idx])/tau2[j - 1] + 
-    #     sum(x[id == g,]*beta[j - 1,])/sigma2[j - 1])
-    #   return(rnorm(1, hat, sig))
-    #   
-    # })
+    # sample A
     
     a_ <-  rnorm(n, a, h.a)
     xa_ <- as.matrix(cbind(x, predict(nsa, a_)))
@@ -104,10 +96,10 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
       
       log.eps <- dpois(y[id == g], exp(sum(xa_[id == g,]*gamma[j - 1,]) + offset[id == g]), log = TRUE) +
         dnorm(a_[id == g], sum(x[id == g,]*beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) + 
-        dnorm(a_[id == g], mean(t[idx]), sqrt(tau2[j - 1]/sum(idx)), log = TRUE) -
+        dnorm(a_[id == g], mean(s.hat[idx]), sqrt(omega2[j - 1]/sum(idx)), log = TRUE) -
         dpois(y[id == g], exp(sum(xa[id == g,]*gamma[j - 1,]) + offset[id == g]), log = TRUE) -
         dnorm(a[id == g], sum(x[id == g,]*beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) -
-        dnorm(a[id == g], mean(t[idx]), sqrt(tau2[j - 1]/sum(idx)), log = TRUE)
+        dnorm(a[id == g], mean(s.hat[idx]), sqrt(omega2[j - 1]/sum(idx)), log = TRUE)
       
       if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
         return(a_[id == g])
@@ -121,19 +113,19 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     for (g in id)
       a.s[s.id == g] <- a[id == g]
     
-    # Sample pred params
+    # Sample pred parameters
     
-    alpha_var <- solve(t(ws.tmp) %*% ws.tmp + diag(omega2[j - 1]/scale, q, q))
-    alpha[j,] <- rmvnorm(1, alpha_var %*% t(ws.tmp) %*% s.tmp, omega2[j - 1]*alpha_var)
+    alpha_var <- solve(t(ws.tmp) %*% ws.tmp + diag(tau2[j - 1]/scale, q, q))
+    alpha[j,] <- rmvnorm(1, alpha_var %*% t(ws.tmp) %*% s.tmp, tau2[j - 1]*alpha_var)
     
-    omega2[j] <- 1/rgamma(1, shape = shape + l/2, rate = rate +
+    tau2[j] <- 1/rgamma(1, shape = shape + l/2, rate = rate +
                             sum((s.tmp - (ws.tmp) %*% alpha[j,])^2)/2)
     
-    # Sample agg params
+    # Sample agg parameters
     
-    tau2[j] <- 1/rgamma(1, shape = shape + m/2, rate = rate + sum((t - a.s)^2)/2)
+    omega2[j] <- 1/rgamma(1, shape = shape + m/2, rate = rate + sum((s.hat - a.s)^2)/2)
     
-    # Sample GPS params
+    # Sample GPS parameters
     
     beta_var <- solve(t(x) %*% x + diag(sigma2[j - 1]/scale, p, p))
     beta[j,] <- rmvnorm(1, beta_var %*% t(x) %*% a, sigma2[j - 1]*beta_var)
@@ -172,11 +164,6 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   omega2 <- omega2[keep]
   amat <- amat[keep,]
   smat <- smat[keep,]
-
-  # rslt <- list(gamma = gamma, beta = beta, alpha = alpha, 
-  #              sigma2 = sigma2, tau2 = tau2, omega2 = omega2,
-  #              amat = amat, smat = smat, 
-  #              accept.a = accept.a, accept.gamma = accept.gamma)
   
   y.new <- exp(log(y) - offset)
 

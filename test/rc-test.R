@@ -11,11 +11,11 @@ library(gam)
 library(parallel)
 
 # Code for generating and fitting data
-source("D:/Github/causal-me/gen-data.R")
-source("D:/Github/causal-me/gibbs-sampler.R")
-source("D:/Github/causal-me/mclapply-hack.R")
-source("D:/Github/causal-me/blp.R")
-source("D:/Github/causal-me/erc.R")
+source("~/Github/causal-me/gen-data.R")
+source("~/Github/causal-me/gibbs-sampler.R")
+source("~/Github/causal-me/mclapply-hack.R")
+source("~/Github/causal-me/blp.R")
+source("~/Github/causal-me/erc.R")
 
 # simulation arguments
 n.sim <- 200
@@ -25,11 +25,11 @@ sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.5
+span <- 0.4
 
 # gen data arguments
-m <- 500 # c(500, 800)
-n <- 100 # c(100, 200)
+m <- 1000 # c(500, 800)
+n <- 200 # c(100, 200)
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.1)
