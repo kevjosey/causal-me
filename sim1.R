@@ -221,7 +221,7 @@ for (k in 1:length(rslt$est)){
   
 }
 
-colnames(tbl) <- outer(names(relabs), c("Bias", "MSE", "CI"), FUN = "paste")[1:12]
+colnames(tbl) <- outer(names(bias), c("Bias", "MSE", "CI"), FUN = "paste")[1:12]
 final <- cbind(rslt$scen_idx, tbl)
 
 save(final, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/table_1.RData")
