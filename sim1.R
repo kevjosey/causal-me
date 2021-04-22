@@ -31,7 +31,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   n <- scenario$n
   m <- scenario$mult*n
   family <- poisson()
-  span <- ifelse(n == 200, 0.4, 0.2)
+  span <- ifelse(n == 800, 0.125, 0.25)
   
   # initialize output
   est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
@@ -155,7 +155,7 @@ a.vals <- seq(6, 10, by = 0.1)
 sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
 n.sim <- 1000
 
-n <- c(200, 400)
+n <- c(400, 800)
 mult <- c(5, 10)
 sig_pred <- c(0, sqrt(0.5)) 
 sig_agg <- c(0, sqrt(2))
@@ -171,30 +171,33 @@ save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim1_rslt.RData"
 
 # Summary Plot
 
+load(file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim1_rslt.RData")
 plotnames <- c("No Measurement Error",
-               "Prediction Error but No Replication Error",
-               "Replication Error but No Prediction Error",
-               "Both Replication and Prediction Error")
+               "Classical Error but No Prediction Error",
+               "Prediction Error but No Classical Error",
+               "Both Classical and Prediction Error")
+idx <- c(18,22,26,30)
 
 filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_1.pdf")
-pdf(file = filename)
+pdf(file = filename, width = 10, height = 10)
 par(mfrow = c(2,2))
 
 for (k in 1:4){
   
   plot(a.vals, rslt$est[[idx[k]]]$est[1,], type = "l", col = "darkgreen", lwd = 2,
-       xlab = "Exposure", ylab = "Rate of Event", main = plotname[k],
-       ylim = c(0,0.1))
+       xlab = "Exposure", ylab = "Rate of Event", main = plotnames[k],
+       ylim = c(0,0.08))
+  grid(lty = 1)
   lines(a.vals, rslt$est[[idx[k]]]$est[2,], type = "l", col = "red", lwd = 2, lty = 2)
   lines(a.vals, rslt$est[[idx[k]]]$est[3,], type = "l", col = "blue", lwd = 2, lty = 2)
   lines(a.vals, rslt$est[[idx[k]]]$est[4,], type = "l", col = "red", lwd = 2, lty = 3)
   lines(a.vals, rslt$est[[idx[k]]]$est[5,], type = "l", col = "blue", lwd = 2, lty = 3)
   
-  if (k == 1){
+  if (k == 4){
     
-    legend("topleft", legend=c("True ERC", "Without Prediction Correction",
-                               "With Prediction Correction", "Without Aggregation Correction",
-                               "With Aggregation Correction"),
+    legend(x = 8, y = 0.02, legend=c("True ERC", "Without Prediction Correction",
+                                     "With Prediction Correction", "Without Classical Correction",
+                                     "With Classical Correction"),
            col=c("darkgreen", "red", "blue", "black", "black"),
            lty = c(1,1,1,2,3), lwd=2, cex=0.8)
     
@@ -203,3 +206,22 @@ for (k in 1:4){
 }
 
 dev.off()
+
+# Summary Table
+
+tbl <- matrix(NA, nrow = length(rslt$est), ncol = 12)
+
+for (k in 1:length(rslt$est)){
+  
+  bias <- round(colMeans(abs(t(rslt$est[[k]]$est[2:5,]) - rslt$est[[k]]$est[1,])/rslt$est[[k]]$est[1,]), 3)
+  mse <- round(colMeans((t(rslt$est[[k]]$est[2:5,]) - rslt$est[[k]]$est[1,])^2), 5)
+  ci <- round(rowMeans(rslt$est[[k]]$cp[1:4,]),3)
+  
+  tbl[k,] <- c(bias, mse, ci)
+  
+}
+
+colnames(tbl) <- outer(names(relabs), c("Bias", "MSE", "CI"), FUN = "paste")[1:12]
+final <- cbind(rslt$scen_idx, tbl)
+
+save(final, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/table_1.RData")

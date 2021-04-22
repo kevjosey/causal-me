@@ -62,7 +62,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     star <- dat$star
     
     # validation subset
-    s <- dat$s*rbinom(m, 1, 0.1)
+    s <- dat$s*rbinom(m, 1,prob)
     s[s == 0] <- NA
     
     # remove clusters w/o exposure data
@@ -133,14 +133,14 @@ a.vals <- seq(6, 10, by = 0.1)
 sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
 n.sim <- 1000
 
-n <- c(100,200)
+n <- c(400)
 mult <- c(5,10)
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
 
 scen_mat <- expand.grid(n = n, mult = mult, gps_scen = gps_scen, out_scen = out_scen)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
-est <- mclapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 16)
+est <- mclapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 8)
 rslt <- list(est = est, scen_idx = scen_mat)
 
 save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim2_rslt.RData")

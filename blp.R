@@ -66,6 +66,80 @@ blp <- function(s, s.id, x = NULL) {
   
 }
 
+multi_blp <- function(s, s.id, x = NULL) {
+  
+  wts <- c(unname(table(s.id)))
+  
+  # initialize exposures
+  z_tmp <- aggregate(x, by = list(s.id), mean)
+  id <- z_tmp[,1]
+  z <- z_tmp[,2:ncol(z_tmp)]
+  
+  # dimensions
+  m <- length(s.id)
+  n <- length(id)
+  
+  z_s <- matrix(NA, nrow = m, ncol = ncol(z))
+  
+  for (g in id)
+    z_s[s.id == g,] <- z[id == g,]
+  
+  p <- ncol(s)
+  q <- ncol(x)
+  
+  if (!is.null(x)) {
+    
+    mu_z <- sum(wts*z)/m
+    mu_x <- colMeans(x)
+    
+    muMat_x <- matrix(rep(mu_x, n), nrow = n, byrow = TRUE)
+    muMat_z <- matrix(rep(mu_z, n), nrow = n, byrow = TRUE)
+    nu <- m - sum(wts^2)/m
+    
+    Omega <- crossprod(s - z_s)/(m - n)
+    Sigma <- (t(wts*(z - muMat_z))%*%(z - muMat_z) - (n - 1)*Omega)/nu
+    Psi <- t(wts*(z - muMat_z))%*%(x - muMat_x)/nu
+    Tau <- cov(x)
+    
+    Phi <- cbind(Sigma, Psi)
+    V <- matrix(NA, p + q, p + q)
+    V[(p+1):(p+q),1:p] <- Sigma[1:p,(p+1):(p+q)] <- Psi
+    V[(p+1):(p+q),(p+1):(p+q)] <- Omega
+    
+    a <- sapply(1:n, function(i, ...) {
+      
+      V[1:p,1:p] <- Sigma + Omega/wts[i]
+      star <- c(z[i,] - mu_z, x[i,] - mu_x)
+      out <- c(mu_z + t(Phi) %*% solve(V) %*% star)
+      
+      return(out)
+      
+    })
+    
+  } else {
+    
+    mu_z <- sum(wts*z)/m
+    muMat_z <- matrix(rep(mu_z, n), nrow = n, byrow = TRUE)
+    nu <- m - sum(wts^2)/m
+    
+    Omega <- crossprod(x - z_x)/(m - n)
+    Sigma <- (t(wts*(z - muMat_z))%*%(z - muMat_z) - (n - 1)*Omega)/nu
+    
+    a <- sapply(1:n, function(i, ...) {
+      
+      V <- Sigma + Omega/wts[i]
+      out <- c(mu_z + Sigma %*% solve(V) %*% c(z[i,] - mu_z))
+      
+      return(out)
+      
+    })
+    
+  }
+  
+  return(a)
+  
+}
+
 pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "SL.ranger")){
   
   # set up evaluation points & matrices for predictions
