@@ -103,11 +103,19 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   out_est <- colMeans(est, na.rm = T)
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("ERC","BLP","Bayes")
+  rownames(out_est) <- c("ERC", "BLP", "Bayes")
+  
+  out_bias <- t(apply(est[,2:3,], 2, function(x) colMeans(abs(x - est[,1,]), na.rm = T)))
+  colnames(out_bias) <- a.vals
+  rownames(out_bias) <- c("BLP", "Bayes")
+  
+  out_sd <- t(apply(est[,2:3,], 2, function(x) apply(x, 2, sd, na.rm = T)))
+  colnames(out_sd) <- a.vals
+  rownames(out_sd) <- c("BLP", "Bayes")
   
   out_se <- colMeans(se, na.rm = T)
   colnames(out_se) <- a.vals
-  rownames(out_se) <- c("ERC","BLP","Bayes")
+  rownames(out_se) <- c("BLP", "Bayes")
   
   cp_blp_x <- sapply(1:n.sim, function(i,...)
     as.numeric((est[i,2,] - 1.96*se[i,1,]) < colMeans(est[,1,],na.rm = TRUE) & 

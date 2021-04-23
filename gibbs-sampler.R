@@ -48,8 +48,9 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   xa <- as.matrix(cbind(x, nsa))
   a.s <- rep(NA, length(s.id))
   
-  for (g in id)
-    a.s[s.id == g] <- a[id == g]
+  stab <- table(s.id)
+  ord <- order(s.id)
+  a.s <- rep(a, stab)[order(ord)]
   
   # dimensions
   p <- ncol(x)
@@ -73,7 +74,6 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   omega2[1] <- var(star - a.s)
   
   amat <- matrix(NA, nrow = n.iter + n.adapt, ncol = n)
-  smat <- matrix(NA, nrow = n.iter + n.adapt, ncol = m)
   
   # gibbs sampler for predictors
   for(j in 2:(n.iter + n.adapt)) {
@@ -82,7 +82,7 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     
     sig <- sqrt((1/omega2[j - 1] + 1/tau2[j - 1])^(-1))
     hat <- (sig^2)*(a.s/omega2[j - 1] + ws %*% alpha[j - 1,]/tau2[j - 1])
-    s.hat <- smat[j,] <- rnorm(m, hat, sig)
+    s.hat <- rnorm(m, hat, sig)
     s.hat[!is.na(s)] <- s[!is.na(s)]
 
     # sample A
@@ -109,9 +109,7 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     })
     
     xa <- as.matrix(cbind(x, predict(nsa, a)))
-    
-    for (g in id)
-      a.s[s.id == g] <- a[id == g]
+    a.s <- rep(a, stab)[order(ord)]
     
     # Sample pred parameters
     
@@ -163,7 +161,6 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   tau2 <- tau2[keep]
   omega2 <- omega2[keep]
   amat <- amat[keep,]
-  smat <- smat[keep,]
   
   y.new <- exp(log(y) - offset)
 
@@ -223,8 +220,8 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   rslt <- list(estimate = estimate, variance = variance,
                mcmc = list(gamma = gamma, beta = beta, alpha = alpha,
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2,
-                           amat = amat, smat = smat,
-                           accept.a = accept.a, accept.gamma = accept.gamma))
+                           amat = amat),
+               accept.a = accept.a, accept.gamma = accept.gamma)
   
   return(rslt)
   

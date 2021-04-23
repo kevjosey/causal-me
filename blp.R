@@ -12,10 +12,9 @@ blp <- function(s, s.id, x = NULL) {
   m <- length(s.id)
   n <- length(id)
   
-  z_s <- rep(NA, m)
-  
-  for (g in id)
-    z_s[s.id == g] <- z[id == g]
+  stab <- table(s.id)
+  ord <- order(s.id)
+  z_s <- rep(z, stab)[order(ord)]
   
   if (!is.null(x)) {
     
@@ -71,18 +70,18 @@ multi_blp <- function(s, s.id, x = NULL) {
   wts <- c(unname(table(s.id)))
   
   # initialize exposures
-  z_tmp <- aggregate(x, by = list(s.id), mean)
+  z_tmp <- aggregate(s, by = list(s.id), mean)
   id <- z_tmp[,1]
-  z <- z_tmp[,2:ncol(z_tmp)]
+  z <- as.matrix(z_tmp[,2:ncol(z_tmp)])
   
   # dimensions
   m <- length(s.id)
   n <- length(id)
   
-  z_s <- matrix(NA, nrow = m, ncol = ncol(z))
-  
-  for (g in id)
-    z_s[s.id == g,] <- z[id == g,]
+  stab <- table(s.id)
+  ord <- order(s.id)
+  z_tmp <- z[rep(rownames(z), stab),]
+  z_s <- z_tmp[order(ord),]
   
   p <- ncol(s)
   q <- ncol(x)
@@ -98,7 +97,7 @@ multi_blp <- function(s, s.id, x = NULL) {
     
     Omega <- crossprod(s - z_s)/(m - n)
     Sigma <- (t(wts*(z - muMat_z))%*%(z - muMat_z) - (n - 1)*Omega)/nu
-    Psi <- t(wts*(z - muMat_z))%*%(x - muMat_x)/nu
+    Psi <- (t(wts*(z - muMat_z))%*%(x - muMat_x))/nu
     Tau <- cov(x)
     
     Phi <- cbind(Sigma, Psi)

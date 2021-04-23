@@ -118,6 +118,14 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   colnames(out_est) <- a.vals
   rownames(out_est) <- c("ERC", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
+  out_bias <- t(apply(est[,2:5,], 2, function(x) colMeans(abs(x - est[,1,]), na.rm = T)))
+  colnames(out_bias) <- a.vals
+  rownames(out_bias) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
+  
+  out_sd <- t(apply(est[,2:5,], 2, function(x) apply(x, 2, sd, na.rm = T)))
+  colnames(out_sd) <- a.vals
+  rownames(out_sd) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
+  
   out_se <- colMeans(se, na.rm = T)
   colnames(out_se) <- a.vals
   rownames(out_se) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
@@ -143,7 +151,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   colnames(out_cp) <- a.vals
   rownames(out_cp) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
-  return(list(est = out_est, se = out_se, cp = out_cp))
+  return(list(est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp))
   
 }
 
@@ -153,7 +161,7 @@ set.seed(42)
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.1)
 sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
-n.sim <- 1000
+n.sim <- 100
 
 n <- c(400, 800)
 mult <- c(5, 10)
@@ -209,19 +217,20 @@ dev.off()
 
 # Summary Table
 
-tbl <- matrix(NA, nrow = length(rslt$est), ncol = 12)
+tbl <- matrix(NA, nrow = length(rslt$est), ncol = 16)
 
 for (k in 1:length(rslt$est)){
   
-  bias <- round(colMeans(abs(t(rslt$est[[k]]$est[2:5,]) - rslt$est[[k]]$est[1,])/rslt$est[[k]]$est[1,]), 3)
-  mse <- round(colMeans((t(rslt$est[[k]]$est[2:5,]) - rslt$est[[k]]$est[1,])^2), 5)
-  ci <- round(rowMeans(rslt$est[[k]]$cp[1:4,]),3)
+  bias <- round(colMeans(t(rslt$est[[k]]$bias)/rslt$est[[k]]$est[1,]), 3)
+  sd <- round(rowMeans(rslt$est[[k]]$sd), 3)
+  se <- round(rowMeans(rslt$est[[k]]$se), 3)
+  ci <- round(rowMeans(rslt$est[[k]]$cp), 3)
   
-  tbl[k,] <- c(bias, mse, ci)
+  tbl[k,] <- c(bias, sd, se, ci)
   
 }
 
-colnames(tbl) <- outer(names(bias), c("Bias", "MSE", "CI"), FUN = "paste")[1:12]
+colnames(tbl) <- outer(names(bias), c("Bias", "SD", "SE", "CI"), FUN = "paste")[1:16]
 final <- cbind(rslt$scen_idx, tbl)
 
 save(final, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/table_1.RData")
