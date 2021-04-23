@@ -23,11 +23,11 @@ sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.4
+span <- 0.2
 
 # gen data arguments
-m <- 1000 # c(500, 800)
-n <- 200 # c(100, 200)
+mult <- 5 # c(5, 80)
+n <- 400 # c(400, 800)
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.1)
@@ -43,7 +43,7 @@ for (i in 1:n.sim){
   print(i)
   
   # generate data
-  dat <- gen_data(m = m, n = n, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
+  dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
                   pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
   
   # zipcode index
@@ -59,7 +59,7 @@ for (i in 1:n.sim){
   s_tilde <- dat$star
   
   # validation subset
-  s <- dat$s*rbinom(m, 1, 0.1)
+  s <- dat$s*rbinom(mult*n, 1, 0.1)
   s[s == 0] <- NA
   
   # remove clusters w/o exposure data

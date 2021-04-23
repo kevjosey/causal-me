@@ -19,11 +19,8 @@
 # id = id for a corresponding to y.id
 # x = covariate matrix
 
-gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
+gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
                      gps_scen = c("a", "b"), out_scen = c("a", "b"), pred_scen = c("a", "b")) {
-  
-  if (n > m)
-    stop("you stop that, you!")
     
   # covariates
   x1 <- stats::rnorm(n, 0, 1)
@@ -33,9 +30,14 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   x <- cbind(x1, x2, x3, x4)
   
   id <- 1:n
-  s.id <- sample(id, m, replace = TRUE)
-  offset <- runif(n, 5, 50)
+  offset <- runif(n, 10, 1000)
   
+  if (mult == 10) {
+    s.id <- rep(id, rep(c(1,3,8,13,25), each = n/5))
+  } else if (mult == 5){
+    s.id <- rep(id, rep(c(1,2,3,7,12), each = n/5))
+  }
+
   # transformed predictors
   u1 <- as.numeric(scale(exp(x1/2)))
   u2 <- as.numeric(scale(x2/(1 + exp(x1)) + 10))
@@ -44,7 +46,7 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
   
   u <- cbind(u1, u2, u3, u4)
   u <- u%*%solve(chol(cov(u)))
-  w2 <- rep(NA, m)
+  w2 <- rep(NA, mult*n)
   
   if (gps_scen == "b") {
     
@@ -60,20 +62,19 @@ gen_data <- function(m, n, sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
     
   }
 
-  w1 <- stats::rnorm(m, 1, 1)
+  w1 <- stats::rnorm(mult*n, 1, 1)
   w <- cbind(w1, w2)
   a <- rnorm(n, mu_gps, sig_gps)
-  a_s <- rep(NA, m)
   
-  for (g in 1:n)
-    a_s[s.id == g] <- a[g]
-    
-  s <- rnorm(m, a_s, sig_agg)
+  stab <- table(s.id)
+  a_s <- rep(a, stab)  
+  
+  s <- rnorm(mult*n, a_s, sig_agg)
   
   if (pred_scen == "b"){
-    star <- rnorm(m, s - 1 + 0.5*w1 - 0.5*w2, sig_pred)
+    star <- rnorm(mult*n, s - 1 + 0.5*w1 - 0.5*w2, sig_pred)
   } else {
-    star <- rnorm(m, s, sig_pred)
+    star <- rnorm(mult*n, s, sig_pred)
   }
   
   if (out_scen == "b") {

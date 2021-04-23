@@ -29,9 +29,9 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   # gen data arguments
   n <- scenario$n
-  m <- scenario$mult*n
+  mult <- scenario$mult
   family <- poisson()
-  span <- ifelse(n == 800, 0.125, 0.25)
+  span <- ifelse(n == 800, 0.1, 0.2)
   
   # initialize output
   est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
@@ -42,7 +42,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     print(i)
     
     # generate data
-    dat <- gen_data(m = m, n = n, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
+    dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
                     pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
     
     # zipcode index
@@ -58,7 +58,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     s_tilde <- dat$star
     
     # validation subset
-    s <- dat$s*rbinom(m, 1, prob)
+    s <- dat$s*rbinom(mult*n, 1, prob)
     s[s == 0] <- NA
     
     # remove clusters w/o exposure data
