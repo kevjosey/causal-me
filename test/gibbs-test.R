@@ -27,7 +27,7 @@ pred_scen <- "b"
 span <- 0.5
 
 # gen data arguments
-m <- 2000 # c(500, 800)
+mult <- 5 # c(500, 800)
 n <- 400 # c(100, 200)
 
 # gibbs sampler stuff
@@ -52,7 +52,7 @@ for (i in 1:n.sim){
   print(i)
   
   # generate data
-  dat <- gen_data(m = m, n = n, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
+  dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
                   pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
   
   # zipcode index
@@ -68,7 +68,7 @@ for (i in 1:n.sim){
   star <- dat$star
   
   # validation subset
-  s <- dat$s*rbinom(m, 1, 0.1)
+  s <- dat$s*rbinom(n*mult, 1, 0.1)
   s[s == 0] <- NA
   
   # remove clusters w/o exposure data

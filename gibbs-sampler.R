@@ -49,8 +49,9 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   a.s <- rep(NA, length(s.id))
   
   stab <- table(s.id)
-  ord <- order(s.id)
-  a.s <- rep(a, stab)[order(ord)]
+  sword <- order(order(s.id))
+  shield <- order(order(id))
+  a.s <- rep(a, stab)[sword]
   
   # dimensions
   p <- ncol(x)
@@ -81,7 +82,7 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     # sample S
     
     sig <- sqrt((1/omega2[j - 1] + 1/tau2[j - 1])^(-1))
-    hat <- (sig^2)*(a.s/omega2[j - 1] + ws %*% alpha[j - 1,]/tau2[j - 1])
+    hat <- (sig^2)*(a.s/omega2[j - 1] + c(ws %*% alpha[j - 1,])/tau2[j - 1])
     s.hat <- rnorm(m, hat, sig)
     s.hat[!is.na(s)] <- s[!is.na(s)]
 
@@ -89,27 +90,21 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     
     a_ <-  rnorm(n, a, h.a)
     xa_ <- as.matrix(cbind(x, predict(nsa, a_)))
+    dt <- setDT(data.frame(s.id = s.id, s.hat = s.hat))[,.(A = .N, B = mean(s.hat)), by = 's.id'][order(s.id)]
+    z.hat <- dt$B[shield]
+    size <- dt$A[shield]
     
-    a <- amat[j,] <- sapply(id, function(g, ...) {
-      
-      idx <- s.id == g
-      
-      log.eps <- dpois(y[id == g], exp(sum(xa_[id == g,]*gamma[j - 1,]) + offset[id == g]), log = TRUE) +
-        dnorm(a_[id == g], sum(x[id == g,]*beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) + 
-        dnorm(a_[id == g], mean(s.hat[idx]), sqrt(omega2[j - 1]/sum(idx)), log = TRUE) -
-        dpois(y[id == g], exp(sum(xa[id == g,]*gamma[j - 1,]) + offset[id == g]), log = TRUE) -
-        dnorm(a[id == g], sum(x[id == g,]*beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) -
-        dnorm(a[id == g], mean(s.hat[idx]), sqrt(omega2[j - 1]/sum(idx)), log = TRUE)
-      
-      if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
-        return(a_[id == g])
-      else
-        return(a[id == g])
-      
-    })
+    log.eps <- dpois(y, exp(c(xa_%*%gamma[j - 1,]) + offset), log = TRUE) +
+      dnorm(a_, c(x%*%beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) + 
+      dnorm(a_, z.hat, sqrt(omega2[j - 1]/size), log = TRUE) -
+      dpois(y, exp(c(xa%*%gamma[j - 1,]) + offset), log = TRUE) -
+      dnorm(a, c(x%*%beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) -
+      dnorm(a, z.hat, sqrt(omega2[j - 1]/size), log = TRUE)
+    
+    a <- amat[j,] <- ifelse((log(runif(1)) <= log.eps) & !is.na(log.eps), a_, a)
     
     xa <- as.matrix(cbind(x, predict(nsa, a)))
-    a.s <- rep(a, stab)[order(ord)]
+    a.s <- rep(a, stab)[sword]
     
     # Sample pred parameters
     
@@ -117,7 +112,7 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     alpha[j,] <- rmvnorm(1, alpha_var %*% t(ws.tmp) %*% s.tmp, tau2[j - 1]*alpha_var)
     
     tau2[j] <- 1/rgamma(1, shape = shape + l/2, rate = rate +
-                            sum((s.tmp - (ws.tmp) %*% alpha[j,])^2)/2)
+                            sum(c(s.tmp - c(ws.tmp %*% alpha[j,]))^2)/2)
     
     # Sample agg parameters
     
@@ -216,6 +211,8 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   est.mat <- do.call(rbind, out)
   estimate <- colMeans(est.mat)
   variance <- apply(est.mat, 2, var)
+  
+  amat <- amat[,order(shield)]
 
   rslt <- list(estimate = estimate, variance = variance,
                mcmc = list(gamma = gamma, beta = beta, alpha = alpha,

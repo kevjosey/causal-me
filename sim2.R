@@ -28,13 +28,13 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   # gen data arguments
   n <- scenario$n # c(500, 800)
-  m <- n*scenario$mult # c(100, 200)
+  mult <- scenario$mult # c(100, 200)
   span <- 0.5
   
   # gibbs sampler stuff
-  thin <- 50
-  n.iter <- 5000
-  n.adapt <- 500
+  thin <- 10
+  n.iter <- 1000
+  n.adapt <- 1000
   family <- poisson()
   
   # initialize output
@@ -46,7 +46,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     print(i)
     
     # generate data
-    dat <- gen_data(m = m, n = n, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
+    dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
                     pred_scen = "b", out_scen = out_scen, gps_scen = gps_scen)
     
     # zipcode index
@@ -62,7 +62,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     star <- dat$star
     
     # validation subset
-    s <- dat$s*rbinom(m, 1,prob)
+    s <- dat$s*rbinom(n*mult, 1, prob)
     s[s == 0] <- NA
     
     # remove clusters w/o exposure data
@@ -87,7 +87,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     gibbs_x <- try(gibbs_dr(s = s, star = star, y = y, offset = offset,
                             s.id = s.id, id = id, w = w, x = x, family = family,
                             n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-                            h.a = 1, h.gamma = 0.3, deg.num = 4,
+                            h.a = 1, h.gamma = 0.25, deg.num = 4,
                             a.vals = a.vals, span = span, mc.cores = 1), silent = TRUE)
     
     # estimates
@@ -133,6 +133,46 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
 }
 
+mclapply2 <- function(X, FUN, ..., 
+                      mc.preschedule = TRUE, mc.set.seed = TRUE,
+                      mc.silent = FALSE, mc.cores = getOption("mc.cores", 2L),
+                      mc.cleanup = TRUE, mc.allow.recursive = TRUE,
+                      mc.progress = TRUE, mc.style = 3) {
+  if (!is.vector(X) || is.object(X)) X <- as.list(X)
+  
+  if (mc.progress) {
+    f <- fifo(tempfile(), open="w+b", blocking=T)
+    p <- parallel:::mcfork()
+    pb <- txtProgressBar(0, length(X), style=mc.style)
+    setTxtProgressBar(pb, 0) 
+    progress <- 0
+    if (inherits(p, "masterProcess")) {
+      while (progress < length(X)) {
+        readBin(f, "double")
+        progress <- progress + 1
+        setTxtProgressBar(pb, progress) 
+      }
+      cat("\n")
+      parallel:::mcexit()
+    }
+  }
+  tryCatch({
+    result <- mclapply(X, ..., function(...) {
+      res <- FUN(...)
+      if (mc.progress) writeBin(1, f)
+      res
+    }, 
+    mc.preschedule = mc.preschedule, mc.set.seed = mc.set.seed,
+    mc.silent = mc.silent, mc.cores = mc.cores,
+    mc.cleanup = mc.cleanup, mc.allow.recursive = mc.allow.recursive
+    )
+    
+  }, finally = {
+    if (mc.progress) close(f)
+  })
+  result
+}
+
 # for replication
 set.seed(42)
 
@@ -141,14 +181,14 @@ a.vals <- seq(6, 10, by = 0.1)
 sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
 n.sim <- 1000
 
-n <- c(400)
+n <- c(400,800)
 mult <- c(5,10)
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
 
 scen_mat <- expand.grid(n = n, mult = mult, gps_scen = gps_scen, out_scen = out_scen)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
-est <- mclapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 8)
+est <- mclapply2(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 8)
 rslt <- list(est = est, scen_idx = scen_mat)
 
 save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim2_rslt.RData")
@@ -159,6 +199,7 @@ plotnames <- c("GPS scenario: \"a\"; Outcome scenario \"a\"",
                "GPS scenario: \"b\"; Outcome scenario \"a\"",
                "GPS scenario: \"a\"; Outcome scenario \"b\"",
                "GPS scenario: \"b\"; Outcome scenario \"b\"")
+idx <- c(1,2,3,4)
 
 filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_2.pdf")
 pdf(file = filename)
