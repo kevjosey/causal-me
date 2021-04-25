@@ -24,19 +24,19 @@ sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.5
+span <- 0.25
 
 # gen data arguments
 mult <- 5 # c(500, 800)
 n <- 400 # c(100, 200)
 
 # gibbs sampler stuff
-thin <- 50
-n.iter <- 5000
-n.adapt <- 500
+thin <- 10
+n.iter <- 1000
+n.adapt <- 1000
 h.a <- 1
-h.gamma <- 0.3
-deg.num <- 2
+h.gamma <- 0.2
+deg.num <- 4
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.1)
@@ -92,7 +92,7 @@ for (i in 1:n.sim){
   gibbs_x <- gibbs_dr(s = s, star = star, y = y, offset = offset,
                       s.id = s.id, id = id, w = w, x = x, family = family,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-                      h.a = 1, h.gamma = 0.3, deg.num = deg.num,
+                      h.a = 1, h.gamma = 0.25, deg.num = deg.num,
                       a.vals = a.vals, span = span, mc.cores = 1)
   
   # estimates

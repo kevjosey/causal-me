@@ -44,14 +44,12 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   # initialize exposures
   a.tmp <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
   a <- aggregate(a.tmp, by = list(s.id), mean)[,2]
-  nsa <- ns(a, deg.num, Boundary.knots = c(min(a) - 2*sd(a)/sqrt(n), max(a) + 2*sd(a)/sqrt(n)))
-  xa <- as.matrix(cbind(x, nsa))
+  nsa <- ns(a, deg.num, Boundary.knots = c(min(s, na.rm = TRUE), max(s, na.rm = TRUE)))
   a.s <- rep(NA, length(s.id))
-  
   stab <- table(s.id)
   sword <- order(order(s.id))
-  shield <- order(order(id))
   a.s <- rep(a, stab)[sword]
+  xa <- as.matrix(cbind(x, nsa))
   
   # dimensions
   p <- ncol(x)
@@ -90,18 +88,24 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     
     a_ <-  rnorm(n, a, h.a)
     xa_ <- as.matrix(cbind(x, predict(nsa, a_)))
-    dt <- setDT(data.frame(s.id = s.id, s.hat = s.hat))[,.(A = .N, B = mean(s.hat)), by = 's.id'][order(s.id)]
-    z.hat <- dt$B[shield]
-    size <- dt$A[shield]
-    
-    log.eps <- dpois(y, exp(c(xa_%*%gamma[j - 1,]) + offset), log = TRUE) +
-      dnorm(a_, c(x%*%beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) + 
-      dnorm(a_, z.hat, sqrt(omega2[j - 1]/size), log = TRUE) -
-      dpois(y, exp(c(xa%*%gamma[j - 1,]) + offset), log = TRUE) -
-      dnorm(a, c(x%*%beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) -
-      dnorm(a, z.hat, sqrt(omega2[j - 1]/size), log = TRUE)
-    
-    a <- amat[j,] <- ifelse((log(runif(1)) <= log.eps) & !is.na(log.eps), a_, a)
+
+    a <- amat[j,] <- sapply(id, function(g, ...) {
+      
+      idx <- s.id == g
+      
+      log.eps <- dpois(y[id == g], exp(sum(xa_[id == g,]*gamma[j - 1,]) + offset[id == g]), log = TRUE) +
+        dnorm(a_[id == g], sum(x[id == g,]*beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) + 
+        dnorm(a_[id == g], mean(s.hat[idx]), sqrt(omega2[j - 1]/sum(idx)), log = TRUE) -
+        dpois(y[id == g], exp(sum(xa[id == g,]*gamma[j - 1,]) + offset[id == g]), log = TRUE) -
+        dnorm(a[id == g], sum(x[id == g,]*beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) -
+        dnorm(a[id == g], mean(s.hat[idx]), sqrt(omega2[j - 1]/sum(idx)), log = TRUE)
+      
+      if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
+        return(a_[id == g])
+      else
+        return(a[id == g])
+      
+    })
     
     xa <- as.matrix(cbind(x, predict(nsa, a)))
     a.s <- rep(a, stab)[sword]
@@ -158,7 +162,7 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   amat <- amat[keep,]
   
   y.new <- exp(log(y) - offset)
-
+  
   out <- mclapply(1:nrow(amat), function(k, ...){
 
     a <- amat[k,]
@@ -176,7 +180,7 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
       mean(dnorm(a.tmp, pimod.vals, sqrt(sigma2[k]))))
     phat <- predict(smooth.spline(a.vals, phat.vals), x = a)$y
     phat[which(phat < 0)] <- 1e-6
-    phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
+    # phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
 
     muhat <- exp(c(xa %*% gamma[k,]))
 
@@ -192,27 +196,25 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     # aggregate muhat.vals and integrate for influence function
     mhat.vals <- colMeans(muhat.mat)
     mhat <- predict(smooth.spline(a.vals, mhat.vals), x = a)$y
-    mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
+    # mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
 
     # integrate
-    intfn <- (muhat.mat - mhat.mat) * phat.mat
-    int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
-                   (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
+    # intfn <- (muhat.mat - mhat.mat) * phat.mat
+    # int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
+    #                (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
 
     psi <- c((y.new - muhat)/(pihat/phat) + mhat)
     
-    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int,
+    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = NULL,
                      family = family, span = span, se.fit = FALSE)
 
     return(dr_out)
            
   }, mc.cores = mc.cores)
-
+  
   est.mat <- do.call(rbind, out)
   estimate <- colMeans(est.mat)
   variance <- apply(est.mat, 2, var)
-  
-  amat <- amat[,order(shield)]
 
   rslt <- list(estimate = estimate, variance = variance,
                mcmc = list(gamma = gamma, beta = beta, alpha = alpha,
