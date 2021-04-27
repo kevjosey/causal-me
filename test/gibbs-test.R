@@ -11,10 +11,11 @@ library(splines)
 library(parallel)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/gibbs-sampler.R")
-source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("D:/Github/causal-me/gen-data.R")
+source("D:/Github/causal-me/gibbs-sampler.R")
+source("D:/Github/causal-me/mclapply-hack.R")
+source("D:/Github/causal-me/blp.R")
+source("D:/Github/causal-me/erc.R")
 
 # simulation arguments
 n.sim <- 200
@@ -92,8 +93,8 @@ for (i in 1:n.sim){
   gibbs_x <- gibbs_dr(s = s, star = star, y = y, offset = offset,
                       s.id = s.id, id = id, w = w, x = x, family = family,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-                      h.a = 1, h.gamma = 0.25, deg.num = deg.num,
-                      a.vals = a.vals, span = span, mc.cores = 4)
+                      h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
+                      a.vals = a.vals, span = span)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)

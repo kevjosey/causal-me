@@ -4,7 +4,7 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
                      shape = 1e-3, rate = 1e-3, scale = 1e6,
                      thin = 10, n.iter = 10000, n.adapt = 1000,
                      h.a = 0.5, h.gamma = 0.1, deg.num = 3, span = 0.75,
-                     a.vals = seq(min(a), max(a), length.out = 20), mc.cores = 4) {
+                     a.vals = seq(min(a), max(a), length.out = 100)) {
   
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
@@ -171,7 +171,7 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   
   y.new <- exp(log(y) - offset)
   
-  out <- mclapply(1:nrow(amat), function(k, ...){
+  out <- lapply(1:nrow(amat), function(k, ...){
 
     a <- amat[k,]
     xa <- as.matrix(cbind(x, predict(nsa, a)))
@@ -218,9 +218,13 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
 
     return(dr_out)
            
-  }, mc.cores = mc.cores)
+  })
   
   amat <- amat[,order(shield)]
+  # est.mat <- do.call(rbind, lapply(out, function(lst) lst[1,]))
+  # var.mat <- do.call(rbind, lapply(out, function(lst) lst[2,]))
+  # estimate <- colMeans(est.mat)
+  # variance <- (1 + 1/nrow(amat))*apply(est.mat, 2, var) + colMeans(var.mat)
   est.mat <- do.call(rbind, out)
   estimate <- colMeans(est.mat)
   variance <- apply(est.mat, 2, var)

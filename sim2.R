@@ -9,12 +9,13 @@ library(mvtnorm)
 library(SuperLearner)
 library(splines)
 library(parallel)
+library(abind)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/gibbs-sampler.R")
-source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("D:/Github/causal-me/gen-data.R")
+source("D:/Github/causal-me/gibbs-sampler.R")
+source("D:/Github/causal-me/blp.R")
+source("D:/Github/causal-me/erc.R")
 
 simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
@@ -41,7 +42,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   est <- array(NA, dim = c(n.sim, 3, length(a.vals)))
   se <- array(NA, dim = c(n.sim, 2, length(a.vals)))
   
-  for (i in 1:n.sim){
+  out <- mclapply(1:n.sim, function(i,...){
     
     print(i)
     
@@ -88,42 +89,48 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
                             s.id = s.id, id = id, w = w, x = x, family = family,
                             n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
                             h.a = 1, h.gamma = 0.25, deg.num = 2,
-                            a.vals = a.vals, span = span, mc.cores = 4), silent = TRUE)
+                            a.vals = a.vals, span = span), silent = TRUE)
     
     # estimates
-    est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
-    est[i,2,] <- if (!inherits(blp_x, "try-error")) {blp_x$estimate} else {rep(NA, length(a.vals))}
-    est[i,3,] <- if (!inherits(gibbs_x, "try-error")) {gibbs_x$estimate} else {rep(NA, length(a.vals))}
+    est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
+                 if (!inherits(blp_x, "try-error")) {blp_x$estimate} else {rep(NA, length(a.vals))},
+                 if (!inherits(gibbs_x, "try-error")) {gibbs_x$estimate} else {rep(NA, length(a.vals))})
     
     #standard error
-    se[i,1,] <- if (!inherits(blp_x, "try-error")) {sqrt(blp_x$variance)} else {rep(NA, length(a.vals))}
-    se[i,2,] <- if (!inherits(gibbs_x, "try-error")) {sqrt(gibbs_x$variance)} else {rep(NA, length(a.vals))}
-    
-  }
+    se <- rbind(if (!inherits(blp_x, "try-error")) {sqrt(blp_x$variance)} else {rep(NA, length(a.vals))},
+                if (!inherits(gibbs_x, "try-error")) {sqrt(gibbs_x$variance)} else {rep(NA, length(a.vals))})
+   
+    return(list(est = est, se = se))
+     
+  }, mc.cores = 8)
   
-  out_est <- colMeans(est, na.rm = T)
+  est <- abind(lapply(out, function(lst, ...) lst$est), along = 3)
+  se <- abind(lapply(out, function(lst, ...) lst$se), along = 3)
+  
+  out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
   rownames(out_est) <- c("ERC", "BLP", "Bayes")
   
-  out_bias <- t(apply(est[,2:3,], 2, function(x) colMeans(abs(x - est[,1,]), na.rm = T)))
+  compare <- matrix(rowMeans(est[1,,]), nrow = length(a.vals), ncol = n.sim)
+  out_bias <- t(apply(est[2:3,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
   colnames(out_bias) <- a.vals
   rownames(out_bias) <- c("BLP", "Bayes")
   
-  out_sd <- t(apply(est[,2:3,], 2, function(x) apply(x, 2, sd, na.rm = T)))
+  out_sd <- t(apply(est[2:3,,], 1, function(x) apply(x, 1, sd, na.rm = T)))
   colnames(out_sd) <- a.vals
   rownames(out_sd) <- c("BLP", "Bayes")
   
-  out_se <- colMeans(se, na.rm = T)
+  out_se <- t(apply(se, 1, rowMeans, na.rm = T))
   colnames(out_se) <- a.vals
   rownames(out_se) <- c("BLP", "Bayes")
   
   cp_blp_x <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[i,2,] - 1.96*se[i,1,]) < colMeans(est[,1,],na.rm = TRUE) & 
-                 (est[i,2,] + 1.96*se[i,1,]) > colMeans(est[,1,],na.rm = TRUE)))
+    as.numeric((est[2,,i] - 1.96*se[1,,i]) < compare[,1] & 
+                 (est[2,,i] + 1.96*se[1,,i]) > compare[,1]))
   
   cp_gibbs_x <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[i,3,] - 1.96*se[i,2,]) < colMeans(est[,1,],na.rm = TRUE) & 
-                 (est[i,3,] + 1.96*se[i,2,]) > colMeans(est[,1,],na.rm = TRUE)))
+    as.numeric((est[3,,i] - 1.96*se[2,,i]) < compare[,1] & 
+                 (est[3,,i] + 1.96*se[2,,i]) > compare[,1]))
   
   out_cp <- rbind(rowMeans(cp_blp_x, na.rm = T), rowMeans(cp_gibbs_x, na.rm = T))
   colnames(out_cp) <- a.vals
@@ -151,7 +158,7 @@ scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 est <- lapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib)
 rslt <- list(est = est, scen_idx = scen_mat)
 
-save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim2_rslt.RData")
+save(rslt, file = "D:/Dropbox (Personal)/Projects/ERC-EPE/Output/sim2_rslt.RData")
 
 # Summary Plot
 
@@ -159,9 +166,9 @@ plotnames <- c("GPS scenario: \"a\"; Outcome scenario \"a\"",
                "GPS scenario: \"b\"; Outcome scenario \"a\"",
                "GPS scenario: \"a\"; Outcome scenario \"b\"",
                "GPS scenario: \"b\"; Outcome scenario \"b\"")
-idx <- c(1,2,3,4)
+idx <- c(1,5,9,13)
 
-filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_2.pdf")
+filename <- paste0("D:/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_2.pdf")
 pdf(file = filename)
 par(mfrow = c(2,2))
 
@@ -190,3 +197,5 @@ for (k in 1:4){
   }
   
 }
+
+dev.off()

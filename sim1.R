@@ -37,9 +37,9 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
   se <- array(NA, dim = c(n.sim, 4, length(a.vals)))
   
-  for (i in 1:n.sim){
-    
-    print(i)
+  print(scenario)
+  
+  out <- mclapply(1:n.sim, function(i, ...){
     
     # generate data
     dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
@@ -100,51 +100,57 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
                        a.vals = a.vals, sl.lib = sl.lib, span = span), silent = TRUE)
     
     # estimates
-    est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
-    est[i,2,] <- if (!inherits(naive_tilde, "try-error")) {naive_tilde$estimate} else {rep(NA, length(a.vals))}
-    est[i,3,] <- if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))}
-    est[i,4,] <- if (!inherits(blp_tilde, "try-error")) {blp_tilde$estimate} else {rep(NA, length(a.vals))}
-    est[i,5,] <- if (!inherits(blp_hat, "try-error")) {blp_hat$estimate} else {rep(NA, length(a.vals))}
+    est <- cbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
+                 if (!inherits(naive_tilde, "try-error")) {naive_tilde$estimate} else {rep(NA, length(a.vals))},
+                 if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
+                 if (!inherits(blp_tilde, "try-error")) {blp_tilde$estimate} else {rep(NA, length(a.vals))},
+                 if (!inherits(blp_hat, "try-error")) {blp_hat$estimate} else {rep(NA, length(a.vals))})
     
     # standard errors
-    se[i,1,] <- if (!inherits(naive_tilde, "try-error")) {sqrt(naive_tilde$variance)} else {rep(NA, length(a.vals))}
-    se[i,2,] <- if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))}
-    se[i,3,] <- if (!inherits(blp_tilde, "try-error")) {sqrt(blp_tilde$variance)} else {rep(NA, length(a.vals))}
-    se[i,4,] <- if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))}
+    se <- cbind(if (!inherits(naive_tilde, "try-error")) {sqrt(naive_tilde$variance)} else {rep(NA, length(a.vals))},
+                if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
+                if (!inherits(blp_tilde, "try-error")) {sqrt(blp_tilde$variance)} else {rep(NA, length(a.vals))},
+                if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))})
     
-  }
+    return(list(est = est, se = se))
+    
+  }, mc.cores = 8)
   
-  out_est <- colMeans(est, na.rm = T)
+  est <- abind(lapply(out, function(lst, ...) lst$est), along = 3)
+  se <- abind(lapply(out, function(lst, ...) lst$se), along = 3)
+  
+  out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
   rownames(out_est) <- c("ERC", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
-  out_bias <- t(apply(est[,2:5,], 2, function(x) colMeans(abs(x - est[,1,]), na.rm = T)))
+  compare <- matrix(rowMeans(est[1,,]), nrow = length(a.vals), ncol = n.sim)
+  out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
   colnames(out_bias) <- a.vals
   rownames(out_bias) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
-  out_sd <- t(apply(est[,2:5,], 2, function(x) apply(x, 2, sd, na.rm = T)))
+  out_sd <- t(apply(est[2:5,,], 1, function(x) apply(x, 1, sd, na.rm = T)))
   colnames(out_sd) <- a.vals
   rownames(out_sd) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
-  out_se <- colMeans(se, na.rm = T)
+  out_se <- t(apply(se, 1, rowMeans, na.rm = T))
   colnames(out_se) <- a.vals
   rownames(out_se) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
   cp_naive_w <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[i,2,] - 1.96*se[i,1,]) < colMeans(est[,1,],na.rm = TRUE) & 
-                 (est[i,2,] + 1.96*se[i,1,]) > colMeans(est[,1,],na.rm = TRUE)))
+    as.numeric((est[2,,i] - 1.96*se[1,,i]) < compare[,1] & 
+                 (est[2,,i] + 1.96*se[1,,i]) > compare[,1]))
   
   cp_naive_x <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[i,3,] - 1.96*se[i,2,]) < colMeans(est[,1,],na.rm = TRUE) & 
-                 (est[i,3,] + 1.96*se[i,2,]) > colMeans(est[,1,],na.rm = TRUE)))
+    as.numeric((est[3,,i] - 1.96*se[2,,i]) < compare[,1] & 
+                 (est[3,,i] + 1.96*se[2,,i]) > compare[,1]))
   
   cp_blp_w <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[i,4,] - 1.96*se[i,3,]) < colMeans(est[,1,],na.rm = TRUE) & 
-                 (est[i,4,] + 1.96*se[i,3,]) > colMeans(est[,1,],na.rm = TRUE)))
+    as.numeric((est[4,,i] - 1.96*se[3,,i]) < compare[,1] & 
+                 (est[4,,i] + 1.96*se[3,,i]) > compare[,1]))
   
   cp_blp_x <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[i,5,] - 1.96*se[i,4,]) < colMeans(est[,1,],na.rm = TRUE) & 
-                 (est[i,5,] + 1.96*se[i,4,]) > colMeans(est[,1,],na.rm = TRUE)))
+    as.numeric((est[5,,i] - 1.96*se[4,,i]) < compare[,1] & 
+                 (est[5,,i] + 1.96*se[4,,i]) > compare[,1]))
   
   out_cp <- rbind(rowMeans(cp_naive_w, na.rm = T), rowMeans(cp_naive_x, na.rm = T),
                   rowMeans(cp_blp_w, na.rm = T), rowMeans(cp_blp_x, na.rm = T))
