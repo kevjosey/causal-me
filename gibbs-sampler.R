@@ -7,30 +7,37 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
                      a.vals = seq(min(a), max(a), length.out = 20), mc.cores = 4) {
   
   # remove any s.id not present in id
-  su.id <- unique(s.id)[order(unique(s.id))]
-  su.id <- su.id[su.id %in% id]
+  check <- unique(s.id)[order(unique(s.id))]
+  check <- check[check %in% id]
   
-  if(length(su.id) != length(id))
-    stop("some observations in y.id are not represented by measurements of s.id.\n
-         There are no exposure data for these entries.")
+  if(any(!unique(id)))
+    stop("id must be unique.")
   
-  if(!all(su.id == id[order(id)]))
-    stop("some observations in y.id are not represented by measurements of s.id.\n
-         There are no exposure data for these entries.")
+  if(length(check) < length(id))
+    stop("some observations in id are not represented by measurements of s.id.")
   
+  if(length(check) > length(id))
+    warning("deleting some exposures without an associated outcome.")
+
   s <- s[s.id %in% id]
   star <- star[s.id %in% id]
   w <- w[s.id %in% id,]
   s.id <- s.id[s.id %in% id]
   
+  # create variables
   m <- length(s.id)
   n <- length(id)
-  
+
   if (is.null(x)) {
     x <- matrix(1, nrow = length(id), ncol = 1)
   } else {
     x <- model.matrix(~ ., data.frame(x))
   }
+  
+  shield <- order(id)
+  y <- y[shield]
+  x <- x[shield,]
+  id <- id[shield]
   
   if (is.null(w)) {
     ws <- cbind(rep(1, length(s.id)), ns(star, deg.num))
@@ -38,17 +45,24 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     ws <- model.matrix(~ . + ns(star, deg.num), data.frame(w))
   }
   
+  sword <- order(s.id)
+  s <- s[sword]
+  star <- star[sword]
+  ws <- ws[sword,]
+  s.id <- s.id[sword]
+  
+  stab <- table(s.id)
+  
   ws.tmp <- ws[!is.na(s),]
   s.tmp <- s[!is.na(s)]
   
   # initialize exposures
-  a.tmp <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
-  a <- aggregate(a.tmp, by = list(s.id), mean)[,2]
-  nsa <- ns(a, deg.num, Boundary.knots = c(min(s, na.rm = TRUE), max(s, na.rm = TRUE)))
-  a.s <- rep(NA, length(s.id))
-  stab <- table(s.id)
-  sword <- order(order(s.id))
-  a.s <- rep(a, stab)[sword]
+  
+  s.hat <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
+  a <- aggregate(s.hat, by = list(s.id), mean)[,2]
+  a.s <- rep(a, stab)
+  
+  nsa <- ns(a, deg.num, Boundary.knots = c(min(s.hat), max(s.hat)))
   xa <- as.matrix(cbind(x, nsa))
   
   # dimensions
@@ -88,27 +102,21 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
     
     a_ <-  rnorm(n, a, h.a)
     xa_ <- as.matrix(cbind(x, predict(nsa, a_)))
-
-    a <- amat[j,] <- sapply(id, function(g, ...) {
-      
-      idx <- s.id == g
-      
-      log.eps <- dpois(y[id == g], exp(sum(xa_[id == g,]*gamma[j - 1,]) + offset[id == g]), log = TRUE) +
-        dnorm(a_[id == g], sum(x[id == g,]*beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) + 
-        dnorm(a_[id == g], mean(s.hat[idx]), sqrt(omega2[j - 1]/sum(idx)), log = TRUE) -
-        dpois(y[id == g], exp(sum(xa[id == g,]*gamma[j - 1,]) + offset[id == g]), log = TRUE) -
-        dnorm(a[id == g], sum(x[id == g,]*beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) -
-        dnorm(a[id == g], mean(s.hat[idx]), sqrt(omega2[j - 1]/sum(idx)), log = TRUE)
-      
-      if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
-        return(a_[id == g])
-      else
-        return(a[id == g])
-      
-    })
+    z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
+ 
+    test <- log(runif(n))
+    
+    log.eps <- dpois(y, exp(c(xa_%*%gamma[j - 1,]) + offset), log = TRUE) +
+      dnorm(a_, c(x%*%beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) + 
+      dnorm(a_, z.hat, sqrt(omega2[j - 1]/stab), log = TRUE) -
+      dpois(y, exp(c(xa%*%gamma[j - 1,]) + offset), log = TRUE) -
+      dnorm(a, c(x%*%beta[j - 1,]), sqrt(sigma2[j - 1]), log = TRUE) -
+      dnorm(a, z.hat, sqrt(omega2[j - 1]/stab), log = TRUE)
+    
+    a <- amat[j,] <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_, a)
     
     xa <- as.matrix(cbind(x, predict(nsa, a)))
-    a.s <- rep(a, stab)[sword]
+    a.s <- rep(a, stab)
     
     # Sample pred parameters
     
@@ -131,9 +139,9 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
    
     gamma_ <- gamma[j,] <- gamma[j-1,]
     
-    for (k in 1:ncol(xa)){
+    for (k in 1:o){
       
-      gamma_[k] <- c(rnorm(1, mean = gamma[j,k], h.gamma))
+      gamma_[k] <- c(rnorm(1, gamma[j,k], h.gamma))
       
       log.eps <- sum(dpois(y, exp(c(xa %*% gamma_) + offset), log = TRUE)) -
         sum(dpois(y, exp(c(xa %*% gamma[j,]) + offset), log = TRUE)) +
@@ -212,6 +220,7 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
            
   }, mc.cores = mc.cores)
   
+  amat <- amat[,order(shield)]
   est.mat <- do.call(rbind, out)
   estimate <- colMeans(est.mat)
   variance <- apply(est.mat, 2, var)

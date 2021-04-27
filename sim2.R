@@ -29,12 +29,12 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   # gen data arguments
   n <- scenario$n # c(500, 800)
   mult <- scenario$mult # c(100, 200)
-  span <- 0.5
+  span <- ifelse(n == 800, 0.125, 0.25)
   
   # gibbs sampler stuff
   thin <- 10
   n.iter <- 1000
-  n.adapt <- 1000
+  n.adapt <- 100
   family <- poisson()
   
   # initialize output
@@ -87,8 +87,8 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     gibbs_x <- try(gibbs_dr(s = s, star = star, y = y, offset = offset,
                             s.id = s.id, id = id, w = w, x = x, family = family,
                             n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-                            h.a = 1, h.gamma = 0.25, deg.num = 4,
-                            a.vals = a.vals, span = span, mc.cores = 1), silent = TRUE)
+                            h.a = 1, h.gamma = 0.25, deg.num = 2,
+                            a.vals = a.vals, span = span, mc.cores = 4), silent = TRUE)
     
     # estimates
     est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
@@ -133,46 +133,6 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
 }
 
-mclapply2 <- function(X, FUN, ..., 
-                      mc.preschedule = TRUE, mc.set.seed = TRUE,
-                      mc.silent = FALSE, mc.cores = getOption("mc.cores", 2L),
-                      mc.cleanup = TRUE, mc.allow.recursive = TRUE,
-                      mc.progress = TRUE, mc.style = 3) {
-  if (!is.vector(X) || is.object(X)) X <- as.list(X)
-  
-  if (mc.progress) {
-    f <- fifo(tempfile(), open="w+b", blocking=T)
-    p <- parallel:::mcfork()
-    pb <- txtProgressBar(0, length(X), style=mc.style)
-    setTxtProgressBar(pb, 0) 
-    progress <- 0
-    if (inherits(p, "masterProcess")) {
-      while (progress < length(X)) {
-        readBin(f, "double")
-        progress <- progress + 1
-        setTxtProgressBar(pb, progress) 
-      }
-      cat("\n")
-      parallel:::mcexit()
-    }
-  }
-  tryCatch({
-    result <- mclapply(X, ..., function(...) {
-      res <- FUN(...)
-      if (mc.progress) writeBin(1, f)
-      res
-    }, 
-    mc.preschedule = mc.preschedule, mc.set.seed = mc.set.seed,
-    mc.silent = mc.silent, mc.cores = mc.cores,
-    mc.cleanup = mc.cleanup, mc.allow.recursive = mc.allow.recursive
-    )
-    
-  }, finally = {
-    if (mc.progress) close(f)
-  })
-  result
-}
-
 # for replication
 set.seed(42)
 
@@ -188,7 +148,7 @@ out_scen <- c("a", "b")
 
 scen_mat <- expand.grid(n = n, mult = mult, gps_scen = gps_scen, out_scen = out_scen)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
-est <- mclapply2(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 8)
+est <- lapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib)
 rslt <- list(est = est, scen_idx = scen_mat)
 
 save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim2_rslt.RData")
@@ -209,19 +169,23 @@ for (k in 1:4){
   
   plot(a.vals, rslt$est[[idx[k]]]$est[1,], type = "l", col = "darkgreen", lwd = 2,
        xlab = "Exposure", ylab = "Rate of Event", main = plotnames[k],
-       ylim = c(0,0.1))
-  lines(a.vals, rslt$est[[idx[k]]]$est[2,], type = "l", col = "red", lwd = 2, lty = 2)
+       ylim = c(0,0.08))
+  lines(a.vals, rslt$est[[idx[k]]]$est[2,], type = "l", col = "red", lwd = 2, lty = 1)
   lines(a.vals, rslt$est[[idx[k]]]$est[3,], type = "l", col = "blue", lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[[idx[k]]]$est[4,], type = "l", col = "red", lwd = 2, lty = 3)
-  lines(a.vals, rslt$est[[idx[k]]]$est[5,], type = "l", col = "blue", lwd = 2, lty = 3)
+  lines(a.vals, rslt$est[[idx[k]]]$est[2,] -
+          1.96*rslt$est[[idx[k]]]$se[1,], type = "l", col = "red", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[idx[k]]]$est[2,] + 
+          1.96*rslt$est[[idx[k]]]$se[1,], type = "l", col = "red", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[idx[k]]]$est[3,] -
+          1.96*rslt$est[[idx[k]]]$se[2,], type = "l", col = "blue", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[idx[k]]]$est[3,] + 
+          1.96*rslt$est[[idx[k]]]$se[2,], type = "l", col = "blue", lwd = 2, lty = 2)
   
-  if (k == 1){
+  if (k == 4){
     
-    legend("topleft", legend=c("True ERC", "Without Prediction Correction",
-                               "With Prediction Correction", "Without Aggregation Correction",
-                               "With Aggregation Correction"),
-           col=c("darkgreen", "red", "blue", "black", "black"),
-           lty = c(1,1,1,2,3), lwd=2, cex=0.8)
+    legend(x = 8, y = 0.02, legend=c("True ERC", "Single Imputation", "Bayesian", "95% CI"),
+           col=c("darkgreen", "red", "blue", "black"),
+           lty = c(1,2,3,1), lwd=2, cex=0.8)
     
   }
   

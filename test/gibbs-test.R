@@ -27,19 +27,19 @@ pred_scen <- "b"
 span <- 0.25
 
 # gen data arguments
-mult <- 5 # c(500, 800)
+mult <- 10 # c(500, 800)
 n <- 400 # c(100, 200)
 
 # gibbs sampler stuff
 thin <- 10
 n.iter <- 1000
-n.adapt <- 1000
+n.adapt <- 100
 h.a <- 1
-h.gamma <- 0.2
-deg.num <- 4
+h.gamma <- 0.25
+deg.num <- 2
 
 # dr arguments
-a.vals <- seq(6, 10, by = 0.1)
+a.vals <- seq(6, 10, by = 0.05)
 sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
 family <- poisson()
 
@@ -93,7 +93,7 @@ for (i in 1:n.sim){
                       s.id = s.id, id = id, w = w, x = x, family = family,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
                       h.a = 1, h.gamma = 0.25, deg.num = deg.num,
-                      a.vals = a.vals, span = span, mc.cores = 1)
+                      a.vals = a.vals, span = span, mc.cores = 4)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
