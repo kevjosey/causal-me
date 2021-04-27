@@ -13,7 +13,6 @@ library(parallel)
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/gibbs-sampler.R")
-source("~/Github/causal-me/mclapply-hack.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 

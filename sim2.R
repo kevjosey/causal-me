@@ -14,6 +14,7 @@ library(abind)
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/gibbs-sampler.R")
+source("~/Github/causal-me/mclapply-hack.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -25,6 +26,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   sig_pred <- sqrt(0.5)
   gps_scen <- scenario$gps_scen
   out_scen <- scenario$out_scen
+  pred_scen <- "b"
   prob <- 0.2
   
   # gen data arguments
@@ -37,18 +39,21 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   n.iter <- 1000
   n.adapt <- 100
   family <- poisson()
+  h.a <- 1
+  h.gamma <- 0.2
+  deg.num <- 2
   
   # initialize output
   est <- array(NA, dim = c(n.sim, 3, length(a.vals)))
   se <- array(NA, dim = c(n.sim, 2, length(a.vals)))
   
-  out <- mclapply(1:n.sim, function(i,...){
-    
-    print(i)
+  print(scenario)
+  
+  out <- mclapply.hack(1:n.sim, function(i,...){
     
     # generate data
     dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
-                    pred_scen = "b", out_scen = out_scen, gps_scen = gps_scen)
+                    pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
     
     # zipcode index
     s.id <- dat$s.id
@@ -88,7 +93,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     gibbs_x <- try(gibbs_dr(s = s, star = star, y = y, offset = offset,
                             s.id = s.id, id = id, w = w, x = x, family = family,
                             n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-                            h.a = 1, h.gamma = 0.25, deg.num = 2,
+                            h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
                             a.vals = a.vals, span = span), silent = TRUE)
     
     # estimates
@@ -144,7 +149,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
 set.seed(42)
 
 # simulation scenarios
-a.vals <- seq(6, 10, by = 0.1)
+a.vals <- seq(6, 10, by = 0.05)
 sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
 n.sim <- 1000
 

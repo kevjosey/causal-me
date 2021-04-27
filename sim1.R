@@ -13,6 +13,7 @@ library(parallel)
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/gibbs-sampler.R")
+source("~/Github/causal-me/mclapply-hack.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -39,7 +40,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   print(scenario)
   
-  out <- mclapply(1:n.sim, function(i, ...){
+  out <- mclapply.hack(1:n.sim, function(i, ...){
     
     # generate data
     dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
@@ -165,7 +166,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
 set.seed(42)
 
 # simulation scenarios
-a.vals <- seq(6, 10, by = 0.1)
+a.vals <- seq(6, 10, by = 0.05)
 sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
 n.sim <- 1000
 
