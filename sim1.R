@@ -9,6 +9,7 @@ library(mvtnorm)
 library(SuperLearner)
 library(earth)
 library(parallel)
+library(abind)
 
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
@@ -103,14 +104,14 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
                        a.vals = a.vals, sl.lib = sl.lib, span = span), silent = TRUE)
     
     # estimates
-    est <- cbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
+    est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
                  if (!inherits(naive_tilde, "try-error")) {naive_tilde$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(blp_tilde, "try-error")) {blp_tilde$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(blp_hat, "try-error")) {blp_hat$estimate} else {rep(NA, length(a.vals))})
     
     # standard errors
-    se <- cbind(if (!inherits(naive_tilde, "try-error")) {sqrt(naive_tilde$variance)} else {rep(NA, length(a.vals))},
+    se <- rbind(if (!inherits(naive_tilde, "try-error")) {sqrt(naive_tilde$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(blp_tilde, "try-error")) {sqrt(blp_tilde$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))})
