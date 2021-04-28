@@ -16,18 +16,19 @@ source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
 # simulation arguments
-n.sim <- 200
+n.sim <- 100
 sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.2
+span <- 0.25
 
 # gen data arguments
-mult <- 5 # c(5, 80)
-n <- 400 # c(400, 800)
+mult <- 10 
+n <- 400 
+prob <- 0.2
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.1)
@@ -59,7 +60,7 @@ for (i in 1:n.sim){
   s_tilde <- dat$star
   
   # validation subset
-  s <- dat$s*rbinom(mult*n, 1, 0.1)
+  s <- dat$s*rbinom(mult*n, 1, prob)
   s[s == 0] <- NA
   
   # remove clusters w/o exposure data

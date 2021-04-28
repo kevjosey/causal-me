@@ -32,16 +32,18 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   # gen data arguments
   n <- scenario$n # c(500, 800)
   mult <- scenario$mult # c(100, 200)
-  span <- ifelse(n == 800, 0.125, 0.25)
   
   # gibbs sampler stuff
-  thin <- 10
-  n.iter <- 1000
-  n.adapt <- 100
-  family <- poisson()
+  thin <- 50
+  n.iter <- 5000
+  n.adapt <- 500
   h.a <- 1
-  h.gamma <- 0.2
-  deg.num <- 2
+  h.gamma <- 0.25
+  deg.num <- 3
+  
+  # dr arguments
+  span <- ifelse(n == 800, 0.125, 0.25)
+  family <- poisson()
   
   # initialize output
   est <- array(NA, dim = c(n.sim, 3, length(a.vals)))

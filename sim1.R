@@ -23,7 +23,6 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   sig_gps <- 1
   sig_agg <- scenario$sig_agg
   sig_pred <- scenario$sig_pred
-  prob <- scenario$prob
   gps_scen <- "a"
   out_scen <- "a"
   pred_scen <- "b"
@@ -31,9 +30,12 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   # gen data arguments
   n <- scenario$n
   mult <- scenario$mult
+  prob <- scenario$prob
+  
+  # dr arguments
   family <- poisson()
   span <- ifelse(n == 800, 0.125, 0.25)
-  
+
   # initialize output
   est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
   se <- array(NA, dim = c(n.sim, 4, length(a.vals)))
