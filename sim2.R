@@ -184,6 +184,7 @@ for (k in 1:4){
   plot(a.vals, rslt$est[[idx[k]]]$est[1,], type = "l", col = "darkgreen", lwd = 2,
        xlab = "Exposure", ylab = "Rate of Event", main = plotnames[k],
        ylim = c(0,0.08))
+  grid(lty = 1)
   lines(a.vals, rslt$est[[idx[k]]]$est[2,], type = "l", col = "red", lwd = 2, lty = 1)
   lines(a.vals, rslt$est[[idx[k]]]$est[3,], type = "l", col = "blue", lwd = 2, lty = 2)
   lines(a.vals, rslt$est[[idx[k]]]$est[2,] -
