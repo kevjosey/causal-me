@@ -206,3 +206,23 @@ for (k in 1:4){
 }
 
 dev.off()
+
+# Summary Table
+
+tbl <- matrix(NA, nrow = length(rslt$est), ncol = 8)
+
+for (k in 1:length(rslt$est)){
+  
+  bias <- round(colMeans(t(rslt$est[[k]]$bias)/rslt$est[[k]]$est[1,]), 3)
+  sd <- round(rowMeans(rslt$est[[k]]$sd), 3)
+  se <- round(rowMeans(rslt$est[[k]]$se), 3)
+  ci <- round(rowMeans(rslt$est[[k]]$cp), 3)
+  
+  tbl[k,] <- c(bias, sd, se, ci)
+  
+}
+
+colnames(tbl) <- outer(names(bias), c("Bias", "SD", "SE", "CI"), FUN = "paste")[1:8]
+final <- cbind(rslt$scen_idx, tbl)
+
+save(final, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/table_2.RData")
