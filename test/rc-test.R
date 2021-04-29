@@ -23,7 +23,7 @@ sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.25
+span <- 0.3
 
 # gen data arguments
 mult <- 10 
@@ -32,7 +32,7 @@ prob <- 0.2
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.1)
-sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
+sl.lib <- c("SL.mean","SL.glm","SL.earth")
 family <- poisson()
 
 # initialize output

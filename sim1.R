@@ -35,7 +35,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   # dr arguments
   family <- poisson()
-  span <- ifelse(n == 800, 0.125, 0.25)
+  span <- ifelse(n == 800, 0.15, 0.3)
 
   # initialize output
   est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
@@ -169,8 +169,8 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
 set.seed(42)
 
 # simulation scenarios
-a.vals <- seq(6, 10, by = 0.05)
-sl.lib <- c("SL.mean","SL.glm","SL.glm.interaction","SL.earth")
+a.vals <- seq(6, 10, by = 0.04)
+sl.lib <- c("SL.mean","SL.glm","SL.earth")
 n.sim <- 1000
 
 n <- c(400, 800)
