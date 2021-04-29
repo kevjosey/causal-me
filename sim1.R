@@ -194,7 +194,7 @@ plotnames <- c("No Measurement Error",
                "Classical Error but No Prediction Error",
                "Prediction Error but No Classical Error",
                "Both Classical and Prediction Error")
-idx <- c(18,22,26,30)
+idx <- c(17,21,25,29)
 
 filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_1.pdf")
 pdf(file = filename, width = 10, height = 10)

@@ -39,7 +39,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   n.adapt <- 500
   h.a <- 1
   h.gamma <- 0.25
-  deg.num <- 3
+  deg.num <- 2
   
   # dr arguments
   span <- ifelse(n == 800, 0.125, 0.25)
@@ -67,10 +67,10 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     x <- dat$x
     a <- dat$a
     w <- dat$w
-    star <- dat$star
+    s_tilde <- dat$star
     
     # validation subset
-    s <- dat$s*rbinom(n*mult, 1, prob)
+    s <- dat$s*rbinom(mult*n, 1, prob)
     s[s == 0] <- NA
     
     # remove clusters w/o exposure data
@@ -84,15 +84,15 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     }
     
     # exposure predictions
-    s_hat <- pred(s = s, star = star, w = w, sl.lib = sl.lib)
-    a_x <- blp(s = s_hat, s.id = s.id, x = x)
+    s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
+    a_hat <- blp(s = s_hat, s.id = s.id, x = x)
     
     # blp w/ pred
-    blp_x <- try(erc(y = y, a = a_x, x = x, offset = offset, family = family,
+    blp_hat <- try(erc(y = y, a = a_hat, x = x, offset = offset, family = family,
                      a.vals = a.vals, sl.lib = sl.lib, span = span), silent = TRUE)
     
     # Bayesian Approach
-    gibbs_x <- try(gibbs_dr(s = s, star = star, y = y, offset = offset,
+    gibbs_hat <- try(gibbs_dr(s = s, star = s_tilde, y = y, offset = offset,
                             s.id = s.id, id = id, w = w, x = x, family = family,
                             n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
                             h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
@@ -100,12 +100,12 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
-                 if (!inherits(blp_x, "try-error")) {blp_x$estimate} else {rep(NA, length(a.vals))},
-                 if (!inherits(gibbs_x, "try-error")) {gibbs_x$estimate} else {rep(NA, length(a.vals))})
+                 if (!inherits(blp_hat, "try-error")) {blp_hat$estimate} else {rep(NA, length(a.vals))},
+                 if (!inherits(gibbs_hat, "try-error")) {gibbs_hat$estimate} else {rep(NA, length(a.vals))})
     
     #standard error
-    se <- rbind(if (!inherits(blp_x, "try-error")) {sqrt(blp_x$variance)} else {rep(NA, length(a.vals))},
-                if (!inherits(gibbs_x, "try-error")) {sqrt(gibbs_x$variance)} else {rep(NA, length(a.vals))})
+    se <- rbind(if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))},
+                if (!inherits(gibbs_hat, "try-error")) {sqrt(gibbs_hat$variance)} else {rep(NA, length(a.vals))})
    
     return(list(est = est, se = se))
      
@@ -143,7 +143,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   colnames(out_cp) <- a.vals
   rownames(out_cp) <- c("BLP", "Bayes")
   
-  return(list(est = out_est, se = out_se, cp = out_cp))
+  return(list(est = out_est, bias = out_bias, se = out_se, cp = out_cp))
   
 }
 
@@ -169,14 +169,15 @@ save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim2_rslt.RData"
 
 # Summary Plot
 
+load(file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim2_rslt.RData")
 plotnames <- c("GPS scenario: \"a\"; Outcome scenario \"a\"",
                "GPS scenario: \"b\"; Outcome scenario \"a\"",
                "GPS scenario: \"a\"; Outcome scenario \"b\"",
                "GPS scenario: \"b\"; Outcome scenario \"b\"")
-idx <- c(1,5,9,13)
+idx <- c(2,6,10,14)
 
 filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_2.pdf")
-pdf(file = filename)
+pdf(file = filename, width = 10, height = 10)
 par(mfrow = c(2,2))
 
 for (k in 1:4){
@@ -186,7 +187,7 @@ for (k in 1:4){
        ylim = c(0,0.08))
   grid(lty = 1)
   lines(a.vals, rslt$est[[idx[k]]]$est[2,], type = "l", col = "red", lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[[idx[k]]]$est[3,], type = "l", col = "blue", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[idx[k]]]$est[3,], type = "l", col = "blue", lwd = 2, lty = 1)
   lines(a.vals, rslt$est[[idx[k]]]$est[2,] -
           1.96*rslt$est[[idx[k]]]$se[1,], type = "l", col = "red", lwd = 2, lty = 2)
   lines(a.vals, rslt$est[[idx[k]]]$est[2,] + 

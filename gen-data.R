@@ -28,6 +28,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   x3 <- stats::rnorm(n, 0, 1)
   x4 <- stats::rnorm(n, 0, 1)
   x <- cbind(x1, x2, x3, x4)
+  x <- x%*%solve(chol(cov(x)))
   
   id <- 1:n
   offset <- runif(n, 10, 1000)
@@ -56,7 +57,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
     
   } else {
     
-    mu_gps <- 8 + 0.5*x1 - 0.5*x2 - 0.5*x3 + 0.5*x4
+    mu_gps <- 8 + 0.5*x[,1] - 0.5*x[,2] - 0.5*x[,3] + 0.5*x[,4]
     for (g in 1:n)
       w2[s.id == g] <- rnorm(sum(s.id == g), x2[id == g], 1)
     
@@ -81,7 +82,8 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
     mu_out <- -3 - 0.3*u[,1] - 0.1*u[,2] + 0.1*u[,3] + 0.3*u[,4] +
       0.3*(a - 8) - 0.1*(a - 8)^2
   } else { # y_scen == "b"
-    mu_out <- -3 - 0.3*x1 - 0.1*x2 + 0.1*x3 + 0.3*x4 + 0.3*(a - 8) - 0.1*(a - 8)^2
+    mu_out <- -3 - 0.3*x[,1] - 0.1*x[,2] + 0.1*x[,3] + 0.3*x[,4] +
+      0.3*(a - 8) - 0.1*(a - 8)^2
   }
   
   y <- rpois(n, exp(mu_out + log(offset)))

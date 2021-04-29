@@ -66,10 +66,10 @@ for (i in 1:n.sim){
   x <- dat$x
   a <- dat$a
   w <- dat$w
-  star <- dat$star
+  s_tilde <- dat$star
   
   # validation subset
-  s <- dat$s*rbinom(n*mult, 1, prob)
+  s <- dat$s*rbinom(mult*n, 1, prob)
   s[s == 0] <- NA
   
   # remove clusters w/o exposure data
@@ -82,15 +82,15 @@ for (i in 1:n.sim){
     id <- dat$id[(id %in% keep)]
   }
   
-  s_hat <- pred(s = s, star = star, w = w, sl.lib = sl.lib)
-  a_x <- blp(s = s_hat, s.id = s.id, x = x)
+  s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
+  a_hat <- blp(s = s_hat, s.id = s.id, x = x)
   
   # blp
-  blp_x <- erc(y = y, a = a_x, x = x, offset = offset, family = family,
+  blp_hat <- erc(y = y, a = a_hat, x = x, offset = offset, family = family,
                a.vals = a.vals, sl.lib = sl.lib, span = span)
   
   # Bayesian analysis
-  gibbs_x <- gibbs_dr(s = s, star = star, y = y, offset = offset,
+  gibbs_hat <- gibbs_dr(s = s, star = s_tilde, y = y, offset = offset,
                       s.id = s.id, id = id, w = w, x = x, family = family,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
                       h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
@@ -98,12 +98,12 @@ for (i in 1:n.sim){
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
-  est[i,2,] <- blp_x$estimate
-  est[i,3,] <- gibbs_x$estimate
+  est[i,2,] <- blp_hat$estimate
+  est[i,3,] <- gibbs_hat$estimate
 
   # standard error
-  se[i,1,] <- sqrt(blp_x$variance)
-  se[i,2,] <- sqrt(gibbs_x$variance)
+  se[i,1,] <- sqrt(blp_hat$variance)
+  se[i,2,] <- sqrt(gibbs_hat$variance)
   
 }
 
