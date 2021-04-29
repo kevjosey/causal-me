@@ -73,10 +73,10 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
   knn[idx] <- 1
   max.a.std <- max(abs(a.std*knn))
   k.std <- knn*c((1 - abs(a.std/max.a.std)^3)^3)
-  # k.std <- knn*dnorm(a.std/max.a.std)/max.a.std
   
   # a.std <- (a - newa)/bw
   # k.std <- ifelse(abs(a.std) <= 1, dnorm(a.std) / bw, 0)
+  # k.std <- knn*dnorm(a.std/max.a.std)/max.a.std
   
   gh <- cbind(1, a.std)
   gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
@@ -96,7 +96,7 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
 }
 
 np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0, length(a)),
-                   sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.gam", "SL.earth")) {
+                   sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")) {
   
   # set up evaluation points & matrices for predictions
   n <- nrow(x)
@@ -137,7 +137,7 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   if (inherits(pi2mod, "try-error")) {
     
     pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
-                           family = gaussian(), SL.library = "SL.mean")
+                           family = gaussian(), SL.library = sl.lib)
     
   } else if (any(pi2mod$SL.predict <= 0)) {
     
@@ -153,7 +153,7 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   phat.vals <- sapply(a.vals, function(a.tmp, ...) 
     mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
   phat <- predict(smooth.spline(a.vals, phat.vals), x = a)$y
-  phat[which(phat < 0)] <- 1e-5
+  phat[which(phat < 0)] <- 1e-6
   phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
   
   # predict marginal outcomes given a.vals (or a.agg)
