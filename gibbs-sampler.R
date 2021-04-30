@@ -10,7 +10,7 @@ gibbs_dr <- function(s, star, y, s.id, id, family = gaussian(),
   check <- unique(s.id)[order(unique(s.id))]
   check <- check[check %in% id]
   
-  if(any(!unique(id)))
+  if(any(duplicated(id)))
     stop("id must be unique.")
   
   if(length(check) < length(id))
