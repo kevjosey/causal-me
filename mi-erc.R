@@ -1,5 +1,5 @@
 
-gibbs_erc <- function(s, star, y, s.id, id, family = gaussian(),
+mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
                       offset = rep(0, length(id)), w = NULL, x = NULL,
                       a.vals = seq(min(a), max(a), length.out = 100),
                       shape = 1e-3, rate = 1e-3, scale = 1e6,
@@ -42,9 +42,11 @@ gibbs_erc <- function(s, star, y, s.id, id, family = gaussian(),
   id <- id[shield]
   
   if (is.null(w)) {
-    ws <- cbind(rep(1, length(s.id)), ns(star, deg.num))
+    ws <- cbind(rep(1, length(s.id)), star)
+    # ws <- cbind(rep(1, length(s.id)), poly(star, deg.num))
   } else {
-    ws <- model.matrix(~ . + ns(star, deg.num), data.frame(w))
+    ws <- cbind(model.matrix(~ ., data.frame(w)), star = star)
+    # ws <- cbind(model.matrix(~ ., data.frame(w)), star = poly(star, deg.num))
   }
   
   sword <- order(s.id)
@@ -64,7 +66,8 @@ gibbs_erc <- function(s, star, y, s.id, id, family = gaussian(),
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
   
-  nsa <- ns(a, deg.num, Boundary.knots = c(min(s.hat), max(s.hat)))
+  # nsa <- ns(a, deg.num, Boundary.knots = c(min(s.hat), max(s.hat)))
+  nsa <- poly(a, deg.num = 2)
   xa <- as.matrix(cbind(x, nsa))
   
   # dimensions

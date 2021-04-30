@@ -169,7 +169,7 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.mean","SL.glm","SL.earth")
+sl.lib <- c("SL.glm")
 n.sim <- 1000
 
 n <- c(400, 800)
@@ -212,7 +212,7 @@ for (k in 1:4){
   
   if (k == 4){
     
-    legend(x = 8, y = 0.02, legend=c("True ERC", "Without Prediction Correction",
+    legend(x = 8, y = 0.02, legend=c("Sample ERF", "Without Prediction Correction",
                                      "With Prediction Correction", "Without Classical Correction",
                                      "With Classical Correction"),
            col=c("darkgreen", "red", "blue", "black", "black"),
@@ -226,20 +226,19 @@ dev.off()
 
 # Summary Table
 
-tbl <- matrix(NA, nrow = length(rslt$est), ncol = 16)
+tbl <- matrix(NA, nrow = length(rslt$est), ncol = 12)
 
 for (k in 1:length(rslt$est)){
   
   bias <- round(colMeans(t(rslt$est[[k]]$bias)/rslt$est[[k]]$est[1,]), 3)
-  sd <- round(rowMeans(rslt$est[[k]]$sd), 3)
-  se <- round(rowMeans(rslt$est[[k]]$se), 3)
+  sd <- round(rowMeans(rslt$est[[k]]$sd/rslt$est[[k]]$se), 3)
   ci <- round(rowMeans(rslt$est[[k]]$cp), 3)
   
-  tbl[k,] <- c(bias, sd, se, ci)
+  tbl[k,] <- c(bias, sd, ci)
   
 }
 
-colnames(tbl) <- outer(names(bias), c("Bias", "SD", "SE", "CI"), FUN = "paste")[1:16]
+colnames(tbl) <- outer(names(bias), c("Bias", "SD", "SE", "CI"), FUN = "paste")[1:12]
 final <- cbind(rslt$scen_idx, tbl)
 
 save(final, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/table_1.RData")

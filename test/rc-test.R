@@ -7,7 +7,7 @@ rm(list = ls())
 library(data.table)
 library(mvtnorm)
 library(SuperLearner)
-library(gam)
+library(earth)
 library(parallel)
 
 # Code for generating and fitting data
@@ -32,7 +32,7 @@ prob <- 0.2
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.mean","SL.glm","SL.earth")
+sl.lib <- c("SL.glm")
 family <- poisson()
 
 # initialize output
@@ -127,7 +127,7 @@ lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "blue", lwd = 2, l
 lines(a.vals, colMeans(est, na.rm = T)[4,], type = "l", col = "red", lwd = 2, lty = 3)
 lines(a.vals, colMeans(est, na.rm = T)[5,], type = "l", col = "blue", lwd = 2, lty = 3)
 
-legend(6, 0.1, legend=c("Sample ERC", "Without Prediction Correction",
+legend(6, 0.1, legend=c("Sample ERF", "Without Prediction Correction",
                         "With Prediction Correction", "Without Aggregation Correction",
                         "With Aggregation Correction"),
        col=c("darkgreen", "red", "blue", "black", "black"),

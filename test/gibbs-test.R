@@ -7,12 +7,14 @@ rm(list = ls())
 library(data.table)
 library(mvtnorm)
 library(SuperLearner)
+library(earth)
 library(splines)
 library(parallel)
 
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/gibbs-mi.R")
+source("~/Github/causal-me/mi-erc.R")
+source("~/Github/causal-me/bayes-erc.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -32,16 +34,16 @@ n <- 400
 prob <- 0.2
 
 # gibbs sampler stuff
-thin <- 20
-n.iter <- 1000
-n.adapt <- 100
+thin <- 100
+n.iter <- 10000
+n.adapt <- 1000
 h.a <- 1
 h.gamma <- 0.25
 deg.num <- 2
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.mean","SL.glm","SL.earth")
+sl.lib <- c("SL.glm")
 family <- poisson()
 
 # initialize output
@@ -90,11 +92,11 @@ for (i in 1:n.sim){
                a.vals = a.vals, sl.lib = sl.lib, span = span)
   
   # Bayesian analysis
-  gibbs_hat <- gibbs_erc(s = s, star = s_tilde, y = y, offset = offset,
+  gibbs_hat <- bayes_erc(s = s, star = s_tilde, y = y, offset = offset,
                          s.id = s.id, id = id, w = w, x = x, family = family,
                          n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
                          h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
-                         a.vals = a.vals, span = span, sl.lib = sl.lib)
+                         a.vals = a.vals, span = span)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
@@ -129,6 +131,6 @@ plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 
 lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = "red", lwd = 2, lty = 1)
 lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "blue", lwd = 2, lty = 1)
 
-legend(6, 0.1, legend=c("Sample ERC", "Single Imputation", "Bayesian"),
+legend(6, 0.1, legend=c("Sample ERF", "Single Imputation", "Multiple Imputation/Bayes"),
        col=c("darkgreen", "red", "blue"),
        lty = c(1,1,1), lwd=2, cex=0.8)
