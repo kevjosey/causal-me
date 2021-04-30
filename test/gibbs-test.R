@@ -12,7 +12,7 @@ library(parallel)
 
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/gibbs-sampler.R")
+source("~/Github/causal-me/gibbs-mi.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -32,9 +32,9 @@ n <- 400
 prob <- 0.2
 
 # gibbs sampler stuff
-thin <- 10
-n.iter <- 10000
-n.adapt <- 1000
+thin <- 20
+n.iter <- 1000
+n.adapt <- 100
 h.a <- 1
 h.gamma <- 0.25
 deg.num <- 2
@@ -90,11 +90,11 @@ for (i in 1:n.sim){
                a.vals = a.vals, sl.lib = sl.lib, span = span)
   
   # Bayesian analysis
-  gibbs_hat <- gibbs_dr(s = s, star = s_tilde, y = y, offset = offset,
-                      s.id = s.id, id = id, w = w, x = x, family = family,
-                      n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-                      h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
-                      a.vals = a.vals, span = span)
+  gibbs_hat <- gibbs_erc(s = s, star = s_tilde, y = y, offset = offset,
+                         s.id = s.id, id = id, w = w, x = x, family = family,
+                         n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
+                         h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
+                         a.vals = a.vals, span = span, sl.lib = sl.lib)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)

@@ -12,9 +12,9 @@ library(parallel)
 library(abind)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/gibbs-sampler.R")
 source("~/Github/causal-me/mclapply-hack.R")
+source("~/Github/causal-me/gen-data.R")
+source("~/Github/causal-me/gibbs-mi.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -92,11 +92,11 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
                      a.vals = a.vals, sl.lib = sl.lib, span = span), silent = TRUE)
     
     # Bayesian Approach
-    gibbs_hat <- try(gibbs_dr(s = s, star = s_tilde, y = y, offset = offset,
-                            s.id = s.id, id = id, w = w, x = x, family = family,
-                            n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-                            h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
-                            a.vals = a.vals, span = span), silent = TRUE)
+    gibbs_hat <- try(gibbs_erc(s = s, star = s_tilde, y = y, offset = offset,
+                               s.id = s.id, id = id, w = w, x = x, family = family,
+                               n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
+                               h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
+                               a.vals = a.vals, span = span), silent = TRUE)
     
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),

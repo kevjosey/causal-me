@@ -16,7 +16,7 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   phat <- wrap$phat
   int <- wrap$int
   y.new <- family$linkinv(family$linkfun(y) - offset)
-  psi <- (y.new - muhat)/(pihat/phat) + mhat
+  psi <- c((y.new - muhat)/(pihat/phat) + mhat)
   
   if(is.null(span)) {
     
