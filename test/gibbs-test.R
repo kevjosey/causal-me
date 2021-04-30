@@ -32,15 +32,15 @@ n <- 400
 prob <- 0.2
 
 # gibbs sampler stuff
-thin <- 50
-n.iter <- 5000
-n.adapt <- 500
+thin <- 10
+n.iter <- 10000
+n.adapt <- 1000
 h.a <- 1
 h.gamma <- 0.25
 deg.num <- 2
 
 # dr arguments
-a.vals <- seq(6, 10, by = 0.05)
+a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.mean","SL.glm","SL.earth")
 family <- poisson()
 

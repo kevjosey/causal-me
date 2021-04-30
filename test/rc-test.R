@@ -31,7 +31,7 @@ n <- 400
 prob <- 0.2
 
 # dr arguments
-a.vals <- seq(6, 10, by = 0.1)
+a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.mean","SL.glm","SL.earth")
 family <- poisson()
 
