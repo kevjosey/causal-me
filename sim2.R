@@ -143,7 +143,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   colnames(out_cp) <- a.vals
   rownames(out_cp) <- c("BLP", "Bayes")
   
-  return(list(est = out_est, bias = out_bias, se = out_se, cp = out_cp))
+  return(list(est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp))
   
 }
 
