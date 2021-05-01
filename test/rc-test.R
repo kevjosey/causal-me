@@ -127,7 +127,7 @@ lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "blue", lwd = 2, l
 lines(a.vals, colMeans(est, na.rm = T)[4,], type = "l", col = "red", lwd = 2, lty = 3)
 lines(a.vals, colMeans(est, na.rm = T)[5,], type = "l", col = "blue", lwd = 2, lty = 3)
 
-legend(6, 0.1, legend=c("Sample ERF", "Without Prediction Correction",
+legend(6, 0.1, legend=c("True ERF", "Without Prediction Correction",
                         "With Prediction Correction", "Without Aggregation Correction",
                         "With Aggregation Correction"),
        col=c("darkgreen", "red", "blue", "black", "black"),

@@ -1,13 +1,13 @@
 
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
 erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
-                a.vals = seq(min(a), max(a), length.out = 100),
+                a.vals = seq(min(a), max(a), length.out = 100), deg.num = 2,
                 span = NULL, span.seq = seq(0.05, 1, by = 0.05), k = 5,
                 sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){	
   
   n <- length(a)
   
-  wrap <- np_est(y = y, a = a, x = x, offset = offset, 
+  wrap <- np_est(y = y, a = a, x = x, offset = offset, deg.num = deg.num,
                  a.vals = a.vals, family = family, sl.lib = sl.lib)
   
   muhat <- wrap$muhat
@@ -95,7 +95,7 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
   
 }
 
-np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0, length(a)),
+np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0, length(a)), deg.num = 2,
                    sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")) {
   
   # set up evaluation points & matrices for predictions
@@ -103,28 +103,9 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   x <- data.frame(x)
   xa <- data.frame(a = a, x = x)
   colnames(xa) <- c("a", colnames(x))
-
-  # cts.x <- apply(x, 2, function(x) (length(unique(x)) > 4))
-  # 
-  # cts.form <- paste(paste("s(", colnames(x[,cts.x,drop = FALSE]), ")",
-  #                         sep = ""), collapse = "+")
-  # 
-  # cat.form <- paste(colnames(x[, !cts.x, drop = FALSE]), collapse = "+")
-  # 
-  # if (sum(!cts.x) > 0 & sum(!cts.x) != length(cts.x)) {
-  #   gam.model <- formula(paste("y ~ s(a) + ", cts.form , "+", cat.form ))
-  # } else if (sum(!cts.x) != length(cts.x)) {
-  #   gam.model <- formula(paste("y ~ s(a) + ", paste(colnames(x), collapse = "+"), sep = ""))
-  # } else {
-  #   gam.model <- formula(paste("y ~ s(a) + ", cts.form))
-  # }
-
-  # estimate nuisance outcome model with SuperLearner
-  # mumod <- mgcv::gam(gam.model, data = xa, family = family, offset = offset)
-  # muhat <- c(predict(mumod, newdata = xa, type = "response"))
   
   # estimate nuisance outcome model with SuperLearner
-  mumod <- glm(y ~ x1 + x2 + x3 + x4 + poly(a, 2), data = xa, family = family, offset = offset)
+  mumod <- glm(y ~ . - a + poly(a, deg.num), data = xa, family = family, offset = offset)
   muhat <- predict(mumod, newdata = xa, type = "response")
   
   # estimate nuisance GPS functions via super learner

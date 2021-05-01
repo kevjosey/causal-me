@@ -4,7 +4,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
                      a.vals = seq(min(a), max(a), length.out = 100),
                      shape = 1e-3, rate = 1e-3, scale = 1e6,
                      thin = 10, n.iter = 10000, n.adapt = 1000,
-                     h.a = 0.5, h.gamma = 0.1, deg.num = 3, span = 0.75) {
+                     h.a = 0.5, h.gamma = 0.1, deg.num = 2, span = 0.75) {
   
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
@@ -41,10 +41,10 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   if (is.null(w)) {
     ws <- cbind(rep(1, length(s.id)), star)
-    # ws <- cbind(rep(1, length(s.id)), poly(star, deg.num))
+    # ws <- cbind(rep(1, length(s.id)), poly(star, degree = deg.num))
   } else {
     ws <- cbind(model.matrix(~ ., data.frame(w)), star = star)
-    # ws <- cbind(model.matrix(~ ., data.frame(w)), star = poly(star, deg.num))
+    # ws <- cbind(model.matrix(~ ., data.frame(w)), star = poly(star, degree = deg.num))
   }
   
   sword <- order(s.id)
@@ -64,8 +64,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
   
-  # nsa <- ns(a, deg.num, Boundary.knots = c(min(s.hat), max(s.hat)))
-  nsa <- poly(a, deg.num = 2)
+  nsa <- poly(a, degree = deg.num)
   xa <- as.matrix(cbind(x, nsa))
   
   # dimensions

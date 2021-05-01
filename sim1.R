@@ -212,7 +212,7 @@ for (k in 1:4){
   
   if (k == 4){
     
-    legend(x = 8, y = 0.02, legend=c("Sample ERF", "Without Prediction Correction",
+    legend(x = 8, y = 0.02, legend=c("True ERF", "Without Prediction Correction",
                                      "With Prediction Correction", "Without Classical Correction",
                                      "With Classical Correction"),
            col=c("darkgreen", "red", "blue", "black", "black"),

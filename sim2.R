@@ -117,20 +117,20 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("ERC", "BLP", "Bayes")
+  rownames(out_est) <- c("ERC", "SI", "MI")
   
   compare <- matrix(rowMeans(est[1,,]), nrow = length(a.vals), ncol = n.sim)
   out_bias <- t(apply(est[2:3,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
   colnames(out_bias) <- a.vals
-  rownames(out_bias) <- c("BLP", "Bayes")
+  rownames(out_bias) <- c("SI", "MI")
   
   out_sd <- t(apply(est[2:3,,], 1, function(x) apply(x, 1, sd, na.rm = T)))
   colnames(out_sd) <- a.vals
-  rownames(out_sd) <- c("BLP", "Bayes")
+  rownames(out_sd) <- c("SI", "MI")
   
   out_se <- t(apply(se, 1, rowMeans, na.rm = T))
   colnames(out_se) <- a.vals
-  rownames(out_se) <- c("BLP", "Bayes")
+  rownames(out_se) <- c("SI", "MI")
   
   cp_blp_x <- sapply(1:n.sim, function(i,...)
     as.numeric((est[2,,i] - 1.96*se[1,,i]) < compare[,1] & 
@@ -142,7 +142,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   out_cp <- rbind(rowMeans(cp_blp_x, na.rm = T), rowMeans(cp_gibbs_x, na.rm = T))
   colnames(out_cp) <- a.vals
-  rownames(out_cp) <- c("BLP", "Bayes")
+  rownames(out_cp) <- c("SI", "MI")
   
   return(list(est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp))
   
@@ -200,7 +200,7 @@ for (k in 1:4){
   
   if (k == 4){
     
-    legend(x = 8, y = 0.02, legend=c("Sample ERF", "Single Imputation", "Multiple Imputation/Bayes", "95% Confidence Interval"),
+    legend(x = 8, y = 0.02, legend=c("True ERF", "Single Imputation", "Multiple Imputation", "95% Confidence Interval"),
            col=c("darkgreen", "red", "blue", "black"),
            lty = c(1,1,1,2), lwd=2, cex=0.8)
     
