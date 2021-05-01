@@ -14,7 +14,6 @@ library(parallel)
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/mi-erc.R")
-source("~/Github/causal-me/bayes-erc.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -35,8 +34,8 @@ prob <- 0.2
 
 # gibbs sampler stuff
 thin <- 100
-n.iter <- 10000
-n.adapt <- 1000
+n.iter <- 5000
+n.adapt <- 500
 h.a <- 1
 h.gamma <- 0.25
 deg.num <- 2
@@ -114,12 +113,12 @@ colnames(out_est) <- a.vals
 rownames(out_est) <- c("SAMPLE ERC","BLP","Bayes")
 
 cp_blp_x <- sapply(1:n.sim, function(i,...)
-  as.numeric((est[i,2,] - 1.96*se[i,1,]) < colMeans(est[,1,],na.rm = TRUE) & 
-               (est[i,2,] + 1.96*se[i,1,]) > colMeans(est[,1,],na.rm = TRUE)))
+  as.numeric((est[i,2,] - 1.96*se[i,1,]) < est[i,1,] & 
+               (est[i,2,] + 1.96*se[i,1,]) > est[i,1,],na.rm = TRUE))
 
 cp_gibbs_x <- sapply(1:n.sim, function(i,...)
-  as.numeric((est[i,3,] - 1.96*se[i,2,]) < colMeans(est[,1,],na.rm = TRUE) & 
-               (est[i,3,] + 1.96*se[i,2,]) > colMeans(est[,1,],na.rm = TRUE)))
+  as.numeric((est[i,3,] - 1.96*se[i,2,]) < est[i,1,] & 
+               (est[i,3,] + 1.96*se[i,2,]) > est[i,1,]))
 
 out_cp <- rbind(rowMeans(cp_blp_x, na.rm = T), rowMeans(cp_gibbs_x, na.rm = T))
 colnames(out_cp) <- a.vals

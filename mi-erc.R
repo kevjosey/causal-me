@@ -1,12 +1,10 @@
 
-mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
-                      offset = rep(0, length(id)), w = NULL, x = NULL,
-                      a.vals = seq(min(a), max(a), length.out = 100),
-                      shape = 1e-3, rate = 1e-3, scale = 1e6,
-                      thin = 10, n.iter = 10000, n.adapt = 1000,
-                      h.a = 0.5, h.gamma = 0.1, deg.num = 3, 
-                      span = NULL, span.seq = seq(0.05, 1, by = 0.05), k = 5,
-                      sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")) {
+bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
+                     offset = rep(0, length(id)), w = NULL, x = NULL,
+                     a.vals = seq(min(a), max(a), length.out = 100),
+                     shape = 1e-3, rate = 1e-3, scale = 1e6,
+                     thin = 10, n.iter = 10000, n.adapt = 1000,
+                     h.a = 0.5, h.gamma = 0.1, deg.num = 3, span = 0.75) {
   
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
@@ -20,7 +18,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   if(length(check) > length(id))
     warning("deleting some exposures without an associated outcome.")
-  
+
   s <- s[s.id %in% id]
   star <- star[s.id %in% id]
   w <- w[s.id %in% id,]
@@ -29,7 +27,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   # create variables
   m <- length(s.id)
   n <- length(id)
-  
+
   if (is.null(x)) {
     x <- matrix(1, nrow = length(id), ncol = 1)
   } else {
@@ -102,13 +100,13 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     hat <- (sig^2)*(a.s/omega2[i - 1] + c(ws %*% alpha[i - 1,])/tau2[i - 1])
     s.hat <- rnorm(m, hat, sig)
     s.hat[!is.na(s)] <- s[!is.na(s)]
-    
+
     # sample A
     
     a_ <-  rnorm(n, a, h.a)
     xa_ <- as.matrix(cbind(x, predict(nsa, a_)))
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
-    
+ 
     test <- log(runif(n))
     
     log.eps <- dpois(y, exp(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
@@ -129,7 +127,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     alpha[i,] <- rmvnorm(1, alpha_var %*% t(ws.tmp) %*% s.tmp, tau2[i - 1]*alpha_var)
     
     tau2[i] <- 1/rgamma(1, shape = shape + l/2, rate = rate +
-                          sum(c(s.tmp - c(ws.tmp %*% alpha[i,]))^2)/2)
+                            sum(c(s.tmp - c(ws.tmp %*% alpha[i,]))^2)/2)
     
     # Sample agg parameters
     
@@ -141,7 +139,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     beta[i,] <- rmvnorm(1, beta_var %*% t(x) %*% a, sigma2[i - 1]*beta_var)
     
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - x %*% beta[i,])^2)/2)
-    
+   
     gamma_ <- gamma[i,] <- gamma[i-1,]
     
     for (j in 1:o){
@@ -151,7 +149,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
       log.eps <- sum(dpois(y, exp(c(xa %*% gamma_) + offset), log = TRUE)) -
         sum(dpois(y, exp(c(xa %*% gamma[i,]) + offset), log = TRUE)) +
         dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma[i,j], 0 , scale, log = TRUE)
-      
+        
       if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
         gamma[i,j] <- gamma_[j]
       else
@@ -173,14 +171,61 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   tau2 <- tau2[keep]
   omega2 <- omega2[keep]
   amat <- amat[keep,]
-  a.list <- as.list(data.frame(t(amat)))
   
-  out <- lapply(a.list, erc, y = y, x = x, family, offset = offset, a.vals = a.vals,
-                  span = span, span.seq = span.seq, k = k, sl.lib = sl.lib)
+  y.new <- exp(log(y) - offset)
+  
+  out <- lapply(1:nrow(amat), function(i, ...){
+
+    a <- amat[j,]
+    xa <- as.matrix(cbind(x, predict(nsa, a)))
+    
+    if (ncol(x) > 1) {
+      pimod.vals <- c(x %*% beta[i,])
+    } else {
+      pimod.vals <- c(x %*% beta[i])
+    }
+
+    # exposure models
+    pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
+    phat.vals <- sapply(a.vals, function(a.tmp, ...)
+      mean(dnorm(a.tmp, pimod.vals, sqrt(sigma2[i]))))
+    phat <- predict(smooth.spline(a.vals, phat.vals), x = a)$y
+    phat[which(phat < 0)] <- 1e-6
+    phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
+
+    muhat <- exp(c(xa %*% gamma[i,]))
+
+    # predict marginal outcomes given a.vals (or a.agg)
+    muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
+
+      xa.tmp <- cbind(x = x, matrix(rep(c(predict(nsa, a.tmp)), n), 
+                                    byrow = TRUE, nrow = n))
+      return(exp(c(xa.tmp %*% gamma[i,])))
+
+    })
+
+    # aggregate muhat.vals and integrate for influence function
+    mhat.vals <- colMeans(muhat.mat)
+    mhat <- predict(smooth.spline(a.vals, mhat.vals), x = a)$y
+    mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
+
+    # integrate
+    intfn <- (muhat.mat - mhat.mat) * phat.mat
+    int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
+                   (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
+
+    psi <- c((y.new - muhat)/(pihat/phat) + mhat)
+    
+    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int,
+                     family = family, span = span, se.fit = TRUE)
+
+    return(dr_out)
+           
+  })
   
   amat <- amat[,order(shield)]
-  est.mat <- do.call(rbind, lapply(out, function(lst) lst$estimate))
-  var.mat <- do.call(rbind, lapply(out, function(lst) lst$variance))
+  est.mat <- do.call(rbind, lapply(out, function(lst) lst[1,]))
+  var.mat <- do.call(rbind, lapply(out, function(lst) lst[2,]))
   estimate <- colMeans(est.mat)
   variance <- (1 + 1/nrow(amat))*apply(est.mat, 2, var) + colMeans(var.mat)
   

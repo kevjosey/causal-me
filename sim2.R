@@ -15,7 +15,7 @@ library(abind)
 # Code for generating and fitting data
 source("~/Github/causal-me/mclapply-hack.R")
 source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/gibbs-mi.R")
+source("~/Github/causal-me/mi-erc.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -35,9 +35,9 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   mult <- scenario$mult # c(100, 200)
   
   # gibbs sampler stuff
-  thin <- 10
-  n.iter <- 10000
-  n.adapt <- 1000
+  thin <- 100
+  n.iter <- 5000
+  n.adapt <- 500
   h.a <- 1
   h.gamma <- 0.25
   deg.num <- 2
