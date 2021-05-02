@@ -137,7 +137,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     beta_var <- solve(t(x) %*% x + diag(sigma2[i - 1]/scale, p, p))
     beta[i,] <- rmvnorm(1, beta_var %*% t(x) %*% a, sigma2[i - 1]*beta_var)
     
-    sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - x %*% beta[i,])^2)/2)
+    sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
    
     gamma_ <- gamma[i,] <- gamma[i-1,]
     
@@ -175,7 +175,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   out <- lapply(1:nrow(amat), function(i, ...){
 
-    a <- amat[j,]
+    a <- amat[i,]
     xa <- as.matrix(cbind(x, predict(nsa, a)))
     
     if (ncol(x) > 1) {
@@ -190,15 +190,14 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
       mean(dnorm(a.tmp, pimod.vals, sqrt(sigma2[i]))))
     phat <- predict(smooth.spline(a.vals, phat.vals), x = a)$y
     phat[which(phat < 0)] <- 1e-6
-    phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
+    # phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
 
     muhat <- exp(c(xa %*% gamma[i,]))
 
     # predict marginal outcomes given a.vals (or a.agg)
     muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
 
-      xa.tmp <- cbind(x = x, matrix(rep(c(predict(nsa, a.tmp)), n), 
-                                    byrow = TRUE, nrow = n))
+      xa.tmp <- cbind(x = x, matrix(rep(c(predict(nsa, a.tmp)), n), byrow = TRUE, nrow = n))
       return(exp(c(xa.tmp %*% gamma[i,])))
 
     })
@@ -206,27 +205,30 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     # aggregate muhat.vals and integrate for influence function
     mhat.vals <- colMeans(muhat.mat)
     mhat <- predict(smooth.spline(a.vals, mhat.vals), x = a)$y
-    mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
+    # mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
 
     # integrate
-    intfn <- (muhat.mat - mhat.mat) * phat.mat
-    int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
-                   (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
+    # intfn <- (muhat.mat - mhat.mat) * phat.mat
+    # int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
+    #                (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
 
     psi <- c((y.new - muhat)/(pihat/phat) + mhat)
     
-    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int,
-                     family = family, span = span, se.fit = TRUE)
+    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = NULL,
+                     family = family, span = span, se.fit = FALSE)
 
     return(dr_out)
            
   })
   
   amat <- amat[,order(shield)]
-  est.mat <- do.call(rbind, lapply(out, function(lst) lst[1,]))
-  var.mat <- do.call(rbind, lapply(out, function(lst) lst[2,]))
+  # est.mat <- do.call(rbind, lapply(out, function(lst) lst[1,]))
+  # var.mat <- do.call(rbind, lapply(out, function(lst) lst[2,]))
+  # estimate <- colMeans(est.mat)
+  # variance <- (1 + 1/nrow(amat))*apply(est.mat, 2, var) + colMeans(var.mat)
+  est.mat <- do.call(rbind, out)
   estimate <- colMeans(est.mat)
-  variance <- (1 + 1/nrow(amat))*apply(est.mat, 2, var) + colMeans(var.mat)
+  variance <- apply(est.mat, 2, var)
   
   rslt <- list(estimate = estimate, variance = variance,
                mcmc = list(gamma = gamma, beta = beta, alpha = alpha,

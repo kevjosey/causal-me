@@ -11,9 +11,9 @@ library(earth)
 library(parallel)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("D:/Github/causal-me/gen-data.R")
+source("D:/Github/causal-me/blp.R")
+source("D:/Github/causal-me/erc.R")
 
 # simulation arguments
 n.sim <- 100
@@ -31,7 +31,7 @@ n <- 400
 prob <- 0.2
 
 # dr arguments
-a.vals <- seq(6, 10, by = 0.04)
+a.vals <- seq(6, 10, by = 0.08)
 sl.lib <- c("SL.glm")
 family <- poisson()
 
@@ -117,7 +117,7 @@ for (i in 1:n.sim){
 
 out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals
-rownames(out_est) <- c("SAMPLE ERC","Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
+rownames(out_est) <- c("True ERF","Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
 
 plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 2,
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 

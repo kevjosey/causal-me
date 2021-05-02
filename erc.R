@@ -79,13 +79,13 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
   # k.std <- knn*dnorm(a.std/max.a.std)/max.a.std
   
   gh <- cbind(1, a.std)
-  gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
   b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, 
              psi = psi, gh = gh, family = family)
   mu <- family$linkinv(b$par[1])
   
   if (se.fit){
     
+    gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
     v.inf <- (psi + int - family$linkinv(c(gh%*%b$par)))^2
     sig <- gh.inv %*% t(gh) %*% diag(k.std) %*% diag(v.inf) %*% diag(k.std) %*% gh %*% gh.inv
     return(c(mu = mu, sig = sig[1,1]))
@@ -101,11 +101,11 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   # set up evaluation points & matrices for predictions
   n <- nrow(x)
   x <- data.frame(x)
-  xa <- data.frame(a = a, x = x)
-  colnames(xa) <- c("a", colnames(x))
+  xa <- data.frame(x = x, a = a)
+  colnames(xa) <- c(colnames(x), "a")
   
   # estimate nuisance outcome model with SuperLearner
-  mumod <- glm(y ~ . - a + poly(a, deg.num), data = xa, family = family, offset = offset)
+  mumod <- glm(y ~ . - a + poly(a, degree = deg.num), data = xa, family = family, offset = offset)
   muhat <- predict(mumod, newdata = xa, type = "response")
   
   # estimate nuisance GPS functions via super learner
@@ -140,7 +140,7 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   # predict marginal outcomes given a.vals (or a.agg)
   muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
     
-    xa.tmp <- data.frame(a = a.tmp, x = x)
+    xa.tmp <- data.frame(x = x, a = a.tmp)
     colnames(xa.tmp) <- colnames(xa) 
     return(predict(mumod, newdata = xa.tmp, type = "response"))
     

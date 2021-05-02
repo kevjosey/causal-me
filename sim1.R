@@ -124,7 +124,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("ERC", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
+  rownames(out_est) <- c("ERF", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
   compare <- matrix(rowMeans(est[1,,]), nrow = length(a.vals), ncol = n.sim)
   out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
@@ -168,7 +168,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
 set.seed(42)
 
 # simulation scenarios
-a.vals <- seq(6, 10, by = 0.04)
+a.vals <- seq(6, 10, by = 0.08)
 sl.lib <- c("SL.glm")
 n.sim <- 1000
 

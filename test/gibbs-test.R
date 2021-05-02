@@ -12,10 +12,10 @@ library(splines)
 library(parallel)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/mi-erc.R")
-source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("D:/Github/causal-me/gen-data.R")
+source("D:/Github/causal-me/mi-erc.R")
+source("D:/Github/causal-me/blp.R")
+source("D:/Github/causal-me/erc.R")
 
 # simulation arguments
 n.sim <- 100
@@ -29,7 +29,7 @@ span <- 0.3
 
 # gen data arguments
 mult <- 10
-n <- 400 
+n <- 800 
 prob <- 0.2
 
 # gibbs sampler stuff
@@ -41,7 +41,7 @@ h.gamma <- 0.25
 deg.num <- 2
 
 # dr arguments
-a.vals <- seq(6, 10, by = 0.04)
+a.vals <- seq(6, 10, by = 0.08)
 sl.lib <- c("SL.glm")
 family <- poisson()
 
@@ -110,7 +110,7 @@ for (i in 1:n.sim){
 
 out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals
-rownames(out_est) <- c("ERF","SI","Bayes")
+rownames(out_est) <- c("ERF","SI","MI")
 
 cp_blp_x <- sapply(1:n.sim, function(i,...)
   as.numeric((est[i,2,] - 1.96*se[i,1,]) < est[i,1,] & 

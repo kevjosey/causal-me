@@ -117,7 +117,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("ERC", "SI", "MI")
+  rownames(out_est) <- c("ERF", "SI", "MI")
   
   compare <- matrix(rowMeans(est[1,,]), nrow = length(a.vals), ncol = n.sim)
   out_bias <- t(apply(est[2:3,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
@@ -152,7 +152,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
 set.seed(42)
 
 # simulation scenarios
-a.vals <- seq(6, 10, by = 0.04)
+a.vals <- seq(6, 10, by = 0.08)
 sl.lib <- c("SL.glm")
 n.sim <- 1000
 
@@ -177,7 +177,7 @@ plotnames <- c("GPS: \"a\"; Outcome: \"a\"",
                "GPS: \"b\"; Outcome: \"b\"")
 idx <- c(1,5,9,13)
 
-filename <- paste0("~//Dropbox (Personal)/Projects/ERC-EPE/Output/plot_2.pdf")
+filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_2.pdf")
 pdf(file = filename, width = 10, height = 10)
 par(mfrow = c(2,2))
 
