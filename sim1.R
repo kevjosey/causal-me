@@ -92,15 +92,15 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     # naive
     naive_tilde <- try(erc(y = y, a = z_tilde, x = x, offset = offset, family = family,
-                           a.vals = a.vals, sl.lib = sl.lib, span = span), silent = TRUE)
+                           a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
     naive_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, family = family,
-                         a.vals = a.vals, sl.lib = sl.lib, span = span), silent = TRUE)
+                         a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
     
     # blp approach
     blp_tilde <- try(erc(y = y, a = a_tilde, x = x, offset = offset, family = family,
-                         a.vals = a.vals, sl.lib = sl.lib, span = span), silent = TRUE)
+                         a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
     blp_hat <- try(erc(y = y, a = a_hat, x = x, offset = offset, family = family,
-                       a.vals = a.vals, sl.lib = sl.lib, span = span), silent = TRUE)
+                       a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
     
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
@@ -168,7 +168,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
 set.seed(42)
 
 # simulation scenarios
-a.vals <- seq(6, 10, by = 0.08)
+a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.glm")
 n.sim <- 1000
 

@@ -11,9 +11,9 @@ library(earth)
 library(parallel)
 
 # Code for generating and fitting data
-source("D:/Github/causal-me/gen-data.R")
-source("D:/Github/causal-me/blp.R")
-source("D:/Github/causal-me/erc.R")
+source("~/Github/causal-me/gen-data.R")
+source("~/Github/causal-me/blp.R")
+source("~/Github/causal-me/erc.R")
 
 # simulation arguments
 n.sim <- 100
@@ -31,7 +31,7 @@ n <- 400
 prob <- 0.2
 
 # dr arguments
-a.vals <- seq(6, 10, by = 0.08)
+a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.glm")
 family <- poisson()
 
@@ -91,15 +91,15 @@ for (i in 1:n.sim){
   
   # naive
   naive_tilde <- erc(y = y, a = z_tilde, x = x, offset = offset, family = family,
-                     a.vals = a.vals, sl.lib = sl.lib, span = span)
+                     a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   naive_hat <- erc(y = y, a = z_hat, x = x, offset = offset, family = family,
-                   a.vals = a.vals, sl.lib = sl.lib, span = span)
+                   a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
   # blp 
   blp_tilde <- erc(y = y, a = a_tilde, x = x, offset = offset, family = family,
-               a.vals = a.vals, sl.lib = sl.lib, span = span)
+               a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   blp_hat <- erc(y = y, a = a_hat, x = x, offset = offset, family = family,
-               a.vals = a.vals, sl.lib = sl.lib, span = span)
+               a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
