@@ -197,7 +197,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     # predict marginal outcomes given a.vals (or a.agg)
     muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
       
-      xa.tmp <- cbind(x = x, matrix(rep(c(predict(nsa, a.tmp)), n), byrow = TRUE, nrow = n))
+      xa.tmp <- as.matrix(cbind(x, matrix(rep(c(predict(nsa, a.tmp)), n), byrow = TRUE, nrow = n)))
       return(exp(c(xa.tmp %*% gamma[i,])))
       
     })

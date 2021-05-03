@@ -15,7 +15,7 @@ library(abind)
 # Code for generating and fitting data
 source("~/Github/causal-me/mclapply-hack.R")
 source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/mi-erc.R")
+source("~/Github/causal-me/bayes-erc.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -52,11 +52,13 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   print(scenario)
   
+  # generate data
+  dat_list <- replicate(n.sim, gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
+                                        pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen))
+  
   out <- mclapply.hack(1:n.sim, function(i,...){
-    
-    # generate data
-    dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
-                    pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
+
+    dat <- dat_list[,i]
     
     # zipcode index
     s.id <- dat$s.id
@@ -133,12 +135,12 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   rownames(out_se) <- c("SI", "MI")
   
   cp_blp_x <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[2,,i] - 1.96*se[1,,i]) < compare[,1] & 
-                 (est[2,,i] + 1.96*se[1,,i]) > compare[,1]))
+    as.numeric((est[2,,i] - 1.96*se[1,,i]) < rowMeans(compare) & 
+                 (est[2,,i] + 1.96*se[1,,i]) > rowMeans(compare)))
   
   cp_gibbs_x <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[3,,i] - 1.96*se[2,,i]) < compare[,1] & 
-                 (est[3,,i] + 1.96*se[2,,i]) > compare[,1]))
+    as.numeric((est[3,,i] - 1.96*se[2,,i]) < rowMeans(compare) & 
+                 (est[3,,i] + 1.96*se[2,,i]) > rowMeans(compare)))
   
   out_cp <- rbind(rowMeans(cp_blp_x, na.rm = T), rowMeans(cp_gibbs_x, na.rm = T))
   colnames(out_cp) <- a.vals
@@ -153,7 +155,7 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.glm")
+sl.lib <- c("SL.mean","SL.glm")
 n.sim <- 1000
 
 n <- c(400,800)

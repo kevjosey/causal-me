@@ -34,7 +34,8 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   # dr arguments
   family <- poisson()
-  span <- ifelse(n == 800, 0.15, 0.3)
+  span <- ifelse(n == 800, 0.125, 0.25)
+  deg.num <- 2
 
   # initialize output
   est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
@@ -42,11 +43,13 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   print(scenario)
   
+  # generate data
+  dat_list <- replicate(n.sim, gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
+                  pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen))
+  
   out <- mclapply.hack(1:n.sim, function(i, ...){
     
-    # generate data
-    dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
-                    pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
+    dat <- dat_list[,i]
     
     # zipcode index
     s.id <- dat$s.id
@@ -140,20 +143,20 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   rownames(out_se) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
   cp_naive_w <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[2,,i] - 1.96*se[1,,i]) < compare[,1] & 
-                 (est[2,,i] + 1.96*se[1,,i]) > compare[,1]))
+    as.numeric((est[2,,i] - 1.96*se[1,,i]) < rowMeans(compare) & 
+                 (est[2,,i] + 1.96*se[1,,i]) > rowMeans(compare)))
   
   cp_naive_x <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[3,,i] - 1.96*se[2,,i]) < compare[,1] & 
-                 (est[3,,i] + 1.96*se[2,,i]) > compare[,1]))
+    as.numeric((est[3,,i] - 1.96*se[2,,i]) < rowMeans(compare) & 
+                 (est[3,,i] + 1.96*se[2,,i]) > rowMeans(compare)))
   
   cp_blp_w <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[4,,i] - 1.96*se[3,,i]) < compare[,1] & 
-                 (est[4,,i] + 1.96*se[3,,i]) > compare[,1]))
+    as.numeric((est[4,,i] - 1.96*se[3,,i]) < rowMeans(compare) & 
+                 (est[4,,i] + 1.96*se[3,,i]) > rowMeans(compare)))
   
   cp_blp_x <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[5,,i] - 1.96*se[4,,i]) < compare[,1] & 
-                 (est[5,,i] + 1.96*se[4,,i]) > compare[,1]))
+    as.numeric((est[5,,i] - 1.96*se[4,,i]) < rowMeans(compare) & 
+                 (est[5,,i] + 1.96*se[4,,i]) > rowMeans(compare)))
   
   out_cp <- rbind(rowMeans(cp_naive_w, na.rm = T), rowMeans(cp_naive_x, na.rm = T),
                   rowMeans(cp_blp_w, na.rm = T), rowMeans(cp_blp_x, na.rm = T))
@@ -169,7 +172,7 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.glm")
+sl.lib <- c("SL.mean","SL.glm")
 n.sim <- 1000
 
 n <- c(400, 800)
@@ -193,7 +196,7 @@ plotnames <- c("No Measurement Error",
                "Classical Error but No Prediction Error",
                "Prediction Error but No Classical Error",
                "Both Classical and Prediction Error")
-idx <- c(17,21,25,29)
+idx <- c(1,5,9,13)
 
 filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_1.pdf")
 pdf(file = filename, width = 10, height = 10)

@@ -29,7 +29,7 @@ span <- 0.3
 
 # gen data arguments
 mult <- 10
-n <- 800 
+n <- 400 
 prob <- 0.2
 
 # gibbs sampler stuff
