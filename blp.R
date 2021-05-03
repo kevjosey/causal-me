@@ -23,10 +23,12 @@ blp <- function(s, s.id, x = NULL) {
     
     mu_z <- sum(wts*z)/m
     mu_x <- colMeans(x)
+    muMat_x <- matrix(rep(mu_x, n), nrow = n, byrow = TRUE)
     nu <- m - sum(wts^2)/m
+    
     tau2 <- sum((s - z_s)^2)/(m - n)
     sigma2 <- (sum(wts*(z - mu_z)^2) - (n - 1)*tau2)/nu
-    psi <- t(wts*(z - mu_z))%*%(x - matrix(rep(mu_x, n), nrow = n, byrow = TRUE))/nu
+    psi <- crossprod(wts*(z - mu_z), as.matrix(x - muMat_x))/nu
     Omega <- cov(x)
     
     phi <- c(sigma2, psi)
@@ -80,7 +82,7 @@ multi_blp <- function(s, s.id, x = NULL) {
   
   stab <- table(s.id)
   ord <- order(s.id)
-  z_tmp <- z[rep(rownames(z), stab),]
+  z_tmp <- z[rep(1:nrow(z), stab),]
   z_s <- z_tmp[order(ord),]
   
   p <- ncol(s)
@@ -88,16 +90,15 @@ multi_blp <- function(s, s.id, x = NULL) {
   
   if (!is.null(x)) {
     
-    mu_z <- sum(wts*z)/m
+    mu_z <- colSums(wts*z)/m
     mu_x <- colMeans(x)
-    
     muMat_x <- matrix(rep(mu_x, n), nrow = n, byrow = TRUE)
     muMat_z <- matrix(rep(mu_z, n), nrow = n, byrow = TRUE)
     nu <- m - sum(wts^2)/m
     
-    Omega <- crossprod(s - z_s)/(m - n)
-    Sigma <- (t(wts*(z - muMat_z))%*%(z - muMat_z) - (n - 1)*Omega)/nu
-    Psi <- (t(wts*(z - muMat_z))%*%(x - muMat_x))/nu
+    Omega <- crossprod(as.matrix(s - z_s))/(m - n)
+    Sigma <- (crossprod(wts*(z - muMat_z), (z - muMat_z)) - (n - 1)*Omega)/nu
+    Psi <- crossprod(wts*(z - muMat_z), as.matrix(x - muMat_x))/nu
     Tau <- cov(x)
     
     Phi <- cbind(Sigma, Psi)
@@ -117,12 +118,12 @@ multi_blp <- function(s, s.id, x = NULL) {
     
   } else {
     
-    mu_z <- sum(wts*z)/m
+    mu_z <- colSums(wts*z)/m
     muMat_z <- matrix(rep(mu_z, n), nrow = n, byrow = TRUE)
     nu <- m - sum(wts^2)/m
     
-    Omega <- crossprod(x - z_x)/(m - n)
-    Sigma <- (t(wts*(z - muMat_z))%*%(z - muMat_z) - (n - 1)*Omega)/nu
+    Omega <- crossprod(as.matrix(s - z_s))/(m - n)
+    Sigma <- (crossprod(wts*(z - muMat_z), (z - muMat_z)) - (n - 1)*Omega)/nu
     
     a <- sapply(1:n, function(i, ...) {
       
@@ -139,7 +140,7 @@ multi_blp <- function(s, s.id, x = NULL) {
   
 }
 
-pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.earth", "SL.ranger")){
+pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth",)){
   
   # set up evaluation points & matrices for predictions
   ws <- data.frame(w, star)

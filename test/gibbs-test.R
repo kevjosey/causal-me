@@ -42,7 +42,7 @@ deg.num <- 2
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.glm")
+sl.lib <- c("SL.mean","SL.glm")
 family <- poisson()
 
 # initialize output
