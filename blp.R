@@ -32,15 +32,15 @@ blp <- function(s, s.id, x = NULL) {
     Omega <- cov(x)
     
     phi <- c(sigma2, psi)
-    Sigma <- matrix(NA, p + 1, p + 1)
-    Sigma[2:(p+1),] <- Sigma[,2:(p+1)] <- psi 
-    Sigma[2:(p+1),2:(p+1)] <- Omega
+    V <- matrix(NA, p + 1, p + 1)
+    V[2:(p+1),] <- V[,2:(p+1)] <- psi 
+    V[2:(p+1),2:(p+1)] <- Omega
     
     a <- sapply(1:n, function(i, ...) {
       
-      Sigma[1,1] <- sigma2 + tau2/wts[i]
+      V[1,1] <- sigma2 + tau2/wts[i]
       star <- c(z[i] - mu_z, t(x[i,]) - mu_x)
-      out <- c(mu_z + t(phi)%*%solve(Sigma)%*%star)
+      out <- c(mu_z + t(phi)%*%solve(V)%*%star)
       
       return(out)
       

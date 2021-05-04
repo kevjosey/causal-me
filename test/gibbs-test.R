@@ -23,7 +23,7 @@ sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
-out_scen <- "a"
+out_scen <- "b"
 pred_scen <- "b"
 span <- 0.25
 
@@ -33,7 +33,7 @@ n <- 400
 prob <- 0.2
 
 # gibbs sampler stuff
-thin <- 100
+thin <- 50
 n.iter <- 5000
 n.adapt <- 500
 h.a <- 1

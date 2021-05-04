@@ -199,7 +199,7 @@ plotnames <- c("No Measurement Error",
 idx <- c(20,24,28,32)
 
 filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_1.pdf")
-pdf(file = filename, width = 10, height = 10)
+pdf(file = filename, width = 9, height = 9)
 par(mfrow = c(2,2))
 
 for (k in 1:4){
@@ -215,7 +215,7 @@ for (k in 1:4){
   
   if (k == 4){
     
-    legend(x = 8, y = 0.02, legend=c("True ERF", "Without Prediction Correction",
+    legend(x = 7.7, y = 0.025, legend=c("True ERF", "Without Prediction Correction",
                                      "With Prediction Correction", "Without Classical Correction",
                                      "With Classical Correction"),
            col=c("darkgreen", "red", "blue", "black", "black"),
@@ -237,7 +237,7 @@ for (k in 1:length(rslt$est)){
   se <- round(rowMeans(rslt$est[[k]]$se/rslt$est[[k]]$sd), 3)
   ci <- round(rowMeans(rslt$est[[k]]$cp), 3)
   
-  tbl[k,] <- c(bias, sd, ci)
+  tbl[k,] <- c(bias, se, ci)
   
 }
 

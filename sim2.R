@@ -35,7 +35,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   mult <- scenario$mult # c(100, 200)
   
   # gibbs sampler stuff
-  thin <- 100
+  thin <- 50
   n.iter <- 5000
   n.adapt <- 500
   h.a <- 1
@@ -180,7 +180,7 @@ plotnames <- c("GPS: \"a\"; Outcome: \"a\"",
 idx <- c(4,8,12,16)
 
 filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_2.pdf")
-pdf(file = filename, width = 10, height = 10)
+pdf(file = filename, width = 9, height = 9)
 par(mfrow = c(2,2))
 
 for (k in 1:4){
@@ -202,7 +202,7 @@ for (k in 1:4){
   
   if (k == 4){
     
-    legend(x = 8, y = 0.02, legend=c("True ERF", "Single Imputation", "Bayesian Approach", "95% Confidence Interval"),
+    legend(x = 7.7, y = 0.025, legend=c("True ERF", "Single Imputation", "Bayesian Approach", "95% Confidence Interval"),
            col=c("darkgreen", "red", "blue", "black"),
            lty = c(1,1,1,2), lwd=2, cex=0.8)
     
@@ -222,7 +222,7 @@ for (k in 1:length(rslt$est)){
   se <- round(rowMeans(rslt$est[[k]]$se/rslt$est[[k]]$sd), 3)
   ci <- round(rowMeans(rslt$est[[k]]$cp), 3)
   
-  tbl[k,] <- c(bias, sd, ci)
+  tbl[k,] <- c(bias, se, ci)
   
 }
 
