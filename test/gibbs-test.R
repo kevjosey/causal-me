@@ -25,7 +25,7 @@ sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.3
+span <- 0.25
 
 # gen data arguments
 mult <- 10

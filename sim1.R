@@ -187,16 +187,16 @@ scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 est <- lapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib)
 rslt <- list(est = est, scen_idx = scen_mat)
 
-save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim1_rslt.RData")
+save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim_1.RData")
 
 # Summary Plot
 
-load(file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim1_rslt.RData")
+load(file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim_1.RData")
 plotnames <- c("No Measurement Error",
                "Classical Error but No Prediction Error",
                "Prediction Error but No Classical Error",
                "Both Classical and Prediction Error")
-idx <- c(17,21,25,29)
+idx <- c(20,24,28,32)
 
 filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_1.pdf")
 pdf(file = filename, width = 10, height = 10)
@@ -234,14 +234,14 @@ tbl <- matrix(NA, nrow = length(rslt$est), ncol = 12)
 for (k in 1:length(rslt$est)){
   
   bias <- round(colMeans(t(rslt$est[[k]]$bias)/rslt$est[[k]]$est[1,]), 3)
-  sd <- round(rowMeans(rslt$est[[k]]$se/rslt$est[[k]]$sd), 3)
+  se <- round(rowMeans(rslt$est[[k]]$se/rslt$est[[k]]$sd), 3)
   ci <- round(rowMeans(rslt$est[[k]]$cp), 3)
   
   tbl[k,] <- c(bias, sd, ci)
   
 }
 
-colnames(tbl) <- outer(names(bias), c("Bias", "SD", "SE", "CI"), FUN = "paste")[1:12]
+colnames(tbl) <- outer(names(bias), c("Bias", "SE", "CI"), FUN = "paste")[1:12]
 final <- cbind(rslt$scen_idx, tbl)
 
-save(final, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/table_1.RData")
+write.csv(final, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/table_1.csv")
