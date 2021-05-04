@@ -196,7 +196,7 @@ plotnames <- c("No Measurement Error",
                "Classical Error but No Prediction Error",
                "Prediction Error but No Classical Error",
                "Both Classical and Prediction Error")
-idx <- c(1,5,9,13)
+idx <- c(17,21,25,29)
 
 filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_1.pdf")
 pdf(file = filename, width = 10, height = 10)
@@ -234,7 +234,7 @@ tbl <- matrix(NA, nrow = length(rslt$est), ncol = 12)
 for (k in 1:length(rslt$est)){
   
   bias <- round(colMeans(t(rslt$est[[k]]$bias)/rslt$est[[k]]$est[1,]), 3)
-  sd <- round(rowMeans(rslt$est[[k]]$sd/rslt$est[[k]]$se), 3)
+  sd <- round(rowMeans(rslt$est[[k]]$se/rslt$est[[k]]$sd), 3)
   ci <- round(rowMeans(rslt$est[[k]]$cp), 3)
   
   tbl[k,] <- c(bias, sd, ci)

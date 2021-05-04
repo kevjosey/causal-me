@@ -40,11 +40,11 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   id <- id[shield]
   
   if (is.null(w)) {
-    ws <- cbind(rep(1, length(s.id)), star)
-    # ws <- cbind(rep(1, length(s.id)), poly(star, degree = deg.num))
+    # ws <- cbind(rep(1, length(s.id)), star)
+    ws <- cbind(rep(1, length(s.id)), poly(star, degree = deg.num))
   } else {
-    ws <- cbind(model.matrix(~ ., data.frame(w)), star = star)
-    # ws <- cbind(model.matrix(~ ., data.frame(w)), star = poly(star, degree = deg.num))
+    # ws <- cbind(model.matrix(~ ., data.frame(w)), star = star)
+    ws <- cbind(model.matrix(~ ., data.frame(w)), star = poly(star, degree = deg.num))
   }
   
   sword <- order(s.id)

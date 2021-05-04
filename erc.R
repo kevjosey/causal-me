@@ -57,7 +57,7 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   variance <- dr_out[2,]
   
   names(estimate) <- names(variance) <- a.vals
-  out <- list(estimate = estimate, variance = variance)	
+  out <- list(estimate = estimate, variance = variance, span = span)	
   
   return(out)
   

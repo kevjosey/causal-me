@@ -27,8 +27,8 @@ blp <- function(s, s.id, x = NULL) {
     nu <- m - sum(wts^2)/m
     
     tau2 <- sum((s - z_s)^2)/(m - n)
-    sigma2 <- (sum(wts*(z - mu_z)^2) - (n - 1)*tau2)/nu
-    psi <- crossprod(wts*(z - mu_z), as.matrix(x - muMat_x))/nu
+    sigma2 <- c(sum(wts*(z - mu_z)^2) - (n - 1)*tau2)/nu
+    psi <- c(crossprod(wts*(z - mu_z), as.matrix(x - muMat_x)))/nu
     Omega <- cov(x)
     
     phi <- c(sigma2, psi)
@@ -39,7 +39,7 @@ blp <- function(s, s.id, x = NULL) {
     a <- sapply(1:n, function(i, ...) {
       
       Sigma[1,1] <- sigma2 + tau2/wts[i]
-      star <- c(z[i] - mu_z, x[i,] - mu_x)
+      star <- c(z[i] - mu_z, t(x[i,]) - mu_x)
       out <- c(mu_z + t(phi)%*%solve(Sigma)%*%star)
       
       return(out)
@@ -97,20 +97,20 @@ multi_blp <- function(s, s.id, x = NULL) {
     nu <- m - sum(wts^2)/m
     
     Omega <- crossprod(as.matrix(s - z_s))/(m - n)
-    Sigma <- (crossprod(wts*(z - muMat_z), (z - muMat_z)) - (n - 1)*Omega)/nu
+    Sigma <- as.matrix(crossprod(wts*(z - muMat_z), (z - muMat_z)) - (n - 1)*Omega)/nu
     Psi <- crossprod(wts*(z - muMat_z), as.matrix(x - muMat_x))/nu
     Tau <- cov(x)
     
     Phi <- cbind(Sigma, Psi)
     V <- matrix(NA, p + q, p + q)
-    V[(p+1):(p+q),1:p] <- Sigma[1:p,(p+1):(p+q)] <- Psi
-    V[(p+1):(p+q),(p+1):(p+q)] <- Omega
+    V[(p+1):(p+q),1:p] <- V[1:p,(p+1):(p+q)] <- Psi
+    V[(p+1):(p+q),(p+1):(p+q)] <- Tau
     
     a <- sapply(1:n, function(i, ...) {
       
       V[1:p,1:p] <- Sigma + Omega/wts[i]
-      star <- c(z[i,] - mu_z, x[i,] - mu_x)
-      out <- c(mu_z + t(Phi) %*% solve(V) %*% star)
+      star <- c(t(z[i,]) - mu_z, t(x[i,]) - mu_x)
+      out <- c(mu_z + Phi %*% solve(V) %*% star)
       
       return(out)
       
@@ -123,12 +123,12 @@ multi_blp <- function(s, s.id, x = NULL) {
     nu <- m - sum(wts^2)/m
     
     Omega <- crossprod(as.matrix(s - z_s))/(m - n)
-    Sigma <- (crossprod(wts*(z - muMat_z), (z - muMat_z)) - (n - 1)*Omega)/nu
+    Sigma <- as.matrix(crossprod(wts*(z - muMat_z), (z - muMat_z)) - (n - 1)*Omega)/nu
     
     a <- sapply(1:n, function(i, ...) {
       
       V <- Sigma + Omega/wts[i]
-      out <- c(mu_z + Sigma %*% solve(V) %*% c(z[i,] - mu_z))
+      out <- c(mu_z + Sigma %*% solve(V) %*% c(t(z[i,]) - mu_z))
       
       return(out)
       

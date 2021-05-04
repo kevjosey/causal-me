@@ -1,0 +1,7 @@
+# Mac files
+.DS_Store
+
+# data formats
+*.csv
+*.RData
+*.RDS

@@ -110,7 +110,7 @@ for (i in 1:n.sim){
 
 out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals
-rownames(out_est) <- c("ERF","SI","MI")
+rownames(out_est) <- c("ERF","SI","Bayes")
 
 cp_blp_x <- sapply(1:n.sim, function(i,...)
   as.numeric((est[i,2,] - 1.96*se[i,1,]) < est[i,1,] & 
@@ -122,7 +122,7 @@ cp_gibbs_x <- sapply(1:n.sim, function(i,...)
 
 out_cp <- rbind(rowMeans(cp_blp_x, na.rm = T), rowMeans(cp_gibbs_x, na.rm = T))
 colnames(out_cp) <- a.vals
-rownames(out_cp) <- c("SI", "MI")
+rownames(out_cp) <- c("SI", "Bayes")
 
 plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 2,
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
@@ -130,6 +130,6 @@ plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 
 lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = "red", lwd = 2, lty = 1)
 lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "blue", lwd = 2, lty = 1)
 
-legend(6, 0.1, legend=c("True ERF", "Single Imputation", "Multiple Imputation"),
+legend(6, 0.1, legend=c("True ERF", "Single Imputation", "Bayesian Approach"),
        col=c("darkgreen", "red", "blue"),
        lty = c(1,1,1), lwd=2, cex=0.8)
