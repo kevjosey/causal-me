@@ -69,14 +69,10 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
   a.std <- a - newa
   k <- floor(min(span, 1)*length(a))
   idx <- order(abs(a.std))[1:k]
-  knn <- rep(0, length(a))
-  knn[idx] <- 1
-  max.a.std <- max(abs(a.std*knn))
-  k.std <- knn*c((1 - abs(a.std/max.a.std)^3)^3)
-  
-  # a.std <- (a - newa)/bw
-  # k.std <- ifelse(abs(a.std) <= 1, dnorm(a.std) / bw, 0)
-  # k.std <- knn*dnorm(a.std/max.a.std)/max.a.std
+  a.std <- a.std[idx]
+  psi <- psi[idx]
+  max.a.std <- max(abs(a.std))
+  k.std <- c((1 - abs(a.std/max.a.std)^3)^3)
   
   gh <- cbind(1, a.std)
   b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, 
@@ -85,6 +81,7 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
   
   if (se.fit){
     
+    int <- int[idx]
     gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
     v.inf <- (psi + int - family$linkinv(c(gh%*%b$par)))^2
     sig <- gh.inv %*% t(gh) %*% diag(k.std) %*% diag(v.inf) %*% diag(k.std) %*% gh %*% gh.inv

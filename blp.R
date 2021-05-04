@@ -106,7 +106,7 @@ multi_blp <- function(s, s.id, x = NULL) {
     V[(p+1):(p+q),1:p] <- V[1:p,(p+1):(p+q)] <- Psi
     V[(p+1):(p+q),(p+1):(p+q)] <- Tau
     
-    a <- sapply(1:n, function(i, ...) {
+    a <- t(sapply(1:n, function(i, ...) {
       
       V[1:p,1:p] <- Sigma + Omega/wts[i]
       star <- c(t(z[i,]) - mu_z, t(x[i,]) - mu_x)
@@ -114,7 +114,7 @@ multi_blp <- function(s, s.id, x = NULL) {
       
       return(out)
       
-    })
+    }))
     
   } else {
     
@@ -125,14 +125,14 @@ multi_blp <- function(s, s.id, x = NULL) {
     Omega <- crossprod(as.matrix(s - z_s))/(m - n)
     Sigma <- as.matrix(crossprod(wts*(z - muMat_z), (z - muMat_z)) - (n - 1)*Omega)/nu
     
-    a <- sapply(1:n, function(i, ...) {
+    a <- t(sapply(1:n, function(i, ...) {
       
       V <- Sigma + Omega/wts[i]
       out <- c(mu_z + Sigma %*% solve(V) %*% c(t(z[i,]) - mu_z))
       
       return(out)
       
-    })
+    }))
     
   }
   
@@ -140,7 +140,7 @@ multi_blp <- function(s, s.id, x = NULL) {
   
 }
 
-pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth",)){
+pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){
   
   # set up evaluation points & matrices for predictions
   ws <- data.frame(w, star)
