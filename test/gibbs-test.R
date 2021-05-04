@@ -23,7 +23,7 @@ sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
-out_scen <- "b"
+out_scen <- "a"
 pred_scen <- "b"
 span <- 0.25
 
