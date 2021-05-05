@@ -23,18 +23,18 @@ n.sim <- 100
 sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
-gps_scen <- "a"
-out_scen <- "b"
+gps_scen <- "b"
+out_scen <- "a"
 pred_scen <- "b"
 span <- 0.25
 
 # gen data arguments
-mult <- 10
+mult <- 10 
 n <- 400 
 prob <- 0.2
 
 # gibbs sampler stuff
-thin <- 20
+thin <- 10
 n.iter <- 1000
 n.adapt <- 100
 h.a <- 1
@@ -45,6 +45,7 @@ deg.num <- 2
 a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.mean","SL.glm")
 family <- poisson()
+deg.num <- 2
 
 # initialize output
 est <- array(NA, dim = c(n.sim, 3, length(a.vals)))
@@ -89,7 +90,7 @@ for (i in 1:n.sim){
   
   # blp
   blp_hat <- erc(y = y, a = a_hat, x = x, offset = offset, family = family,
-               a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
+                 a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
   # Bayesian analysis
   gibbs_hat <- mi_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
@@ -102,20 +103,16 @@ for (i in 1:n.sim){
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
   est[i,2,] <- blp_hat$estimate
   est[i,3,] <- gibbs_hat$estimate
-  
-  est[which(est>1 | est<0)] <- NA
 
   # standard error
   se[i,1,] <- sqrt(blp_hat$variance)
   se[i,2,] <- sqrt(gibbs_hat$variance)
   
-  se[which(se>1 | se<0)] <- NA
-  
 }
 
 out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals
-rownames(out_est) <- c("ERF","SI","Bayes")
+rownames(out_est) <- c("ERF","SI","MI")
 
 cp_blp_x <- sapply(1:n.sim, function(i,...)
   as.numeric((est[i,2,] - 1.96*se[i,1,]) < est[i,1,] & 

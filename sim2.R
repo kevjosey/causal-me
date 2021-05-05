@@ -96,7 +96,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
                      a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
     
     # Bayesian Approach
-    gibbs_hat <- try(mi_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
+    gibbs_hat <- try(bayes_erc(s = s, star = s_tilde, y = y, offset = offset,
                             s.id = s.id, id = id, w = w, x = x, family = family,
                             n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
                             h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
@@ -107,15 +107,9 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
                  if (!inherits(blp_hat, "try-error")) {blp_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(gibbs_hat, "try-error")) {gibbs_hat$estimate} else {rep(NA, length(a.vals))})
     
-    est[,which(a.vals > max(a))] <- NA
-    est[,which(a.vals < min(a))] <- NA
-    
     #standard error
     se <- rbind(if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(gibbs_hat, "try-error")) {sqrt(gibbs_hat$variance)} else {rep(NA, length(a.vals))})
-   
-    se[,which(a.vals > max(a))] <- NA
-    se[,which(a.vals < min(a))] <- NA
     
     return(list(est = est, se = se))
      
