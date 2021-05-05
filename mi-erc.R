@@ -41,11 +41,11 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   id <- id[shield]
   
   if (is.null(w)) {
-    ws <- cbind(rep(1, length(s.id)), star)
-    # ws <- cbind(rep(1, length(s.id)), poly(star, degree = deg.num))
+    # ws <- cbind(rep(1, length(s.id)), star)
+    ws <- cbind(rep(1, length(s.id)), poly(star, degree = deg.num))
   } else {
-    ws <- cbind(model.matrix(~ ., data.frame(w)), star = star)
-    # ws <- cbind(model.matrix(~ ., data.frame(w)), star = poly(star, degree = deg.num))
+    # ws <- cbind(model.matrix(~ ., data.frame(w)), star = star)
+    ws <- cbind(model.matrix(~ ., data.frame(w)), star = poly(star, degree = deg.num))
   }
   
   sword <- order(s.id)
@@ -100,13 +100,13 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     hat <- (sig^2)*(a.s/omega2[i - 1] + c(ws %*% alpha[i - 1,])/tau2[i - 1])
     s.hat <- rnorm(m, hat, sig)
     s.hat[!is.na(s)] <- s[!is.na(s)]
-
+    
     # sample A
     
     a_ <-  rnorm(n, a, h.a)
     xa_ <- as.matrix(cbind(x, predict(nsa, a_)))
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
- 
+    
     test <- log(runif(n))
     
     log.eps <- dpois(y, exp(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
@@ -127,7 +127,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     alpha[i,] <- rmvnorm(1, alpha_var %*% t(ws.tmp) %*% s.tmp, tau2[i - 1]*alpha_var)
     
     tau2[i] <- 1/rgamma(1, shape = shape + l/2, rate = rate +
-                            sum(c(s.tmp - c(ws.tmp %*% alpha[i,]))^2)/2)
+                          sum(c(s.tmp - c(ws.tmp %*% alpha[i,]))^2)/2)
     
     # Sample agg parameters
     
@@ -139,7 +139,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     beta[i,] <- rmvnorm(1, beta_var %*% t(x) %*% a, sigma2[i - 1]*beta_var)
     
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
-   
+    
     gamma_ <- gamma[i,] <- gamma[i-1,]
     
     for (j in 1:o){
@@ -149,7 +149,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
       log.eps <- sum(dpois(y, exp(c(xa %*% gamma_) + offset), log = TRUE)) -
         sum(dpois(y, exp(c(xa %*% gamma[i,]) + offset), log = TRUE)) +
         dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma[i,j], 0 , scale, log = TRUE)
-        
+      
       if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
         gamma[i,j] <- gamma_[j]
       else
@@ -187,8 +187,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   rslt <- list(estimate = estimate, variance = variance,
                mcmc = list(gamma = gamma, beta = beta, alpha = alpha,
-                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2,
-                           amat = amat),
+                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2, amat = amat),
                accept.a = accept.a, accept.gamma = accept.gamma)
   
   return(rslt)

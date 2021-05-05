@@ -14,6 +14,7 @@ library(parallel)
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/bayes-erc.R")
+source("~/Github/causal-me/mi-erc.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -23,7 +24,7 @@ sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
-out_scen <- "a"
+out_scen <- "b"
 pred_scen <- "b"
 span <- 0.25
 
@@ -33,9 +34,9 @@ n <- 400
 prob <- 0.2
 
 # gibbs sampler stuff
-thin <- 50
-n.iter <- 5000
-n.adapt <- 500
+thin <- 20
+n.iter <- 1000
+n.adapt <- 100
 h.a <- 1
 h.gamma <- 0.25
 deg.num <- 2
@@ -91,7 +92,7 @@ for (i in 1:n.sim){
                a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
   # Bayesian analysis
-  gibbs_hat <- bayes_erc(s = s, star = s_tilde, y = y, offset = offset,
+  gibbs_hat <- mi_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
                          s.id = s.id, id = id, w = w, x = x, family = family,
                          n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
                          h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
@@ -101,10 +102,14 @@ for (i in 1:n.sim){
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
   est[i,2,] <- blp_hat$estimate
   est[i,3,] <- gibbs_hat$estimate
+  
+  est[which(est>1 | est<0)] <- NA
 
   # standard error
   se[i,1,] <- sqrt(blp_hat$variance)
   se[i,2,] <- sqrt(gibbs_hat$variance)
+  
+  se[which(se>1 | se<0)] <- NA
   
 }
 

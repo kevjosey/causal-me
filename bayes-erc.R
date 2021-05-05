@@ -214,11 +214,11 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     psi <- c((y.new - muhat)/(pihat/phat) + mhat)
     
-    dr_mod <- loess(psi ~ a, data = data.frame(psi = psi, a = a), span = span, degree = 1)
-    dr_out <- predict(dr_mod, newdata = data.frame(a = a.vals))
+    # dr_mod <- loess(psi ~ a, data = data.frame(psi = psi, a = a), span = span, degree = 1)
+    # dr_out <- predict(dr_mod, newdata = data.frame(a = a.vals))
     
-    # dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = NULL,
-    #                  family = family, span = span, se.fit = FALSE)
+    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = NULL,
+                     family = family, span = span, se.fit = FALSE)
     
     return(dr_out)
     
@@ -231,8 +231,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   rslt <- list(estimate = estimate, variance = variance,
                mcmc = list(gamma = gamma, beta = beta, alpha = alpha,
-                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2,
-                           amat = amat),
+                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2, amat = amat),
                accept.a = accept.a, accept.gamma = accept.gamma)
   
   return(rslt)

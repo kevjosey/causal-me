@@ -16,6 +16,7 @@ library(abind)
 source("~/Github/causal-me/mclapply-hack.R")
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/bayes-erc.R")
+source("~/Github/causal-me/mi-erc.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -36,8 +37,8 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   # gibbs sampler stuff
   thin <- 10
-  n.iter <- 10000
-  n.adapt <- 1000
+  n.iter <- 1000
+  n.adapt <- 100
   h.a <- 1
   h.gamma <- 0.25
   deg.num <- 2
@@ -95,21 +96,27 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
                      a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
     
     # Bayesian Approach
-    gibbs_hat <- try(bayes_erc(s = s, star = s_tilde, y = y, offset = offset,
-                               s.id = s.id, id = id, w = w, x = x, family = family,
-                               n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-                               h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
-                               a.vals = a.vals, span = span), silent = TRUE)
+    gibbs_hat <- try(mi_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
+                            s.id = s.id, id = id, w = w, x = x, family = family,
+                            n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
+                            h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
+                            a.vals = a.vals, span = span), silent = TRUE)
     
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
                  if (!inherits(blp_hat, "try-error")) {blp_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(gibbs_hat, "try-error")) {gibbs_hat$estimate} else {rep(NA, length(a.vals))})
     
+    est[,which(a.vals > max(a))] <- NA
+    est[,which(a.vals < min(a))] <- NA
+    
     #standard error
     se <- rbind(if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(gibbs_hat, "try-error")) {sqrt(gibbs_hat$variance)} else {rep(NA, length(a.vals))})
    
+    se[,which(a.vals > max(a))] <- NA
+    se[,which(a.vals < min(a))] <- NA
+    
     return(list(est = est, se = se))
      
   }, mc.cores = 8)
@@ -119,20 +126,20 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("ERF", "SI", "Bayes")
+  rownames(out_est) <- c("ERF", "SI", "MI")
   
   compare <- matrix(rowMeans(est[1,,]), nrow = length(a.vals), ncol = n.sim)
   out_bias <- t(apply(est[2:3,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
   colnames(out_bias) <- a.vals
-  rownames(out_bias) <- c("SI", "Bayes")
+  rownames(out_bias) <- c("SI", "MI")
   
   out_sd <- t(apply(est[2:3,,], 1, function(x) apply(x, 1, sd, na.rm = T)))
   colnames(out_sd) <- a.vals
-  rownames(out_sd) <- c("SI", "Bayes")
+  rownames(out_sd) <- c("SI", "MI")
   
   out_se <- t(apply(se, 1, rowMeans, na.rm = T))
   colnames(out_se) <- a.vals
-  rownames(out_se) <- c("SI", "Bayes")
+  rownames(out_se) <- c("SI", "MI")
   
   cp_blp_x <- sapply(1:n.sim, function(i,...)
     as.numeric((est[2,,i] - 1.96*se[1,,i]) < rowMeans(compare) & 
@@ -144,7 +151,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   out_cp <- rbind(rowMeans(cp_blp_x, na.rm = T), rowMeans(cp_gibbs_x, na.rm = T))
   colnames(out_cp) <- a.vals
-  rownames(out_cp) <- c("SI", "Bayes")
+  rownames(out_cp) <- c("SI", "MI")
   
   return(list(est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp))
   
@@ -202,7 +209,7 @@ for (k in 1:4){
   
   if (k == 4){
     
-    legend(x = 7.7, y = 0.025, legend=c("True ERF", "Single Imputation", "Bayesian Approach", "95% Confidence Interval"),
+    legend(x = 7.7, y = 0.025, legend=c("True ERF", "Single Imputation", "Multiple Imputation", "95% Confidence Interval"),
            col=c("darkgreen", "red", "blue", "black"),
            lty = c(1,1,1,2), lwd=2, cex=0.8)
     
