@@ -93,10 +93,10 @@ for (i in 1:n.sim){
   
   # Bayesian analysis
   gibbs_hat <- mi_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
-                         s.id = s.id, id = id, w = w, x = x, family = family,
-                         n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-                         h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
-                         a.vals = a.vals, span = span)
+                      s.id = s.id, id = id, w = w, x = x, family = family,
+                      n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
+                      h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
+                      a.vals = a.vals, span = span)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
@@ -135,6 +135,6 @@ plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 
 lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = "red", lwd = 2, lty = 1)
 lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "blue", lwd = 2, lty = 1)
 
-legend(6, 0.1, legend=c("True ERF", "Single Imputation", "Bayesian Approach"),
+legend(6, 0.1, legend=c("True ERF", "Single Imputation", "Multiple Imputation"),
        col=c("darkgreen", "red", "blue"),
        lty = c(1,1,1), lwd=2, cex=0.8)
