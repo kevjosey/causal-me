@@ -7,7 +7,6 @@ rm(list = ls())
 library(data.table)
 library(mvtnorm)
 library(SuperLearner)
-library(earth)
 library(parallel)
 
 # Code for generating and fitting data

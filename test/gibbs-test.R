@@ -7,8 +7,6 @@ rm(list = ls())
 library(data.table)
 library(mvtnorm)
 library(SuperLearner)
-library(earth)
-library(splines)
 library(parallel)
 
 # Code for generating and fitting data
@@ -35,8 +33,8 @@ prob <- 0.2
 
 # gibbs sampler stuff
 thin <- 10
-n.iter <- 1000
-n.adapt <- 100
+n.iter <- 10000
+n.adapt <- 1000
 h.a <- 1
 h.gamma <- 0.25
 deg.num <- 2
@@ -49,7 +47,7 @@ deg.num <- 2
 
 # initialize output
 est <- array(NA, dim = c(n.sim, 3, length(a.vals)))
-se <- array(NA, dim = c(n.sim, 2, length(a.vals)))
+se <- cp <- array(NA, dim = c(n.sim, 2, length(a.vals)))
 
 for (i in 1:n.sim){
   
@@ -93,7 +91,7 @@ for (i in 1:n.sim){
                  a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
   # Bayesian analysis
-  gibbs_hat <- mi_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
+  gibbs_hat <- bayes_erc(s = s, star = s_tilde, y = y, offset = offset,
                       s.id = s.id, id = id, w = w, x = x, family = family,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
                       h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
@@ -108,21 +106,19 @@ for (i in 1:n.sim){
   se[i,1,] <- sqrt(blp_hat$variance)
   se[i,2,] <- sqrt(gibbs_hat$variance)
   
+  # coverage
+  cp[i,1,] <- as.numeric((est[i,2,] - 1.96*se[i,1,]) < est[i,1,] & 
+                           (est[i,2,] + 1.96*se[i,1,]) > est[i,1,])
+  cp[i,2,] <- as.numeric(gibbs_hat$hpdi[1,] < est[i,1,] & 
+                           gibbs_hat$hpdi[2,] > est[i,1,])
+  
 }
 
 out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals
 rownames(out_est) <- c("ERF","SI","MI")
 
-cp_blp_x <- sapply(1:n.sim, function(i,...)
-  as.numeric((est[i,2,] - 1.96*se[i,1,]) < est[i,1,] & 
-               (est[i,2,] + 1.96*se[i,1,]) > est[i,1,],na.rm = TRUE))
-
-cp_gibbs_x <- sapply(1:n.sim, function(i,...)
-  as.numeric((est[i,3,] - 1.96*se[i,2,]) < est[i,1,] & 
-               (est[i,3,] + 1.96*se[i,2,]) > est[i,1,]))
-
-out_cp <- rbind(rowMeans(cp_blp_x, na.rm = T), rowMeans(cp_gibbs_x, na.rm = T))
+out_cp <- colMeans(cp, na.rm = T)
 colnames(out_cp) <- a.vals
 rownames(out_cp) <- c("SI", "Bayes")
 

@@ -214,9 +214,6 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     psi <- c((y.new - muhat)/(pihat/phat) + mhat)
     
-    # dr_mod <- loess(psi ~ a, data = data.frame(psi = psi, a = a), span = span, degree = 1)
-    # dr_out <- predict(dr_mod, newdata = data.frame(a = a.vals))
-    
     dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = NULL,
                      family = family, span = span, se.fit = FALSE)
     
@@ -228,16 +225,18 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   est.mat <- do.call(rbind, out)
   estimate <- colMeans(est.mat)
   variance <- apply(est.mat, 2, var)
+  hpdi <- apply(est.mat, 2, hpd)
   
-  rslt <- list(estimate = estimate, variance = variance,
-               mcmc = list(gamma = gamma, beta = beta, alpha = alpha,
-                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2, amat = amat),
+  rslt <- list(estimate = estimate, variance = variance, hpdi = hpdi,
+               mcmc = list(amat = amat, gamma = gamma, beta = beta, alpha = alpha,
+                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2),
                accept.a = accept.a, accept.gamma = accept.gamma)
   
   return(rslt)
   
 }
 
+# highest posterior density interval
 hpd <- function(x, alpha = 0.05){
   
   n <- length(x)

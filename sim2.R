@@ -37,8 +37,8 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   # gibbs sampler stuff
   thin <- 10
-  n.iter <- 1000
-  n.adapt <- 100
+  n.iter <- 10000
+  n.adapt <- 1000
   h.a <- 1
   h.gamma <- 0.25
   deg.num <- 2
@@ -111,43 +111,46 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     se <- rbind(if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(gibbs_hat, "try-error")) {sqrt(gibbs_hat$variance)} else {rep(NA, length(a.vals))})
     
-    return(list(est = est, se = se))
+    cp <- rbind(if (!inherits(blp_hat, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} 
+      else {rep(NA, length(a.vals))},
+      if (!inherits(gibbs_hat, "try-error")) {as.numeric(gibbs_hat$hpdi[1,] < est[1,] & gibbs_hat$hpdi[2,] > est[1,])}
+      else {rep(NA, length(a.vals))})
+    
+    return(list(est = est, se = se, cp = cp, hpdi = gibbs_hat$hpdi))
      
   }, mc.cores = 8)
   
   est <- abind(lapply(out, function(lst, ...) lst$est), along = 3)
   se <- abind(lapply(out, function(lst, ...) lst$se), along = 3)
+  cp <- abind(lapply(out, function(lst, ...) lst$cp), along = 3)
+  hpdi <- abind(lapply(out, function(lst, ...) lst$hpdi), along = 3)
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("ERF", "SI", "MI")
+  rownames(out_est) <- c("ERF", "SI", "Bayes")
   
-  compare <- matrix(rowMeans(est[1,,]), nrow = length(a.vals), ncol = n.sim)
+  compare <- matrix(est[1,,], nrow = length(a.vals), ncol = n.sim)
   out_bias <- t(apply(est[2:3,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
   colnames(out_bias) <- a.vals
-  rownames(out_bias) <- c("SI", "MI")
+  rownames(out_bias) <- c("SI", "Bayes")
   
   out_sd <- t(apply(est[2:3,,], 1, function(x) apply(x, 1, sd, na.rm = T)))
   colnames(out_sd) <- a.vals
-  rownames(out_sd) <- c("SI", "MI")
+  rownames(out_sd) <- c("SI", "Bayes")
   
   out_se <- t(apply(se, 1, rowMeans, na.rm = T))
   colnames(out_se) <- a.vals
-  rownames(out_se) <- c("SI", "MI")
+  rownames(out_se) <- c("SI", "Bayes")
   
-  cp_blp_x <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[2,,i] - 1.96*se[1,,i]) < rowMeans(compare) & 
-                 (est[2,,i] + 1.96*se[1,,i]) > rowMeans(compare)))
-  
-  cp_gibbs_x <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[3,,i] - 1.96*se[2,,i]) < rowMeans(compare) & 
-                 (est[3,,i] + 1.96*se[2,,i]) > rowMeans(compare)))
-  
-  out_cp <- rbind(rowMeans(cp_blp_x, na.rm = T), rowMeans(cp_gibbs_x, na.rm = T))
+  out_cp <- t(apply(cp, 1, rowMeans, na.rm = T))
   colnames(out_cp) <- a.vals
-  rownames(out_cp) <- c("SI", "MI")
+  rownames(out_cp) <- c("SI", "Bayes")
   
-  return(list(est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp))
+  out_hdpi <- t(apply(hdpi, 1, rowMeans, na.rm = T))
+  colnames(out_hdpi) <- a.vals
+  rownames(out_hdpi) <- c("LB", "UB")
+  
+  return(list(est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp, hdpi = out_hdpi))
   
 }
 
@@ -159,8 +162,8 @@ a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.mean","SL.glm")
 n.sim <- 1000
 
-n <- c(400,800)
-mult <- c(5,10)
+n <- c(800)
+mult <- c(10)
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
 
@@ -196,14 +199,12 @@ for (k in 1:4){
           1.96*rslt$est[[idx[k]]]$se[1,], type = "l", col = "red", lwd = 2, lty = 2)
   lines(a.vals, rslt$est[[idx[k]]]$est[2,] + 
           1.96*rslt$est[[idx[k]]]$se[1,], type = "l", col = "red", lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[[idx[k]]]$est[3,] -
-          1.96*rslt$est[[idx[k]]]$se[2,], type = "l", col = "blue", lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[[idx[k]]]$est[3,] + 
-          1.96*rslt$est[[idx[k]]]$se[2,], type = "l", col = "blue", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[idx[k]]]$hdpi[1,], type = "l", col = "blue", lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[[idx[k]]]$hdpi[2,], type = "l", col = "blue", lwd = 2, lty = 2)
   
   if (k == 4){
     
-    legend(x = 7.7, y = 0.025, legend=c("True ERF", "Single Imputation", "Multiple Imputation", "95% Confidence Interval"),
+    legend(x = 7.7, y = 0.025, legend=c("True ERF", "Single Imputation", "Bayesian Approach", "95% Confidence Interval"),
            col=c("darkgreen", "red", "blue", "black"),
            lty = c(1,1,1,2), lwd=2, cex=0.8)
     

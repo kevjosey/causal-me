@@ -118,18 +118,28 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
                 if (!inherits(blp_tilde, "try-error")) {sqrt(blp_tilde$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))})
     
-    return(list(est = est, se = se))
+    cp <- rbind(if (!inherits(naive_tilde, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} 
+                else {rep(NA, length(a.vals))},
+                if (!inherits(naive_hat, "try-error")) {as.numeric((est[3,] - 1.96*se[2,]) < est[1,] & (est[3,] + 1.96*se[2,]) > est[1,])}
+                else {rep(NA, length(a.vals))},
+                if (!inherits(blp_tilde, "try-error")) {as.numeric((est[4,] - 1.96*se[3,]) < est[1,] & (est[4,] + 1.96*se[3,]) > est[1,])}
+                else {rep(NA, length(a.vals))},
+                if (!inherits(blp_hat, "try-error")) {as.numeric((est[5,] - 1.96*se[4,]) < est[1,] & (est[5,] + 1.96*se[4,]) > est[1,])}
+                else {rep(NA, length(a.vals))})
+    
+    return(list(est = est, se = se, cp = cp))
     
   }, mc.cores = 8)
   
   est <- abind(lapply(out, function(lst, ...) lst$est), along = 3)
   se <- abind(lapply(out, function(lst, ...) lst$se), along = 3)
+  cp <- abind(lapply(out, function(lst, ...) lst$cp), along = 3)
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
   rownames(out_est) <- c("ERF", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
-  compare <- matrix(rowMeans(est[1,,]), nrow = length(a.vals), ncol = n.sim)
+  compare <- matrix(est[1,,], nrow = length(a.vals), ncol = n.sim)
   out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
   colnames(out_bias) <- a.vals
   rownames(out_bias) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
@@ -142,24 +152,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   colnames(out_se) <- a.vals
   rownames(out_se) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
-  cp_naive_w <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[2,,i] - 1.96*se[1,,i]) < rowMeans(compare) & 
-                 (est[2,,i] + 1.96*se[1,,i]) > rowMeans(compare)))
-  
-  cp_naive_x <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[3,,i] - 1.96*se[2,,i]) < rowMeans(compare) & 
-                 (est[3,,i] + 1.96*se[2,,i]) > rowMeans(compare)))
-  
-  cp_blp_w <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[4,,i] - 1.96*se[3,,i]) < rowMeans(compare) & 
-                 (est[4,,i] + 1.96*se[3,,i]) > rowMeans(compare)))
-  
-  cp_blp_x <- sapply(1:n.sim, function(i,...)
-    as.numeric((est[5,,i] - 1.96*se[4,,i]) < rowMeans(compare) & 
-                 (est[5,,i] + 1.96*se[4,,i]) > rowMeans(compare)))
-  
-  out_cp <- rbind(rowMeans(cp_naive_w, na.rm = T), rowMeans(cp_naive_x, na.rm = T),
-                  rowMeans(cp_blp_w, na.rm = T), rowMeans(cp_blp_x, na.rm = T))
+  out_cp <- t(apply(cp, 1, rowMeans, na.rm = T))
   colnames(out_cp) <- a.vals
   rownames(out_cp) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
