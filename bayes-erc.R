@@ -6,6 +6,8 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
                       thin = 10, n.iter = 10000, n.adapt = 1000,
                       h.a = 0.5, h.gamma = 0.1, deg.num = 2, span = 0.75) {
   
+  dfun <- dpois
+  
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
   check <- check[check %in% id]
@@ -20,7 +22,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     warning("deleting some exposures without an associated outcome.")
   
   s <- s[s.id %in% id]
-  star <- star[s.id %in% id]
+  star <- as.matrix(star)[s.id %in% id,,drop = FALSE]
   w <- w[s.id %in% id,]
   s.id <- s.id[s.id %in% id]
   
@@ -40,16 +42,14 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   id <- id[shield]
   
   if (is.null(w)) {
-    ws <- cbind(rep(1, length(s.id)), star)
-    # ws <- cbind(rep(1, length(s.id)), poly(star, degree = deg.num))
+    ws <- cbind(rep(1, length(s.id)), star = star)
   } else {
     ws <- cbind(model.matrix(~ ., data.frame(w)), star = star)
-    # ws <- cbind(model.matrix(~ ., data.frame(w)), star = poly(star, degree = deg.num))
   }
   
   sword <- order(s.id)
   s <- s[sword]
-  star <- star[sword]
+  star <- star[sword,,drop = FALSE]
   ws <- ws[sword,]
   s.id <- s.id[sword]
   
@@ -64,8 +64,8 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
   
-  nsa <- poly(a, degree = deg.num)
-  xa <- as.matrix(cbind(x, nsa))
+  nsa <- ns(a, df = deg.num)
+  xa <- cbind(x, nsa)
   
   # dimensions
   p <- ncol(x)
@@ -80,15 +80,16 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   sigma2 <- rep(NA, n.adapt + n.iter)
   tau2 <- rep(NA, n.adapt + n.iter)
   omega2 <- rep(NA, n.adapt + n.iter)
+  amat <- matrix(NA, nrow = n.iter + n.adapt, ncol = n)
+  wts <- rep(NA, n.adapt + n.iter)
   
   gamma[1,] <- coef(glm(y ~ 0 + xa, family = family, offset = offset))
   beta[1,] <- coef(lm(a ~ 0 + x))
   alpha[1,] <- coef(lm(s.tmp ~ 0 + ws.tmp))
   sigma2[1] <- sigma(lm(a ~ 0 + x))^2
   tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
-  omega2[1] <- var(star - a.s)
+  omega2[1] <- var(s.hat - a.s)
   
-  amat <- matrix(NA, nrow = n.iter + n.adapt, ncol = n)
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
@@ -102,23 +103,31 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     # sample A
     
-    a_ <-  rnorm(n, a, h.a)
-    xa_ <- as.matrix(cbind(x, predict(nsa, a_)))
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
-    
+    a_ <- rnorm(n, a, h.a)
+    xa_ <- as.matrix(cbind(x, predict(nsa, a_)))
+
     test <- log(runif(n))
-    
-    log.eps <- dpois(y, exp(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
-      dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) + 
+
+    log.eps <- dfun(y, family$linkinv(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
+      dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
       dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
-      dpois(y, exp(c(xa%*%gamma[i - 1,]) + offset), log = TRUE) -
+      dfun(y, family$linkinv(c(xa%*%gamma[i - 1,]) + offset), log = TRUE) -
       dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
       dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
-    
+
     a <- amat[i,] <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_, a)
     
-    xa <- as.matrix(cbind(x, predict(nsa, a)))
+    xa <- cbind(x, predict(nsa, a))
     a.s <- rep(a, stab)
+    
+    num <- exp(dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
+      dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE))
+    denom <- exp(dfun(y, family$linkinv(c(xa%*%gamma[i - 1,]) + offset), log = TRUE) +
+      dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
+      dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE))
+    
+    wts[i] <- prod(num/denom)
     
     # Sample pred parameters
     
@@ -139,14 +148,16 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
     
+    # outcome model while cutting feedback
+    # ipw.tmp <- ipw(a = a, x = x, beta = beta[i,], sigma2 = sigma2[i], a.vals = a.vals)
     gamma_ <- gamma[i,] <- gamma[i-1,]
     
-    for (j in 1:o){
+    for (j in 1:o) {
       
-      gamma_[j] <- c(rnorm(1, gamma[i,j], h.gamma))
+      gamma_[j] <- c(rnorm(1, gamma_[j], h.gamma))
       
-      log.eps <- sum(dpois(y, exp(c(xa %*% gamma_) + offset), log = TRUE)) -
-        sum(dpois(y, exp(c(xa %*% gamma[i,]) + offset), log = TRUE)) +
+      log.eps <- sum(dfun(y, family$linkinv(c(xa %*% gamma_) + offset), log = TRUE)) -
+        sum(dfun(y, family$linkinv(c(xa %*% gamma[i,]) + offset), log = TRUE)) +
         dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma[i,j], 0 , scale, log = TRUE)
       
       if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
@@ -171,61 +182,59 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   omega2 <- omega2[keep]
   amat <- amat[keep,]
   
-  y.new <- exp(log(y) - offset)
-  
   out <- lapply(1:nrow(amat), function(i, ...){
-    
+
     a <- amat[i,]
-    xa <- as.matrix(cbind(x, predict(nsa, a)))
-    
-    if (ncol(x) > 1) {
-      pimod.vals <- c(x %*% beta[i,])
-    } else {
-      pimod.vals <- c(x %*% beta[i])
-    }
-    
-    # exposure models
-    pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
-    phat.vals <- sapply(a.vals, function(a.tmp, ...)
-      mean(dnorm(a.tmp, pimod.vals, sqrt(sigma2[i]))))
-    phat <- predict(smooth.spline(a.vals, phat.vals), x = a)$y
-    phat[which(phat < 0)] <- 1e-6
-    # phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
-    
-    muhat <- exp(c(xa %*% gamma[i,]))
-    
-    # predict marginal outcomes given a.vals (or a.agg)
-    muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
-      
-      xa.tmp <- as.matrix(cbind(x, matrix(rep(c(predict(nsa, a.tmp)), n), byrow = TRUE, nrow = n)))
-      return(exp(c(xa.tmp %*% gamma[i,])))
-      
+    xa <- cbind(x, predict(nsa, a))
+
+    xa.new.list <- lapply(a.vals, function(a.tmp, ...) {
+
+      cbind(x, matrix(rep(c(predict(nsa, a.tmp)), n), byrow = TRUE, nrow = n))
+
     })
-    
-    # aggregate muhat.vals and integrate for influence function
-    mhat.vals <- colMeans(muhat.mat)
-    mhat <- predict(smooth.spline(a.vals, mhat.vals), x = a)$y
-    # mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
-    
+
+    xa.new <- rbind(xa, do.call(rbind, xa.new.list))
+    x.new <- xa.new[,1:ncol(x)]
+    a.new <- c(a, rep(a.vals, each = n))
+    colnames(x.new) <- colnames(x)
+    colnames(xa.new) <- colnames(xa)
+
+    # exposure models
+    pimod.vals <- c(x.new %*% beta[i,])
+    pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2[i]))
+    pihat <- pihat.vals[1:n]
+    pihat.mat <- matrix(pihat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
+    phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
+    phat[which(phat < 0)] <- 1e-6
+
+    # outcome models
+    muhat.vals <- family$linkinv(c(xa.new %*% gamma[i,]))
+    muhat <- muhat.vals[1:n]
+    muhat.mat <- matrix(muhat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
+    mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
+
     # integrate
+    # phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
+    # mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
     # intfn <- (muhat.mat - mhat.mat) * phat.mat
     # int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
     #                (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
-    
-    psi <- c((y.new - muhat)/(pihat/phat) + mhat)
-    
-    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = NULL,
-                     family = family, span = span, se.fit = FALSE)
-    
+
+    psi <- (y.new - muhat)/(pihat/phat) + mhat
+
+    # dr_mod <- mgcv::gam(psi ~ s(a), family = gaussian(), data = data.frame(psi = psi, a = a))
+    # dr_out <- predict(dr_mod, newdata = data.frame(a = a.vals))
+
+    # dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = NULL, span = span, se.fit = FALSE)
+
     return(dr_out)
-    
+
   })
   
   amat <- amat[,order(shield)]
-  est.mat <- do.call(rbind, out)
-  estimate <- colMeans(est.mat)
-  variance <- apply(est.mat, 2, var)
-  hpdi <- apply(est.mat, 2, hpd)
+  estimate <- rowMeans(est.mat)
+  variance <- apply(est.mat, 1, var)
+  hpdi <- apply(est.mat, 1, hpd)
   
   rslt <- list(estimate = estimate, variance = variance, hpdi = hpdi,
                mcmc = list(amat = amat, gamma = gamma, beta = beta, alpha = alpha,
@@ -236,7 +245,23 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
 }
 
-# highest posterior density interval
+ipw <- function(a, x, beta, sigma2, a.vals) {
+  
+  n <- length(a)
+  x.new <- rbind(x, x[rep(1:n, length(a.vals)), ])
+  a.new <- c(a, rep(a.vals, each = n))
+  pimod.vals <- c(x.new %*% beta)
+  pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2))
+  pihat <- pihat.vals[1:n]
+  pihat.mat <- matrix(pihat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
+  phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
+  phat[which(phat < 0)] <- 1e-6
+  out <- phat/pihat
+  return(out)
+  
+}
+
+# highest posterior density
 hpd <- function(x, alpha = 0.05){
   
   n <- length(x)

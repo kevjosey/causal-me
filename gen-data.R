@@ -31,7 +31,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   x <- x%*%solve(chol(cov(x)))
   
   id <- 1:n
-  offset <- runif(n, 10, 1000)
+  offset <- floor(runif(n, 10, 1000))
   
   if (mult == 10) {
     s.id <- rep(id, rep(c(1,3,8,13,25), each = n/5))
@@ -79,10 +79,10 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   }
   
   if (out_scen == "b") {
-    mu_out <- -3 - 0.3*u[,1] - 0.1*u[,2] + 0.1*u[,3] + 0.3*u[,4] +
+    mu_out <- -3 - 0.5*u[,1] - 0.25*u[,2] + 0.25*u[,3] + 0.5*u[,4] +
       0.3*(a - 8) - 0.1*(a - 8)^2
   } else { # y_scen == "b"
-    mu_out <- -3 - 0.3*x[,1] - 0.1*x[,2] + 0.1*x[,3] + 0.3*x[,4] +
+    mu_out <- -3 - 0.5*x[,1] - 0.25*x[,2] + 0.25*x[,3] + 0.5*x[,4] +
       0.3*(a - 8) - 0.1*(a - 8)^2
   }
   
@@ -97,7 +97,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
 
 predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
   
-  # transformed predictors
+  # # transformed predictors
   # u1 <- as.numeric(scale(exp(x[,1]/2)))
   # u2 <- as.numeric(scale(x[,2]/(1 + exp(x[,1])) + 10))
   # u3 <- as.numeric(scale((x[,1]*x[,3]/25 + 0.6)^3))
@@ -112,16 +112,16 @@ predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
   #   a.vec <- rep(a.vals[i],nrow(x))
   # 
   #   if (out_scen == "b") {
-  #     mu_out <- exp(-3 + u %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
+  #     mu_out <- exp(-3 + u %*% c(-0.5,-0.25,0.25,0.5) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
   #   } else { # out_scen == "a"
-  #     mu_out <- exp(-3 + x %*% c(-0.3,-0.1,0.1,0.3) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
+  #     mu_out <- exp(-3 + x %*% c(-0.5,-0.25,0.25,0.5) + 0.3*(a.vec - 8) - 0.1*(a.vec - 8)^2)
   #   }
   # 
   #   out[i] <- mean(mu_out)
   # 
   # }
   
-  out <- exp(-3 + 0.2/2 + 0.3*(a.vals - 8) - 0.1*(a.vals - 8)^2 )
+  out <- exp(-3 + 0.625/2 + 0.3*(a.vals - 8) - 0.1*(a.vals - 8)^2 )
   
   return(out)
   

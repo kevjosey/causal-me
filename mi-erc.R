@@ -21,7 +21,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     warning("deleting some exposures without an associated outcome.")
 
   s <- s[s.id %in% id]
-  star <- star[s.id %in% id]
+  star <- as.matrix(star)[s.id %in% id,]
   w <- w[s.id %in% id,]
   s.id <- s.id[s.id %in% id]
   
@@ -41,16 +41,14 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   id <- id[shield]
   
   if (is.null(w)) {
-    # ws <- cbind(rep(1, length(s.id)), star)
-    ws <- cbind(rep(1, length(s.id)), poly(star, degree = deg.num))
+    ws <- cbind(rep(1, length(s.id)), star = star)
   } else {
-    # ws <- cbind(model.matrix(~ ., data.frame(w)), star = star)
-    ws <- cbind(model.matrix(~ ., data.frame(w)), star = poly(star, degree = deg.num))
+    ws <- cbind(model.matrix(~ ., data.frame(w)), star = star)
   }
   
   sword <- order(s.id)
   s <- s[sword]
-  star <- star[sword]
+  star <- star[sword,]
   ws <- ws[sword,]
   s.id <- s.id[sword]
   
@@ -71,23 +69,20 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   # dimensions
   p <- ncol(x)
   q <- ncol(ws)
-  o <- ncol(xa)
   l <- sum(!is.na(s))
   
   # initialize parameters
-  gamma <- matrix(NA, nrow = n.adapt + n.iter, ncol = o)
   beta <- matrix(NA, nrow = n.adapt + n.iter, ncol = p)
   alpha <- matrix(NA, nrow = n.adapt + n.iter, ncol = q)
   sigma2 <- rep(NA, n.adapt + n.iter)
   tau2 <- rep(NA, n.adapt + n.iter)
   omega2 <- rep(NA, n.adapt + n.iter)
   
-  gamma[1,] <- coef(glm(y ~ 0 + xa, family = family, offset = offset))
   beta[1,] <- coef(lm(a ~ 0 + x))
   alpha[1,] <- coef(lm(s.tmp ~ 0 + ws.tmp))
   sigma2[1] <- sigma(lm(a ~ 0 + x))^2
   tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
-  omega2[1] <- var(star - a.s)
+  omega2[1] <- var(s.hat - a.s)
   
   amat <- matrix(NA, nrow = n.iter + n.adapt, ncol = n)
   
@@ -103,20 +98,11 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     # sample A
     
-    a_ <-  rnorm(n, a, h.a)
-    xa_ <- as.matrix(cbind(x, predict(nsa, a_)))
-    z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
-    
-    test <- log(runif(n))
-    
-    log.eps <- dpois(y, exp(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
-      dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) + 
-      dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
-      dpois(y, exp(c(xa%*%gamma[i - 1,]) + offset), log = TRUE) -
-      dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
-      dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
-    
-    a <- amat[i,] <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_, a)
+    z.hat <- aggregate(s.hat, by = list(s.id), sum)[,2]
+
+    sig <- sqrt((1/sigma2[i - 1] + stab/omega2[i - 1])^(-1))
+    hat <- (sig^2)*(c(x %*% beta[i - 1,])/sigma2[i - 1] + z.hat/omega2[i - 1])
+    a <- amat[i,] <- rnorm(n, hat, sig)
     
     xa <- as.matrix(cbind(x, predict(nsa, a)))
     a.s <- rep(a, stab)
@@ -140,39 +126,16 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
     
-    gamma_ <- gamma[i,] <- gamma[i-1,]
-    
-    for (j in 1:o){
-      
-      gamma_[j] <- c(rnorm(1, gamma[i,j], h.gamma))
-      
-      log.eps <- sum(dpois(y, exp(c(xa %*% gamma_) + offset), log = TRUE)) -
-        sum(dpois(y, exp(c(xa %*% gamma[i,]) + offset), log = TRUE)) +
-        dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma[i,j], 0 , scale, log = TRUE)
-      
-      if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
-        gamma[i,j] <- gamma_[j]
-      else
-        gamma_[j] <- gamma[i,j]
-      
-    }
-    
   }
-  
-  accept.a <- mean(apply(amat[(n.adapt + 1):nrow(amat),], 2, function(x) mean(diff(x) != 0) ))
-  accept.gamma <- mean(apply(gamma[(n.adapt + 1):nrow(gamma),], 2, function(x) mean(diff(x) != 0) ))
   
   # thinning
   keep <- seq(n.adapt + 1, n.iter + n.adapt, by = thin)
-  gamma <- gamma[keep,]
   beta <- beta[keep,]
   alpha <- alpha[keep,]
   sigma2 <- sigma2[keep]
   tau2 <- tau2[keep]
   omega2 <- omega2[keep]
   amat <- amat[keep,]
-  
-  y.new <- exp(log(y) - offset)
   
   a.list <- as.list(as.data.frame(t(amat)))
   
@@ -183,12 +146,11 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   est.mat <- do.call(rbind, lapply(out, function(lst) lst$estimate))
   var.mat <- do.call(rbind, lapply(out, function(lst) lst$variance))
   estimate <- colMeans(est.mat)
-  variance <- apply(est.mat, 2, var) + colMeans(var.mat)
+  variance <- (1 + 1/nrow(amat))*apply(est.mat, 2, var) + colMeans(var.mat)
   
   rslt <- list(estimate = estimate, variance = variance,
-               mcmc = list(gamma = gamma, beta = beta, alpha = alpha,
-                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2, amat = amat),
-               accept.a = accept.a, accept.gamma = accept.gamma)
+               mcmc = list(amat = amat, gamma = gamma, beta = beta, alpha = alpha,
+                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
   return(rslt)
   

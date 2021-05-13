@@ -10,9 +10,9 @@ library(SuperLearner)
 library(parallel)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("D:/Github/causal-me/gen-data.R")
+source("D:/Github/causal-me/blp.R")
+source("D:/Github/causal-me/erc.R")
 
 # simulation arguments
 n.sim <- 100
@@ -74,8 +74,8 @@ for (i in 1:n.sim){
   }
   
   s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
-  a_tilde <- blp(s = s_tilde, s.id = s.id, x = x)
-  a_hat <- blp(s = s_hat, s.id = s.id, x = x)
+  a_tilde <- blp(s = s_tilde, s.id = s.id, x = x)$a
+  a_hat <- blp(s = s_hat, s.id = s.id, x = x)$a
   
   z_tilde_tmp <- aggregate(s_tilde, by = list(s.id), mean)
   z_hat_tmp <- aggregate(s_hat, by = list(s.id), mean)

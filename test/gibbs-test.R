@@ -7,43 +7,43 @@ rm(list = ls())
 library(data.table)
 library(mvtnorm)
 library(SuperLearner)
+library(splines)
 library(parallel)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/bayes-erc.R")
-source("~/Github/causal-me/mi-erc.R")
-source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("D:/Github/causal-me/gen-data.R")
+source("D:/Github/causal-me/bayes-erc.R")
+source("D:/Github/causal-me/mi-erc.R")
+source("D:/Github/causal-me/blp.R")
+source("D:/Github/causal-me/erc.R")
 
 # simulation arguments
 n.sim <- 100
 sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
-gps_scen <- "b"
+gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
 span <- 0.25
-
-# gen data arguments
 mult <- 10 
-n <- 400 
+n <- 1000
 prob <- 0.2
 
-# gibbs sampler stuff
-thin <- 10
-n.iter <- 10000
-n.adapt <- 1000
-h.a <- 1
-h.gamma <- 0.25
-deg.num <- 2
-
-# dr arguments
+# model arguments
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.mean","SL.glm")
+sl.lib <- c("SL.glm") # for single imputation
 family <- poisson()
 deg.num <- 2
+
+# mcmc arguments
+thin <- 5
+n.iter <- 5000
+n.adapt <- 500
+h.a <- 1
+h.gamma <- 0.5
+scale <- 1e6
+shape <- rate <- 1e-3
 
 # initialize output
 est <- array(NA, dim = c(n.sim, 3, length(a.vals)))
@@ -67,7 +67,7 @@ for (i in 1:n.sim){
   x <- dat$x
   a <- dat$a
   w <- dat$w
-  s_tilde <- dat$star
+  s_tilde <- star <- dat$star
   
   # validation subset
   s <- dat$s*rbinom(mult*n, 1, prob)
@@ -84,7 +84,7 @@ for (i in 1:n.sim){
   }
   
   s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
-  a_hat <- blp(s = s_hat, s.id = s.id, x = x)
+  a_hat <- blp(s = s_hat, s.id = s.id, x = x)$a
   
   # blp
   blp_hat <- erc(y = y, a = a_hat, x = x, offset = offset, family = family,
@@ -94,6 +94,7 @@ for (i in 1:n.sim){
   gibbs_hat <- bayes_erc(s = s, star = s_tilde, y = y, offset = offset,
                       s.id = s.id, id = id, w = w, x = x, family = family,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
+                      scale = scale, shape = shape, rate = rate,
                       h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
                       a.vals = a.vals, span = span)
   
@@ -109,18 +110,18 @@ for (i in 1:n.sim){
   # coverage
   cp[i,1,] <- as.numeric((est[i,2,] - 1.96*se[i,1,]) < est[i,1,] & 
                            (est[i,2,] + 1.96*se[i,1,]) > est[i,1,])
-  cp[i,2,] <- as.numeric(gibbs_hat$hpdi[1,] < est[i,1,] & 
-                           gibbs_hat$hpdi[2,] > est[i,1,])
+  cp[i,2,] <- as.numeric((est[i,3,] - 1.96*se[i,2,]) < est[i,1,] & 
+                           (est[i,3,] + 1.96*se[i,2,]) > est[i,1,])
   
 }
 
 out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals
-rownames(out_est) <- c("ERF","SI","MI")
+rownames(out_est) <- c("ERF","RC","MI")
 
 out_cp <- colMeans(cp, na.rm = T)
 colnames(out_cp) <- a.vals
-rownames(out_cp) <- c("SI", "Bayes")
+rownames(out_cp) <- c("RC", "Bayes")
 
 plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 2,
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
@@ -128,6 +129,6 @@ plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 
 lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = "red", lwd = 2, lty = 1)
 lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "blue", lwd = 2, lty = 1)
 
-legend(6, 0.1, legend=c("True ERF", "Single Imputation", "Multiple Imputation"),
+legend(6, 0.1, legend=c("True ERF", "Regression Calibration", "Bayesian Approach"),
        col=c("darkgreen", "red", "blue"),
        lty = c(1,1,1), lwd=2, cex=0.8)

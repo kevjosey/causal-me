@@ -1,32 +1,6 @@
 
 blp <- function(s, s.id, x = NULL, id = NULL) {
   
-  # if (is.null(id) & !is.null(x))
-  #   stop("if x is specified, so must id")
-  # 
-  # if (!is.null(id) & !is.null(x)) {
-  #   
-  #   x <- as.matrix(x)[order(id),]
-  #   id <- id[order(id)]
-  #   
-  #   # initialize exposures
-  #   z_tmp <- aggregate(s, by = list(s.id), mean)
-  #   id <- z_tmp[,1]
-  #   z <- z_tmp[,2]
-  #   
-  #   # dimensions
-  #   m <- length(s.id)
-  #   n <- length(id)
-  #   
-  #   stab <- table(s.id)
-  #   ord <- order(s.id)
-  #   z_s <- rep(z, stab)[order(ord)]
-  #   
-  # } else {
-  #   
-  #   
-  # }
-  
   wts <- c(unname(table(s.id)))
   
   # initialize exposures
@@ -72,6 +46,15 @@ blp <- function(s, s.id, x = NULL, id = NULL) {
       
     })
     
+    cvar <- sapply(1:n, function(i, ...) {
+      
+      V[1,1] <- sigma2 + tau2/wts[i]
+      out <- c(sigma2 - t(phi)%*%solve(V)%*%phi)
+      
+      return(out)
+      
+    })
+    
   } else {
     
     mu_z <- sum(wts*z)/m
@@ -87,9 +70,17 @@ blp <- function(s, s.id, x = NULL, id = NULL) {
       
     })
     
+    cvar <- sapply(1:n, function(i, ...) {
+      
+      out <- c(sigma2 - (sigma2)^2/(sigma2 + tau2/wts[i]))
+      
+      return(out)
+      
+    })
+    
   }
     
-  return(a)
+  return(list(a = a, cvar = cvar))
   
 }
 
