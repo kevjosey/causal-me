@@ -79,6 +79,9 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   tau2 <- rep(NA, n.adapt + n.iter)
   omega2 <- rep(NA, n.adapt + n.iter)
   amat <- matrix(NA, nrow = n.iter + n.adapt, ncol = n)
+  muhat <- matrix(NA, nrow = n.iter + n.adapt, ncol = n)
+  est.mat <- matrix(NA, nrow = n.iter + n.adapt, ncol = length(a.vals))
+  var.mat <- matrix(NA, nrow = n.iter + n.adapt, ncol = length(a.vals))
   
   beta[1,] <- coef(lm(a ~ 0 + x))
   alpha[1,] <- coef(lm(s.tmp ~ 0 + ws.tmp))
@@ -87,12 +90,14 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   omega2[1] <- var(s.hat - a.s)
   amat[1,] <- a
   
-  gps <- dnorm(a, x%*%beta[1,], sqrt(sigma2[1]))
-  nsa <- ns(a, df = deg.num)
-  xa <- cbind(1, nsa, gps)
+  # gps <- dnorm(a, x%*%beta[1,], sqrt(sigma2[1]))
+  nsa <- poly(a, degree = deg.num)
+  xa <- cbind(x, nsa)
+  df <- data.frame(y = y, xa[,-1])
   o <- ncol(xa)
   
-  gamma[1,,] <- matrix(rep(coef(glm(y ~ 0 + xa, family = poisson, offset = offset)), n.boot), nrow = n.boot, byrow = TRUE)
+  mumod <- glm(y ~ ., data = df, family = family, offset = offset)
+  muhat[1,] <- predict(mumod, newdata = df, type = "response")
   y_ <- family$linkinv(family$linkfun(y) - offset)
   
   # gibbs sampler for predictors
@@ -120,13 +125,15 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     a_ <- rnorm(n, a, h.a)
-    gps_ <- dnorm(a_, x%*%beta[i-1,], sqrt(sigma2[i-1]))
-    xa_ <- cbind(1, predict(nsa, a_), gps_)
+    xa_ <- data.frame(x, predict(nsa, a_))
+    colnames(xa_) <- colnames(df)
+    muhat_ <- predict(mumod, newdata = xa_, type = "response")
+    # gps_ <- dnorm(a_, x%*%beta[i-1,], sqrt(sigma2[i-1]))
     
-    log.eps <- log(rowMeans(dpois(y, family$linkinv(tcrossprod(xa_, gamma[i-1,,]) + offset)))) +
+    log.eps <- dpois(y, family$linkinv(family$linkfun(muhat_) + offset), log = TRUE) +
       dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
       dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
-      log(rowMeans(dpois(y, family$linkinv(tcrossprod(xa_, gamma[i-1,,]) + offset)))) -
+      dpois(y, family$linkinv(family$linkfun(muhat[i - 1,]) + offset), log = TRUE) -
       dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
       dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
     
@@ -154,9 +161,53 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
     
     # sample outcome
+    xa <- cbind(x, predict(nsa, a))
+    df <- data.frame(y = y, xa[,-1])
 
-    gps <- dnorm(a, x%*%beta[i,], sqrt(sigma2[i]))
-    xa <- cbind(1, predict(nsa, a), gps)
+    xa.new.list <- lapply(a.vals, function(a.tmp, ...) {
+
+      cbind(x, matrix(rep(c(predict(nsa, a.tmp)), n), byrow = T, nrow = n))
+
+    })
+
+    xa.new <- rbind(xa, do.call(rbind, xa.new.list))
+    x.new <- as.matrix(xa.new[,1:ncol(x)])
+    xa.new <- data.frame(xa.new[,-1])
+    a.new <- c(a, rep(a.vals, each = n))
+    colnames(x.new) <- colnames(x)
+    colnames(xa.new) <- colnames(df)[-1]
+
+    # exposure models
+    pimod.vals <- c(x.new %*% beta[i,])
+    pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2[i]))
+    pihat <- pihat.vals[1:n]
+    pihat.mat <- matrix(pihat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
+    phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
+    phat[which(phat < 0)] <- 1e-6
+
+    # outcome models
+    mumod <- glm(y ~ ., data = df, family = poisson, offset = offset)
+    muhat.vals <- predict(mumod, newdata = xa.new, type = "response")
+    muhat[i,] <- muhat.vals[1:n]
+    muhat.mat <- matrix(muhat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
+    mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
+
+    # integrate
+    phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
+    mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
+    intfn <- (muhat.mat - mhat.mat) * phat.mat
+    int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
+                   (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
+
+    psi <- (y_ - muhat[i,])/(pihat/phat) + mhat
+
+    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, span = span, se.fit = TRUE)
+    est.mat[i,] <- dr_out[1,]
+    var.mat[i,] <- dr_out[2,]
+    
+    # xa <- cbind(1, predict(nsa, a))
+    # df <- data.frame(y = y, xa)
+    # gps <- dnorm(a, x%*%beta[i,], sqrt(sigma2[i]))
     # gamma_ <- gamma0 <- gamma[i-1,]
     
     # for (j in 1:o) {
@@ -176,10 +227,10 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     # 
     # gamma[i,] <- gamma0
     
-    df <- data.frame(y = y, xa[,-1])
-    gmod <- rstanarm::stan_glm(y ~ ., data = df, family = poisson, QR = TRUE,
-                               offset = offset, iter = 2*n.boot, chains = 1, refresh = 0)
-    gamma[i,,] <- do.call(cbind, split.along.dim(as.array(gmod), 3))
+    # df <- data.frame(y = y, xa[,-1])
+    # gmod <- rstanarm::stan_glm(y ~ ., data = df, family = poisson, QR = TRUE,
+    #                            offset = offset, iter = 2*n.boot, chains = 1, refresh = 0)
+    # gamma[i,,] <- do.call(cbind, split.along.dim(as.array(gmod), 3))
     
   }
   
@@ -194,25 +245,27 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   tau2 <- tau2[keep]
   omega2 <- omega2[keep]
   amat <- amat[keep,]
+  est.mat <- est.mat[keep,]
+  var.mat <- var.mat[keep,]
   
-  dr_out <- lapply(1:nrow(beta), function(i, ...){
-    
-    out <- sapply(a.vals, function(a.tmp, ...) {
-      
-      gps <- dnorm(a.tmp, x%*%beta[i,], sqrt(sigma2[i]))
-      xa <- cbind(1, matrix(rep(predict(nsa, a.tmp), n), byrow = TRUE, nrow = n), gps)
-      val <- colMeans(family$linkinv(tcrossprod(xa, gamma[i,,])))
-      return(list(est = mean(val), var = var(val)))
-      
-    })
-    
-    return(list(est = unlist(out[1,]), var = unlist(out[2,])))
-
-  })
+  # dr_out <- lapply(1:nrow(beta), function(i, ...){
+  #   
+  #   out <- sapply(a.vals, function(a.tmp, ...) {
+  # 
+  #     gps <- dnorm(a.tmp, x%*%beta[i,], sqrt(sigma2[i]))
+  #     xa <- cbind(1, matrix(rep(predict(nsa, a.tmp), n), byrow = T, nrow = n), gps)
+  #     val <- colMeans(family$linkinv(tcrossprod(xa, gamma[i,,])))
+  #     return(list(est = mean(val), var = var(val)))
+  # 
+  #   })
+  # 
+  #   return(list(est = unlist(out[1,]), var = unlist(out[2,])))
+  # 
+  # })
   
   amat <- amat[,order(shield)]
-  est.mat <- do.call(rbind, lapply(dr_out, function(arg, ...) arg$est))
-  var.mat <- do.call(rbind, lapply(dr_out, function(arg, ...) arg$var))
+  # est.mat <- do.call(rbind, lapply(dr_out, function(arg, ...) arg$est))
+  # var.mat <- do.call(rbind, lapply(dr_out, function(arg, ...) arg$var))
   estimate <- colMeans(est.mat)
   variance <- colMeans(var.mat) + (1 + 1/nrow(amat))*apply(est.mat, 2, var)
   

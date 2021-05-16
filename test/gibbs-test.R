@@ -11,12 +11,12 @@ library(splines)
 library(parallel)
 
 # Code for generating and fitting data
-source("D:/Github/causal-me/gen-data.R")
-source("D:/Github/causal-me/bayes-erc.R")
-source("D:/Github/causal-me/mi-erc.R")
-source("D:/Github/causal-me/blp.R")
-source("D:/Github/causal-me/erc.R")
-source("D:/Github/causal-me/auxiliary.R")
+source("~/Github/causal-me/gen-data.R")
+source("~/Github/causal-me/bayes-erc.R")
+source("~/Github/causal-me/mi-erc.R")
+source("~/Github/causal-me/blp.R")
+source("~/Github/causal-me/erc.R")
+source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
 n.sim <- 100
