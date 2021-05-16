@@ -13,6 +13,7 @@ library(parallel)
 source("D:/Github/causal-me/gen-data.R")
 source("D:/Github/causal-me/blp.R")
 source("D:/Github/causal-me/erc.R")
+source("D:/Github/causal-me/auxiliary.R")
 
 # simulation arguments
 n.sim <- 100

@@ -64,8 +64,8 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
   
-  nsa <- ns(a, df = deg.num)
-  xa <- cbind(nsa)
+  nsa <- poly(a, degree = deg.num)
+  xa <- cbind(x, nsa)
   
   # dimensions
   p <- ncol(x)
@@ -80,8 +80,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   sigma2 <- rep(NA, n.adapt + n.iter)
   tau2 <- rep(NA, n.adapt + n.iter)
   omega2 <- rep(NA, n.adapt + n.iter)
-  amat <- ipwmat <- matrix(NA, nrow = n.iter + n.adapt, ncol = n)
-  # path <- seq(0,1,length.out = 11)
+  amat <- matrix(NA, nrow = n.iter + n.adapt, ncol = n)
   
   gamma[1,] <- coef(glm(y ~ 0 + xa, family = family, offset = offset))
   beta[1,] <- coef(lm(a ~ 0 + x))
@@ -89,7 +88,6 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   sigma2[1] <- sigma(lm(a ~ 0 + x))^2
   tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
   omega2[1] <- var(s.hat - a.s)
-  ipwmat[1,] <- ipw(a = a, x = x, beta = beta[1,], sigma2 = sigma2[1], a.vals = a.vals) 
   amat[1,] <- a
   
   # gibbs sampler for predictors

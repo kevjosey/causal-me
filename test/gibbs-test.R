@@ -11,11 +11,12 @@ library(splines)
 library(parallel)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/bayes-erc.R")
-source("~/Github/causal-me/mi-erc.R")
-source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("D:/Github/causal-me/gen-data.R")
+source("D:/Github/causal-me/bayes-erc.R")
+source("D:/Github/causal-me/mi-erc.R")
+source("D:/Github/causal-me/blp.R")
+source("D:/Github/causal-me/erc.R")
+source("D:/Github/causal-me/auxiliary.R")
 
 # simulation arguments
 n.sim <- 100
@@ -23,9 +24,9 @@ sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
-out_scen <- "a"
+out_scen <- "b"
 pred_scen <- "b"
-span <- 0.25
+span <- 0.5
 mult <- 10 
 n <- 1000
 prob <- 0.2
@@ -37,11 +38,12 @@ family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
+n.iter <- 500
+n.boot <- 500
+n.adapt <- 100
 thin <- 5
-n.iter <- 5000
-n.adapt <- 500
 h.a <- 1
-h.gamma <- 0.5
+h.gamma <- 0.25
 scale <- 1e6
 shape <- rate <- 1e-3
 
@@ -91,10 +93,10 @@ for (i in 1:n.sim){
                  a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
   # Bayesian analysis
-  gibbs_hat <- bayes_erc(s = s, star = s_tilde, y = y, offset = offset,
+  gibbs_hat <- mi_erc(s = s, star = s_tilde, y = y, offset = offset,
                       s.id = s.id, id = id, w = w, x = x, family = family,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-                      scale = scale, shape = shape, rate = rate,
+                      scale = scale, shape = shape, rate = rate, sl.lib = sl.lib,
                       h.a = h.a, h.gamma = h.gamma, deg.num = deg.num,
                       a.vals = a.vals, span = span)
   
