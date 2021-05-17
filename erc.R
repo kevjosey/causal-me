@@ -35,7 +35,7 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
       for(j in 1:k) {
         
         preds <- sapply(a.sub[folds == j], dr_est, psi = psi.sub[folds != j], a = a.sub[folds != j], 
-                        int = int.sub[folds != j], span = h, se.fit = FALSE)
+                        int = int.sub[folds != j], span = h, family = family, se.fit = FALSE)
         cv.vec[j] <- mean((psi.sub[folds == j] - preds)^2, na.rm = TRUE)
         # some predictions result in `NA` because of the `x` ranges in each fold
         
@@ -50,7 +50,8 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
     
   }
   
-  dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, span = span, se.fit = TRUE)
+  dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, 
+                   span = span, family = family, se.fit = TRUE)
   
   estimate <- dr_out[1,]
   variance <- dr_out[2,]
@@ -63,7 +64,7 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
 }
 
 # LOESS function
-dr_est <- function(newa, a, psi, int, span, se.fit = FALSE) {
+dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE) {
   
   a.std <- a - newa
   k <- floor(min(span, 1)*length(a))
@@ -74,14 +75,14 @@ dr_est <- function(newa, a, psi, int, span, se.fit = FALSE) {
   k.std <- c((1 - abs(a.std/max.a.std)^3)^3)
   
   gh <- cbind(1, a.std)
-  b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh)
-  mu <- c(b$par[1])
+  b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh, family = family)
+  mu <- family$linkinv(c(b$par[1]))
   
   if (se.fit){
     
     int <- int[idx]
     gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
-    v.inf <- (psi + int - c(gh%*%b$par))^2
+    v.inf <- (psi + int - family$linkinv(c(gh%*%b$par)))^2
     sig <- gh.inv %*% t(gh) %*% diag(k.std) %*% diag(v.inf) %*% diag(k.std) %*% gh %*% gh.inv
     return(c(mu = mu, sig = sig[1,1]))
     
@@ -159,8 +160,8 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
 }
 
 # optimization used in dr_est
-opt_fun <- function(par, k.std, psi, gh) {
+opt_fun <- function(par, k.std, psi, gh, family) {
   
-  sum(k.std*(psi - c(gh %*% par))^2)
+  sum(k.std*(psi - family$linkinv(c(gh %*% par)))^2)
   
 }
