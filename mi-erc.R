@@ -74,6 +74,12 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   o <- ncol(xa)
   l <- sum(!is.na(s))
   
+  if (length(h.gamma) == 1)
+    h.gamma <- rep(h.gamma, ncol(xa))
+  
+  if (length(h.gamma) != ncol(xa))
+    stop("length(h.gamma) != ncol(xa))")
+  
   # initialize parameters
   gamma <- matrix(NA, nrow = n.adapt + n.iter, ncol = o)
   beta <- matrix(NA, nrow = n.adapt + n.iter, ncol = p)
@@ -103,28 +109,27 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     # sample A
     
-    z.hat <- aggregate(s.hat, by = list(s.id), sum)[,2]
-
-    sig.a <- sqrt((1/sigma2[i - 1] + stab/omega2[i - 1])^(-1))
-    mu.a <- (sig.a^2)*(c(x %*% beta[i - 1,])/sigma2[i - 1] + z.hat/omega2[i - 1])
-    a <- a.mat[i,] <- rnorm(n, mu.a, sig.a)
-    a.s <- rep(a, stab)
-    
-    # z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
-    # a_ <- rnorm(n, a, h.a)
-    # xa_ <- cbind(x, predict(nsa, a_))
-    # colnames(xa_) <- colnames(xa)
-    # 
-    # log.eps <- dpois(y, family$linkinv(c(xa_ %*% gamma[i - 1,]) + offset), log = TRUE) +
-    #   dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
-    #   dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
-    #   dpois(y, family$linkinv(c(xa %*% gamma[i - 1,]) + offset), log = TRUE) -
-    #   dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
-    #   dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
-    # 
-    # test <- log(runif(n))
-    # a <- a.mat[i,] <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_, a)
+    # z.hat <- aggregate(s.hat, by = list(s.id), sum)[,2]
+    # sig.a <- sqrt((1/sigma2[i - 1] + stab/omega2[i - 1])^(-1))
+    # mu.a <- (sig.a^2)*(c(x %*% beta[i - 1,])/sigma2[i - 1] + z.hat/omega2[i - 1])
+    # a <- a.mat[i,] <- rnorm(n, mu.a, sig.a)
     # a.s <- rep(a, stab)
+    
+    z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
+    a_ <- rnorm(n, a, h.a)
+    xa_ <- cbind(x, predict(nsa, a_))
+    colnames(xa_) <- colnames(xa)
+
+    log.eps <- dpois(y, family$linkinv(c(xa_ %*% gamma[i - 1,]) + offset), log = TRUE) +
+      dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
+      dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
+      dpois(y, family$linkinv(c(xa %*% gamma[i - 1,]) + offset), log = TRUE) -
+      dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
+      dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
+
+    test <- log(runif(n))
+    a <- a.mat[i,] <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_, a)
+    a.s <- rep(a, stab)
     
     # Sample pred parameters
     
@@ -147,25 +152,25 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     # sample outcome
     
-    # xa <- cbind(x, predict(nsa, a))
-    # gamma_ <- gamma0 <- gamma[i-1,]
-    # 
-    # for (j in 1:o) {
-    # 
-    #   gamma_[j] <- c(rnorm(1, gamma0[j], h.gamma))
-    # 
-    #   log.eps <- sum(dfun(y, family$linkinv(c(xa %*% gamma_) + offset), log = TRUE)) -
-    #     sum(dfun(y, family$linkinv(c(xa %*% gamma0) + offset), log = TRUE)) +
-    #     dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma0[j], 0 , scale, log = TRUE)
-    # 
-    #   if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
-    #     gamma0[j] <- gamma_[j]
-    #   else
-    #     gamma_[j] <- gamma0[j]
-    # 
-    # }
-    # 
-    # gamma[i,] <- gamma0
+    xa <- cbind(x, predict(nsa, a))
+    gamma_ <- gamma0 <- gamma[i-1,]
+
+    for (j in 1:o) {
+
+      gamma_[j] <- c(rnorm(1, gamma0[j], h.gamma[j]))
+
+      log.eps <- sum(dfun(y, family$linkinv(c(xa %*% gamma_) + offset), log = TRUE)) -
+        sum(dfun(y, family$linkinv(c(xa %*% gamma0) + offset), log = TRUE)) +
+        dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma0[j], 0 , scale, log = TRUE)
+
+      if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
+        gamma0[j] <- gamma_[j]
+      else
+        gamma_[j] <- gamma0[j]
+
+    }
+
+    gamma[i,] <- gamma_
     
   }
   

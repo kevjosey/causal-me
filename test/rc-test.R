@@ -10,29 +10,29 @@ library(SuperLearner)
 library(parallel)
 
 # Code for generating and fitting data
-source("D:/Github/causal-me/gen-data.R")
-source("D:/Github/causal-me/blp.R")
-source("D:/Github/causal-me/erc.R")
-source("D:/Github/causal-me/auxiliary.R")
+source("~/Github/causal-me/gen-data.R")
+source("~/Github/causal-me/blp.R")
+source("~/Github/causal-me/erc.R")
+source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
-n.sim <- 100
+n.sim <- 1000
 sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
-gps_scen <- "a"
+gps_scen <- "b"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.25
+span <- 0.15
 
 # gen data arguments
 mult <- 10 
-n <- 400 
+n <- 800 
 prob <- 0.2
 
 # dr arguments
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.mean","SL.glm")
+sl.lib <- c("SL.glm")
 family <- poisson()
 deg.num <- 2
 

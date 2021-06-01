@@ -1,7 +1,7 @@
 ipw <- function(a, x, beta, sigma2, a.vals) {
   
   n <- length(a)
-  x.new <- rbind(x, x[rep(1:n, length(a.vals)), ])
+  x.new <- x[rep(1:n, length(a.vals) + 1), ]
   a.new <- c(a, rep(a.vals, each = n))
   pimod.vals <- c(x.new %*% beta)
   pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2))
