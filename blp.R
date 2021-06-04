@@ -177,7 +177,8 @@ multi_blp <- function(s, s.id, x = NULL, id = NULL) {
     
   }
   
-  return(a)
+  colnames(a) <- colnames(x)
+  return(data.frame(id = id, a))
   
 }
 
