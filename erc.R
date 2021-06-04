@@ -165,3 +165,9 @@ opt_fun <- function(par, k.std, psi, gh, family) {
   sum(k.std*(psi - family$linkinv(c(gh %*% par)))^2)
   
 }
+
+opt_fun2 <- function(par, k.std, psi, gh, family, offset) {
+  
+  sum(k.std*(psi - family$linkinv(c(gh %*% par) + offset))^2)
+  
+}

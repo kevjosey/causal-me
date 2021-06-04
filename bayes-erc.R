@@ -165,6 +165,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     # 
     # gamma[i,] <- gamma_
     
+    # uncertainty design
     xa <- cbind(x, predict(nsa, a))
     gmod <- rstanarm::stan_glm(y ~ 0 + ., data = data.frame(y = y, xa), family = poisson, QR = TRUE,
                                offset = offset, iter = 2*n.boot, chains = 1, refresh = 0)
@@ -222,13 +223,11 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     # int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
     #                (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
 
+    # analyze
     # psi <- (y_ - muhat)/(pihat/phat) + mhat
-    # psi <- y_*phat/pihat
-
-    # dr_mod <- mgcv::gam(psi ~ s(a), family = gaussian(), data = data.frame(psi = psi, a = a))
-    # dr_out <- predict(dr_mod, newdata = data.frame(a = a.vals))
-
     # dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = NULL, span = span, se.fit = FALSE)
+    # estimate <- dr_out
+    # variance <- rep(NA, length(a.vals))
     
     # uncertainty
     dr_out <- sapply(1:n.boot, function(j, ...){
@@ -245,9 +244,6 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     estimate <- rowMeans(dr_out)
     variance <- apply(dr_out, 1, var)
-    
-    # estimate <- dr_out
-    # variance <- NA
 
     return(list(estimate = estimate, variance = variance))
 

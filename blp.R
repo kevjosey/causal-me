@@ -3,18 +3,34 @@ blp <- function(s, s.id, x = NULL, id = NULL) {
   
   wts <- c(unname(table(s.id)))
   
+  if (!is.null(id)) {
+    
+    if(sum(duplicated(id)) != 0)
+      stop("duplicate id detected")
+    
+    x <- x[order(id),]
+    id.check <- id[order(id)]
+    
+  } else 
+    id.check <- NULL
+  
   # initialize exposures
   z_tmp <- aggregate(s, by = list(s.id), mean)
   id <- z_tmp[,1]
   z <- z_tmp[,2]
   
+  if (!is.null(id.check) & !identical(id, id.check))
+    stop("id provided does not match unique values of s.id")
+  
+  if (nrow(x) != length(id))
+    stop("x provided does not match length of unique s.id")
+  
   # dimensions
   m <- length(s.id)
   n <- length(id)
   
-  stab <- table(s.id)
   ord <- order(s.id)
-  z_s <- rep(z, stab)[order(ord)]
+  z_s <- rep(z, wts)[order(ord)]
   
   if (!is.null(x)) {
     
@@ -70,36 +86,44 @@ blp <- function(s, s.id, x = NULL, id = NULL) {
       
     })
     
-    cvar <- sapply(1:n, function(i, ...) {
-      
-      out <- c(sigma2 - (sigma2)^2/(sigma2 + tau2/wts[i]))
-      
-      return(out)
-      
-    })
-    
   }
     
-  return(list(a = a, cvar = cvar))
+  return(list(id = id, a = a, cvar = cvar))
   
 }
 
-multi_blp <- function(s, s.id, x = NULL) {
+multi_blp <- function(s, s.id, x = NULL, id = NULL) {
   
   wts <- c(unname(table(s.id)))
+  
+  if (!is.null(id)) {
+    
+    if(sum(duplicated(id)) != 0)
+      stop("duplicate id detected")
+    
+    x <- x[order(id),]
+    id.check <- id[order(id)]
+    
+  } else 
+    id.check <- NULL
   
   # initialize exposures
   z_tmp <- aggregate(s, by = list(s.id), mean)
   id <- z_tmp[,1]
-  z <- as.matrix(z_tmp[,2:ncol(z_tmp)])
+  z <- z_tmp[,2]
+  
+  if (!is.null(id.check) & !identical(id, id.check))
+    stop("id provided does not match unique values of s.id")
+  
+  if (nrow(x) != length(id))
+    stop("x provided does not match length of unique s.id")
   
   # dimensions
   m <- length(s.id)
   n <- length(id)
   
-  stab <- table(s.id)
   ord <- order(s.id)
-  z_tmp <- z[rep(1:nrow(z), stab),]
+  z_tmp <- z[rep(1:nrow(z), wts),]
   z_s <- z_tmp[order(ord),]
   
   p <- ncol(s)

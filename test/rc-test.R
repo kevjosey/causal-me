@@ -16,14 +16,14 @@ source("~/Github/causal-me/erc.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
-n.sim <- 1000
+n.sim <- 100
 sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
-gps_scen <- "b"
-out_scen <- "a"
+gps_scen <- "a"
+out_scen <- "b"
 pred_scen <- "b"
-span <- 0.15
+span <- NULL
 
 # gen data arguments
 mult <- 10 
