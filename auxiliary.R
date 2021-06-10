@@ -54,3 +54,10 @@ hpd <- function(x, alpha = 0.05){
   c(x[k], x[n - m + k])
   
 }
+
+hush <- function(code){
+  sink("NUL") # use /dev/null in UNIX
+  tmp = code
+  sink()
+  return(tmp)
+}

@@ -27,9 +27,9 @@ sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.3
-mult <- 10
-n <- 800
+span <- 0.1
+mult <- 5
+n <- 400
 prob <- 0.2
 
 # model arguments
@@ -40,9 +40,9 @@ deg.num <- 2
 
 # mcmc arguments
 n.iter <- 1000
-n.boot <- 500
+n.boot <- 100
 n.adapt <- 100
-thin <- 5
+thin <- 10
 h.a <- 1
 h.gamma <- c(rep(0.03, 5), rep(1, 2))
 scale <- 1e6

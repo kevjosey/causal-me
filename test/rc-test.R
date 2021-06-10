@@ -21,13 +21,13 @@ sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
-out_scen <- "b"
+out_scen <- "a"
 pred_scen <- "b"
-span <- NULL
+span <- 0.25
 
 # gen data arguments
 mult <- 10 
-n <- 800 
+n <- 2000
 prob <- 0.2
 
 # dr arguments
