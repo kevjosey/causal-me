@@ -73,14 +73,15 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
   max.a.std <- max(abs(a.std))
   k.std <- c((1 - abs(a.std/max.a.std)^3)^3)
   gh <- cbind(1, a.std)
-  b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh, family = family)
-  mu <- c(b$par[1])
+  b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std,
+             psi = psi, gh = gh, family = family)
+  mu <- family$linkinv(c(b$par[1]))
   
   if (se.fit){
     
     int <- int[idx]
     gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
-    v.inf <- (psi + int - c(gh%*%b$par))^2
+    v.inf <- (psi + int - family$linkinv(c(gh%*%b$par)))^2
     sig <- gh.inv %*% t(gh) %*% diag(k.std) %*% diag(v.inf) %*% diag(k.std) %*% gh %*% gh.inv
     return(c(mu = mu, sig = sig[1,1]))
     
@@ -92,7 +93,6 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
 # LOESS function
 dr_est2 <- function(newa, a, y, pihat.vals, offset, span, family = gaussian(), se.fit = FALSE) {
   
-  
   a.std <- a - newa
   k <- floor(min(span, 1)*length(a))
   idx <- order(abs(a.std))[1:k]
@@ -101,7 +101,8 @@ dr_est2 <- function(newa, a, y, pihat.vals, offset, span, family = gaussian(), s
   y <- y[idx]
   k.std <- c((1 - abs(a.std/max.a.std)^3)^3)*mean(pihat.vals[idx])/pihat.vals[idx]
   gh <- cbind(1, a.std)
-  b <- optim(par = c(0,0), fn = opt_fun2, k.std = k.std, psi = y, gh = gh, family = family, offset = offset[idx])
+  b <- optim(par = c(0,0), fn = opt_fun2, k.std = k.std, psi = y, 
+             gh = gh, family = family, offset = offset[idx])
   mu <- family$linkinv(c(b$par[1]))
   
   if (se.fit){
@@ -187,7 +188,7 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
 # optimization used in dr_est
 opt_fun <- function(par, k.std, psi, gh, family) {
   
-  sum(k.std*(psi - c(gh %*% par))^2)
+  sum(k.std*(psi - family$linkinv(c(gh %*% par)))^2)
   
 }
 
