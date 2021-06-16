@@ -34,11 +34,13 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   offset <- floor(runif(n, 10, 1000))
   
   if (mult == 10) {
-    s.id <- rep(id, rep(c(1,3,8,13,25), each = n/5))
+    s.id <- rep(id, rep(c(2,4,6,8,12,14,16,18), each = n/8))
   } else if (mult == 5){
-    s.id <- rep(id, rep(c(1,2,3,7,12), each = n/5))
+    s.id <- rep(id, rep(c(1,2,3,4,6,7,8,9), each = n/8))
   }
 
+  rep(c(1,2,3,7,12), each = n/5)
+  
   # transformed predictors
   u1 <- as.numeric(scale(exp(x[,1]/2)))
   u2 <- as.numeric(scale(x[,2]/(1 + exp(x[,1])) + 10))
@@ -59,7 +61,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
     
     mu_gps <- 8 + 0.5*x[,1] - 0.5*x[,2] - 0.5*x[,3] + 0.5*x[,4]
     for (g in 1:n)
-      w2[s.id == g] <- rnorm(sum(s.id == g), x2[id == g], 1)
+      w2[s.id == g] <- rnorm(sum(s.id == g), x[id == g,2], 1)
     
   }
 
@@ -80,10 +82,10 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   
   if (out_scen == "b") {
     mu_out <- -3 - 0.5*u[,1] - 0.25*u[,2] + 0.25*u[,3] + 0.5*u[,4] +
-      0.3*(a - 7) - 0.1*(a - 7)^2
+      0.5*(a - 8) - 0.25*(a - 8)^2 - 0.25*(a - 8)*u[,1]
   } else { # y_scen == "b"
     mu_out <- -3 - 0.5*x[,1] - 0.25*x[,2] + 0.25*x[,3] + 0.5*x[,4] +
-      0.3*(a - 7) - 0.1*(a - 7)^2
+      0.5*(a - 8) - 0.25*(a - 8)^2 - 0.25*(a - 8)*x[,1]
   }
   
   y <- rpois(n, exp(mu_out + log(offset)))
@@ -97,7 +99,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
 
 predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
   
-  # # transformed predictors
+  # transformed predictors
   u1 <- as.numeric(scale(exp(x[,1]/2)))
   u2 <- as.numeric(scale(x[,2]/(1 + exp(x[,1])) + 10))
   u3 <- as.numeric(scale((x[,1]*x[,3]/25 + 0.6)^3))
@@ -112,16 +114,16 @@ predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
     a.vec <- rep(a.vals[i],nrow(x))
 
     if (out_scen == "b") {
-      mu_out <- exp(-3 + u %*% c(-0.5,-0.25,0.25,0.5) + 0.3*(a.vec - 7) - 0.1*(a.vec - 7)^2)
+      mu_out <- exp(-3 + u %*% c(-0.5,-0.25,0.25,0.5) + 0.5*(a.vec - 8) - 0.25*(a.vec - 8)^2 - 0.25*(a.vec - 8)*x[,1])
     } else { # out_scen == "a"
-      mu_out <- exp(-3 + x %*% c(-0.5,-0.25,0.25,0.5) + 0.3*(a.vec - 7) - 0.1*(a.vec - 7)^2)
+      mu_out <- exp(-3 + x %*% c(-0.5,-0.25,0.25,0.5) + 0.5*(a.vec - 8) - 0.25*(a.vec - 8)^2 - 0.25*(a.vec - 8)*x[,1])
     }
 
     out[i] <- mean(mu_out)
 
   }
   
-  # out <- exp(-3 + 0.625/2 + 0.3*(a.vals - 7) - 0.1*(a.vals - 7)^2 )
+  # out <- exp(-3 + 0.625/2 + 0.5*(a.vals - 8) - 0.25*(a.vals - 8)^2 )
   
   return(out)
   

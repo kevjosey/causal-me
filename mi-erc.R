@@ -29,6 +29,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   # create variables
   m <- length(s.id)
   n <- length(id)
+  l <- sum(!is.na(s))
 
   if (is.null(x)) {
     x <- matrix(1, nrow = length(id), ncol = 1)
@@ -50,29 +51,26 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   # sort on s.id
   sword <- order(s.id)
+  stab <- table(s.id)
   s <- s[sword]
   star <- star[sword]
   ws <- ws[sword,]
   s.id <- s.id[sword]
   
+  # when s is observed
   ws.tmp <- ws[!is.na(s),]
   s.tmp <- s[!is.na(s)]
-  stab <- table(s.id)
   
   # initialize exposures
-  
   s.hat <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
-  
-  nsa <- poly(a, degree = deg.num)
-  xa <- cbind(x, nsa)
+  xa <- cbind(x, a - 8, (a - 8)^2, x[,2]*(a - 8))
   
   # dimensions
   p <- ncol(x)
   q <- ncol(ws)
   o <- ncol(xa)
-  l <- sum(!is.na(s))
   
   if (length(h.gamma) == 1)
     h.gamma <- rep(h.gamma, ncol(xa))
@@ -117,7 +115,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     a_ <- rnorm(n, a, h.a)
-    xa_ <- cbind(x, predict(nsa, a_))
+    xa_ <- cbind(x, a_ - 8, (a_ - 8)^2, x[,2]*(a_ - 8))
     colnames(xa_) <- colnames(xa)
 
     log.eps <- dpois(y, family$linkinv(c(xa_ %*% gamma[i - 1,]) + offset), log = TRUE) +
@@ -152,7 +150,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     # sample outcome
     
-    xa <- cbind(x, predict(nsa, a))
+    xa <- cbind(x, a - 8, (a - 8)^2, x[,2]*(a - 8))
     gamma_ <- gamma0 <- gamma[i-1,]
 
     for (j in 1:o) {

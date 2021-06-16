@@ -1,3 +1,4 @@
+
 ipw <- function(a, x, beta, sigma2, a.vals) {
   
   n <- length(a)

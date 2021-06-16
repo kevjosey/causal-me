@@ -8,6 +8,7 @@ library(data.table)
 library(mvtnorm)
 library(SuperLearner)
 library(parallel)
+library(ranger)
 
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
@@ -17,21 +18,21 @@ source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
 n.sim <- 100
-sig_gps <- 1
+sig_gps <- 2
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
-span <- 0.25
+span <- 0.2
 
 # gen data arguments
 mult <- 10 
-n <- 2000
+n <- 1000
 prob <- 0.2
 
 # dr arguments
-a.vals <- seq(6, 10, by = 0.04)
+a.vals <- seq(4, 12, by = 0.04)
 sl.lib <- c("SL.glm")
 family <- poisson()
 deg.num <- 2
@@ -99,7 +100,7 @@ for (i in 1:n.sim){
   # blp 
   blp_tilde <- erc(y = y, a = a_tilde, x = x, offset = offset, family = family,
                a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
-  blp_hat <- erc(y = y, a = a_hat, x = x, offset = offset, family = family,
+  blp_hat <- erc(y = y, a = dat$a, x = x, offset = offset, family = family,
                a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
   # estimates

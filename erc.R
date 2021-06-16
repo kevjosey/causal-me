@@ -37,7 +37,6 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
         preds <- sapply(a.sub[folds == j], dr_est, psi = psi.sub[folds != j], a = a.sub[folds != j], 
                         int = int.sub[folds != j], span = h, family = family, se.fit = FALSE)
         cv.vec[j] <- mean((psi.sub[folds == j] - preds)^2, na.rm = TRUE)
-        # some predictions result in `NA` because of the `x` ranges in each fold
         
       }
       
@@ -73,20 +72,46 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
   psi <- psi[idx]
   max.a.std <- max(abs(a.std))
   k.std <- c((1 - abs(a.std/max.a.std)^3)^3)
-  
   gh <- cbind(1, a.std)
   b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh, family = family)
-  mu <- family$linkinv(c(b$par[1]))
+  mu <- c(b$par[1])
   
   if (se.fit){
     
     int <- int[idx]
     gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
-    v.inf <- (psi + int - family$linkinv(c(gh%*%b$par)))^2
+    v.inf <- (psi + int - c(gh%*%b$par))^2
     sig <- gh.inv %*% t(gh) %*% diag(k.std) %*% diag(v.inf) %*% diag(k.std) %*% gh %*% gh.inv
     return(c(mu = mu, sig = sig[1,1]))
     
   } else
+    return(mu)
+  
+}
+
+# LOESS function
+dr_est2 <- function(newa, a, y, pihat.vals, offset, span, family = gaussian(), se.fit = FALSE) {
+  
+  
+  a.std <- a - newa
+  k <- floor(min(span, 1)*length(a))
+  idx <- order(abs(a.std))[1:k]
+  a.std <- a.std[idx]
+  max.a.std <- max(abs(a.std))
+  y <- y[idx]
+  k.std <- c((1 - abs(a.std/max.a.std)^3)^3)*mean(pihat.vals[idx])/pihat.vals[idx]
+  gh <- cbind(1, a.std)
+  b <- optim(par = c(0,0), fn = opt_fun2, k.std = k.std, psi = y, gh = gh, family = family, offset = offset[idx])
+  mu <- family$linkinv(c(b$par[1]))
+  
+  if (se.fit){
+  
+    gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
+    v.inf <- (y - family$linkinv(c(gh%*%b$par + offset[idx])))^2
+    sig <- gh.inv %*% t(gh) %*% diag(k.std) %*% diag(v.inf) %*% diag(k.std) %*% gh %*% gh.inv
+    return(c(mu = mu, sig = sig[1,1]))
+  
+  } else 
     return(mu)
   
 }
@@ -97,15 +122,15 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   # set up evaluation points & matrices for predictions
   n <- nrow(x)
   x <- data.frame(x)
-  xa <- data.frame(x = x, a = a)
+  xa <- data.frame(x, a = a)
   colnames(xa) <- c(colnames(x), "a")
   
   # estimate nuisance GPS functions via super learner
   pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
   pimod.vals <- c(pimod$SL.predict)
   
-  pi2mod <- try(SuperLearner(Y = (a - pimod.vals)^2, X = x, 
-                             family = gaussian(), SL.library = sl.lib), silent = TRUE)
+  pi2mod <- try(SuperLearner(Y = (a - pimod.vals)^2, X = x, family = gaussian(),
+                             SL.library = sl.lib), silent = TRUE)
   
   if (inherits(pi2mod, "try-error")) {
     
@@ -130,7 +155,7 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
   
   # estimate nuisance outcome model with SuperLearner
-  mumod <- glm(y ~ . - a + poly(a, degree = deg.num), data = xa, family = family, offset = offset)
+  mumod <- glm(y ~ . - a + poly(a, deg.num) + a:x1, data = xa, family = family, offset = offset)
   muhat <- predict(mumod, newdata = xa, type = "response")
   
   # predict marginal outcomes given a.vals (or a.agg)
@@ -162,11 +187,11 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
 # optimization used in dr_est
 opt_fun <- function(par, k.std, psi, gh, family) {
   
-  sum(k.std*(psi - family$linkinv(c(gh %*% par)))^2)
+  sum(k.std*(psi - c(gh %*% par))^2)
   
 }
 
-opt_fun2 <- function(par, k.std, psi, gh, family, offset) {
+opt_fun2 <- function(par, k.std, y, gh, family, offset) {
   
   sum(k.std*(psi - family$linkinv(c(gh %*% par) + offset))^2)
   
