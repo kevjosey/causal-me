@@ -40,11 +40,11 @@ family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
-n.iter <- 10000
-n.boot <- 500
-n.adapt <- 1000
-thin <- 100
-h.a <- 1
+n.iter <- 1000
+n.boot <- 200
+n.adapt <- 100
+thin <- 10
+h.a <- 0.5
 h.gamma <- c(rep(0.02, 5), rep(0.01, 3))
 scale <- 1e6
 shape <- rate <- 1e-3
