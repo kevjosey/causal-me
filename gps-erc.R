@@ -67,7 +67,7 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
   # data dimensions
   p <- ncol(x)
   q <- ncol(ws)
-  o <- deg.num + 1
+  o <- deg.num + 3
   
   # initialize parameters
   beta <- matrix(NA, nrow = n.adapt + n.iter, ncol = p)
@@ -86,18 +86,19 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   # outcome stuff
   y_ <- family$linkinv(family$linkfun(y) - offset)
-  xa <- cbind(1, a - 8, (a - 8)^2)
-  wts <- ipw(a = a, x = x, beta = beta[1,], sigma2 = sigma2[1], a.vals)
-  gamma <- matrix(NA, nrow = n.adapt + n.iter, ncol = o)
-  gamma[1,] <- coef(glm(y ~ 0 + xa, family = family, offset = offset, weights = wts))
-  # gamma <- array(NA, dim = c(n.adapt + n.iter, n.boot, o))
-  # gamma[1,,] <- matrix(rep(coef(glm(y ~ 0 + xa, family = family, offset = offset, weights = wts)), n.boot),
-  #                      byrow = TRUE, nrow = n.boot, ncol = o)
+  gps <- dnorm(a, c(x%*%beta[1,]), sqrt(sigma2[1]))
+  xa <- cbind(model.matrix( ~ .^2 , data.frame(gps = gps - mean(gps), a = a - mean(a))), 
+              poly(a - mean(a), degree = deg.num, raw = TRUE)[,-1])
+  # gamma <- matrix(NA, nrow = n.adapt + n.iter, ncol = o)
+  # gamma[1,] <- coef(glm(y ~ 0 + xa, family = family, offset = offset))
+  gamma <- array(NA, dim = c(n.adapt + n.iter, n.boot, ncol = o))
+  gamma[1,,] <- matrix(rep(coef(glm(y ~ 0 + xa, family = family, offset = offset)), n.boot),
+                       byrow = TRUE, nrow = n.boot, ncol = o)
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
-    # print(i)
+    print(i)
     
     # sample S
     
@@ -107,25 +108,20 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
     s.hat[!is.na(s)] <- s[!is.na(s)]
     
     # sample A
-
-    # z.hat <- aggregate(s.hat, by = list(s.id), sum)[,2]
-    # sig.a <- sqrt((1/sigma2[i - 1] + stab/omega2[i - 1])^(-1))
-    # mu.a <- (sig.a^2)*(c(x %*% beta[i - 1,])/sigma2[i - 1] + z.hat/omega2[i - 1])
-    # a <- a.mat[i,] <- rnorm(n, mu.a, sig.a)
-    # a.s <- rep(a, stab)
     
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     a_ <- rnorm(n, a, h.a)
-    xa_ <- cbind(1, a_ - 8, (a_ - 8)^2)
-    wts_ <- ipw(a = a_, x = x, beta = beta[i - 1,], sigma2 = sigma2[i - 1], a.vals)
-
-    log.eps <- wts_*dfun(y, family$linkinv(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
+    gps_ <- dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]))
+    xa_ <- cbind(model.matrix( ~ .^2 , data.frame(gps = gps_ - mean(gps_), a = a_ - mean(a_))), 
+                poly(a_ - mean(a_), degree = deg.num, raw = TRUE)[,-1])
+    
+    log.eps <- dfun(y, family$linkinv(c(xa_%*%colMeans(gamma[i - 1,,])) + offset), log = TRUE) +
       dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
       dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
-      wts*dfun(y, family$linkinv(c(xa%*%gamma[i - 1,]) + offset), log = TRUE) -
+      dfun(y, family$linkinv(c(xa%*%colMeans(gamma[i - 1,,])) + offset), log = TRUE) -
       dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
       dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
-
+    
     test <- log(runif(n))
     a <- a.mat[i,] <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_, a)
     a.s <- rep(a, stab)
@@ -150,43 +146,46 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
     
     # Sample outcome model while cutting feedback
-    
-    xa <- cbind(1, a - 8, (a - 8)^2)
-    wts <- ipw(a = a, x = x, beta = beta[i,], sigma2 = sigma2[i], a.vals = a.vals)
-    gamma_ <- gamma0 <- gamma[i - 1,]
-
-    for (j in 1:o) {
-
-      gamma_[j] <- c(rnorm(1, gamma0[j], h.gamma))
-
-      log.eps <- sum(wts*dfun(y, family$linkinv(c(xa %*% gamma_) + offset), log = TRUE)) -
-        sum(wts*dfun(y, family$linkinv(c(xa %*% gamma0) + offset), log = TRUE)) +
-        dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma0[j], 0 , scale, log = TRUE)
-
-      if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
-        gamma0[j] <- gamma_[j]
-      else
-        gamma_[j] <- gamma0[j]
-
-    }
-
-    gamma[i,] <- gamma_
+    # gps <- dnorm(a, c(x%*%beta[i,]), sqrt(sigma2[i]), log = TRUE)
+    # xa <- cbind(model.matrix( ~ .^2 , data.frame(gps = gps - mean(gps), a = a - mean(a))), 
+    #             poly(a - mean(a), degree = deg.num, raw = TRUE)[,-1],
+    #             poly(gps - mean(gps), degree = deg.num, raw = TRUE)[,-1])
+    # 
+    # gamma_ <- gamma0 <- gamma[i - 1,]
+    # 
+    # for (j in 1:o) {
+    #   
+    #   gamma_[j] <- c(rnorm(1, gamma0[j], h.gamma))
+    #   
+    #   log.eps <- sum(dfun(y, family$linkinv(c(xa %*% gamma_) + offset), log = TRUE)) -
+    #     sum(dfun(y, family$linkinv(c(xa %*% gamma0) + offset), log = TRUE)) +
+    #     dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma0[j], 0 , scale, log = TRUE)
+    #   
+    #   if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
+    #     gamma0[j] <- gamma_[j]
+    #   else
+    #     gamma_[j] <- gamma0[j]
+    #   
+    # }
+    # 
+    # gamma[i,] <- gamma_
     
     # uncertainty design
-    # xa <- cbind(1, a - 8, (a - 8)^2)
-    # wts <- ipw(a = a, x = x, beta = beta[i,], sigma2 = sigma2[i], a.vals = a.vals)
-    # gmod <- rstanarm::stan_glm(y ~ 0 + ., data = data.frame(y = y, xa), family = poisson, QR = TRUE,
-    #                            offset = offset, weights = wts, iter = 2*n.boot, chains = 1, refresh = 0)
-    # gamma[i,,] <- do.call(cbind, split.along.dim(as.array(gmod), 3))
+    gps <- dnorm(a, c(x%*%beta[i,]), sqrt(sigma2[i]))
+    xa <- cbind(model.matrix( ~ .^2 , data.frame(gps = gps - mean(gps), a = a - mean(a))),
+                poly(a - mean(a), degree = deg.num, raw = TRUE)[,-1])
+    gmod <- rstanarm::stan_glm(y ~ 0 + ., data = data.frame(y = y, xa), family = poisson, QR = TRUE,
+                               offset = offset, iter = 2*n.boot, chains = 1, refresh = 0)
+    gamma[i,,] <- do.call(cbind, split.along.dim(as.array(gmod), 3))
     
   }
   
   accept.a <- apply(a.mat[(n.adapt + 1):nrow(a.mat),], 2, function(x) mean(diff(x) != 0) )
-  accept.gamma <- apply(gamma[(n.adapt + 1):nrow(a.mat),], 2, function(x) mean(diff(x) != 0) )
+  # accept.gamma <- apply(gamma[(n.adapt + 1):nrow(a.mat),], 2, function(x) mean(diff(x) != 0) )
   
   # thinning
   keep <- seq(n.adapt + 1, n.iter + n.adapt, by = thin)
-  gamma <- gamma[keep,]
+  gamma <- gamma[keep,,]
   beta <- beta[keep,]
   alpha <- alpha[keep,]
   sigma2 <- sigma2[keep]

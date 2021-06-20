@@ -29,7 +29,7 @@ gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
 span <- 0.2
-mult <- 5
+mult <- 10
 n <- 400
 prob <- 0.2
 
@@ -41,11 +41,11 @@ deg.num <- 2
 
 # mcmc arguments
 n.iter <- 1000
-n.boot <- 200
+n.boot <- 500
 n.adapt <- 100
 thin <- 10
 h.a <- 0.5
-h.gamma <- c(rep(0.02, 5), rep(0.01, 3))
+h.gamma <- rep(0.03, 6)
 scale <- 1e6
 shape <- rate <- 1e-3
 
@@ -74,7 +74,7 @@ for (i in 1:n.sim){
   s_tilde <- star <- dat$star
   
   # validation subset
-  s <- dat$s*rbinom(mult*n, 1, prob)
+  s <- dat$s*rbinom(1.5*n, 1, prob)
   s[s == 0] <- NA
   
   # remove clusters w/o exposure data
