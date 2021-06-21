@@ -91,9 +91,15 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
               poly(a - mean(a), degree = deg.num, raw = TRUE)[,-1])
   # gamma <- matrix(NA, nrow = n.adapt + n.iter, ncol = o)
   # gamma[1,] <- coef(glm(y ~ 0 + xa, family = family, offset = offset))
-  gamma <- array(NA, dim = c(n.adapt + n.iter, n.boot, ncol = o))
-  gamma[1,,] <- matrix(rep(coef(glm(y ~ 0 + xa, family = family, offset = offset)), n.boot),
-                       byrow = TRUE, nrow = n.boot, ncol = o)
+  # gamma <- array(NA, dim = c(n.adapt + n.iter, n.boot, ncol = o))
+  # gamma[1,,] <- matrix(rep(coef(glm(y ~ 0 + xa, family = family, offset = offset)), n.boot),
+  #                      byrow = TRUE, nrow = n.boot, ncol = o)
+  
+  f.mat <- array(NA, dim=c(n.adapt + n.iter,n,o))
+  tPost <- matrix(NA, nrow = n, ncol = o)
+  sPost <- rep(NA, n)
+  
+  tPost[1,] <- sPost[1] <- 1 
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
@@ -115,7 +121,7 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
     xa_ <- cbind(model.matrix( ~ .^2 , data.frame(gps = gps_ - mean(gps_), a = a_ - mean(a_))), 
                 poly(a_ - mean(a_), degree = deg.num, raw = TRUE)[,-1])
     
-    log.eps <- dfun(y, family$linkinv(c(xa_%*%colMeans(gamma[i - 1,,])) + offset), log = TRUE) +
+    log.eps <- dnorm(y_, rowSums(f.mat[i - 1,,]), sqrt(sPost), log = TRUE) +
       dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
       dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
       dfun(y, family$linkinv(c(xa%*%colMeans(gamma[i - 1,,])) + offset), log = TRUE) -
@@ -174,9 +180,57 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
     gps <- dnorm(a, c(x%*%beta[i,]), sqrt(sigma2[i]))
     xa <- cbind(model.matrix( ~ .^2 , data.frame(gps = gps - mean(gps), a = a - mean(a))),
                 poly(a - mean(a), degree = deg.num, raw = TRUE)[,-1])
-    gmod <- rstanarm::stan_glm(y ~ 0 + ., data = data.frame(y = y, xa), family = poisson, QR = TRUE,
-                               offset = offset, iter = 2*n.boot, chains = 1, refresh = 0)
-    gamma[i,,] <- do.call(cbind, split.along.dim(as.array(gmod), 3))
+    # gmod <- rstanarm::stan_glm(y ~ 0 + ., data = data.frame(y = y, xa), family = poisson, QR = TRUE,
+    #                            offset = offset, iter = 2*n.boot, chains = 1, refresh = 0)
+    # gamma[i,,] <- do.call(cbind, split.along.dim(as.array(gmod), 3))
+    
+    kernMat = array(NA, dim=c(o,n,n))
+    vecMat = array(NA, dim=c(o,n,n))
+    invMat = array(NA, dim=c(o,n,n))
+    eigMat = array(NA, dim=c(o,n))
+    
+    for (j in 1 : pCont) {
+      kernMat[j,,] = diag(n)
+      for (n1 in 1 : n) {
+        for (n2 in 1 : n1) {
+          kernMat[j,n1,n2] = exp(-abs(xa[n1,j] - xa[n2,j]))
+          kernMat[j,n2,n1] = kernMat[j,n1,n2]
+        }
+      }
+      
+      eig = eigen(kernMat[j,,])
+      eigMat[j,] = eig$values
+      vecMat[j,,] = eig$vectors
+      logDet[j] = determinant(kernMat[j,,])$modulus
+      invMat[j,,] = solve(kernMat[j,,])
+      
+    }
+    
+    for (j in 1:o) {
+      
+      SSM = SSM + t(f.mat[i-1,,j]) %*% invMat[j,,] %*% f.mat[i-1,,j] / tPost[i-1,j]
+    }
+    
+    aStar = shape + n*(o + 1)/2
+    bStar = rate + crossprod(y - apply(f.mat[i-1,,], 1, sum)) / 2 + SSM/2
+    
+    sPost[i] < 1/rgamma(1, aStar, bStar)
+    tPost[i,j] <- 1/rgamma(1, shape + n/2, rate + t(f.mat[i-1,,j]) %*% invMat[j,,] %*% f.mat[i-1,,j]/(2*sPost[i]))
+
+    tempF <- fYPost[i-1,,]
+    for (j in 1 : pCont) {
+      
+      ytilde = y_ - rowSums(tempF[,-j])
+      
+      tempObj1 = tPost[i,j]*eigMat[j,] / (1 + tPost[i,j]*eigMat[j,])
+      
+      varMat = t(t(vecMat[j,,]) * tempObj1) %*% t(vecMat[j,,])
+      rj = rnorm(n, mean = 0, sd = sqrt(sPost[i]*tempObj1))
+      tempF[,j] = varMat %*% ytilde + vecMat[j,,] %*% as.vector(rj)
+      
+    }
+    
+    f.mat[i,,] <- tempF
     
   }
   
@@ -193,46 +247,51 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
   omega2 <- omega2[keep]
   a.mat <- a.mat[keep,]
 
-  out <- lapply(1:nrow(a.mat), function(i, ...){
-
-    a <- a.mat[i,]
-    n <- length(a)
-    x.new <- x[rep(1:n, length(a.vals)), ]
-    a.new <- rep(a.vals, each = n)
-    # sig.a <- sqrt((1/sigma2[i] + rep(stab, length(a.vals))/omega2[i])^(-1))
-    # mu.a <- (sig.a^2)*(c(x.new %*% beta[i,])/sigma2[i] + rep(z.mat[i,], length(a.vals))/omega2[i])
-    pimod.vals <- c(x.new %*% beta[i,])
-    pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2[i]))
-    pihat.mat <- matrix(pihat.vals, nrow = n, ncol = length(a.vals))
-    phat <- colMeans(pihat.mat)
-
-    # uncertainty design
-    dr_out <- sapply(1:length(a.vals), function(j, ...){
-
-      a.std <- a - a.vals[j]
-      k <- floor(min(span, 1)*length(a))
-      idx <- order(abs(a.std))[1:k]
-      a.std <- a.std[idx]
-      max.a.std <- max(abs(a.std))
-      y_ <- y_[idx]
-      k.std <- c((1 - abs(a.std/max.a.std)^3)^3)*mean(pihat.mat[idx,j])/pihat.mat[idx,j]
-      gh <- cbind(1, a.std)
-      b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = y_, gh = gh, family = family)
-      mu <- family$linkinv(c(b$par[1]))
-
-      gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
-      v.inf <- (y_ - family$linkinv(c(gh%*%b$par)))^2
-      sig <- gh.inv %*% t(gh) %*% diag(k.std) %*% diag(v.inf) %*% diag(k.std) %*% gh %*% gh.inv
-      return(c(mu = mu, sig = sig[1,1]))
-
-    })
-
-    estimate <- dr_out[1,]
-    variance <- dr_out[2,]
-
-    return(list(estimate = estimate, variance = variance))
-
-  })
+  # out <- lapply(1:nrow(a.mat), function(i, ...){
+  # 
+  #   a <- a.mat[i,]
+  #   n <- length(a)
+  #   x.new <- x[rep(1:n, length(a.vals)), ]
+  #   a.new <- rep(a.vals, each = n)
+  #   # sig.a <- sqrt((1/sigma2[i] + rep(stab, length(a.vals))/omega2[i])^(-1))
+  #   # mu.a <- (sig.a^2)*(c(x.new %*% beta[i,])/sigma2[i] + rep(z.mat[i,], length(a.vals))/omega2[i])
+  #   pimod.vals <- c(x.new %*% beta[i,])
+  #   pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2[i]))
+  #   pihat.mat <- matrix(pihat.vals, nrow = n, ncol = length(a.vals))
+  #   phat <- colMeans(pihat.mat)
+  # 
+  #   # uncertainty design
+  #   dr_out <- sapply(1:length(a.vals), function(j, ...){
+  # 
+  #     a.std <- a - a.vals[j]
+  #     k <- floor(min(span, 1)*length(a))
+  #     idx <- order(abs(a.std))[1:k]
+  #     a.std <- a.std[idx]
+  #     max.a.std <- max(abs(a.std))
+  #     y_ <- y_[idx]
+  #     k.std <- c((1 - abs(a.std/max.a.std)^3)^3)*mean(pihat.mat[idx,j])/pihat.mat[idx,j]
+  #     gh <- cbind(1, a.std)
+  #     b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = y_, gh = gh, family = family)
+  #     mu <- family$linkinv(c(b$par[1]))
+  # 
+  #     gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
+  #     v.inf <- (y_ - family$linkinv(c(gh%*%b$par)))^2
+  #     sig <- gh.inv %*% t(gh) %*% diag(k.std) %*% diag(v.inf) %*% diag(k.std) %*% gh %*% gh.inv
+  #     return(c(mu = mu, sig = sig[1,1]))
+  # 
+  #   })
+  # 
+  #   estimate <- dr_out[1,]
+  #   variance <- dr_out[2,]
+  # 
+  #   return(list(estimate = estimate, variance = variance))
+  # 
+  # })
+  
+  a.list <- as.list(data.frame(t(a.mat)))
+  
+  out <- lapply(a.list, erc, y = y, x = x[,-1], offset = offset, deg.num = deg.num, 
+                   a.vals = a.vals, family = family, span = span, sl.lib = sl.lib)
   
   a.mat <- a.mat[,order(shield)]
   est.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$estimate))
