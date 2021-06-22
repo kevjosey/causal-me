@@ -41,9 +41,9 @@ family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
-n.iter <- 1000
+n.iter <- 10000
 n.boot <- 500
-n.adapt <- 100
+n.adapt <- 1000
 thin <- 10
 h.a <- 0.5
 h.gamma <- rep(0.03, 6)

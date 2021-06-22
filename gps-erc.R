@@ -5,7 +5,7 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
                     shape = 1e-3, rate = 1e-3, scale = 1e6,
                     thin = 10, n.iter = 10000, n.adapt = 1000,
                     h.a = 0.5, span = 0.75, 
-                    control = dbartsControl(updateState = TRUE, verbose = FALSE, n.burn = 0L, 
+                    control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
                                             n.samples = 1L, n.thin = 5L, n.chains = 1L)) {
   
   dfun <- dpois
@@ -77,6 +77,7 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
   tau2 <- rep(NA, n.adapt + n.iter)
   omega2 <- rep(NA, n.adapt + n.iter)
   a.mat <- matrix(NA, nrow = n.iter + n.adapt, ncol = n)
+  mu.mat <- matrix(NA, nrow = n.iter + n.adapt, ncol = length(a.vals))
   
   beta[1,] <- coef(lm(a ~ 0 + x))
   alpha[1,] <- coef(lm(s.tmp ~ 0 + ws.tmp))
@@ -84,12 +85,13 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
   tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
   omega2[1] <- var(s.hat - a.s)
   a.mat[1,] <- a
+  mu.mat[1,] <- 0
   
   # outcome stuff
   y_ <- family$linkinv(family$linkfun(y) - offset)
-  xa_train <- data.frame(y_ = y_, x = x[,-1], a = a)
-  xa_test <- data.frame(x = x[rep(1:n, length(a.vals) + 1),-1], a = c(a, rep(a.vals, n)))
-  sampler <- dbarts::dbarts(y_ ~ . , xa_train, xa_test, control = control)
+  xa.train <- data.frame(y_ = y_, x = x[,-1], a = a)
+  xa.test <- data.frame(x = x[rep(1:n, length(a.vals) + 1),-1], a = c(a, rep(a.vals, n)))
+  sampler <- dbarts::dbarts(y_ ~ . , xa.train, xa.test, control = control)
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
@@ -115,10 +117,6 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
     
-    # Sample outcome model
-    
-    temp <- sampler$run()
-    
     # sample S
     
     sig.s <- sqrt((1/omega2[i - 1] + 1/tau2[i - 1])^(-1))
@@ -131,7 +129,7 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
     exam <- FALSE
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     
-    a_ <- cbind(rnorm(n, a, h.a), rep(a.vals, each = n))
+    a_ <- c(rnorm(n, a, h.a), rep(a.vals, each = n))
     sampler$setTestPredictor(x = a_, column = "a")
     samples <- sampler$run()
     
@@ -141,18 +139,21 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
     mu[mu <= 0] <- 1e-5
     
     log.eps <- dnorm(y_, mu_[1:n], samples$sigma[1], log = TRUE) +
-      dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
-      dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
+      dnorm(a_[1:n], c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
+      dnorm(a_[1:n], z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
       dnorm(y_, mu, samples$sigma[1], log = TRUE) -
       dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
       dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
     
     test <- log(runif(n))
-    temp <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_, a)
+    temp <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_[1:n], a)
     sampler$setPredictor(x = temp, column = "a", forceUpdate = TRUE)
     
     a <- a.mat[i,] <- temp
     a.s <- rep(a, stab)
+    
+    muhat.mat <- matrix(mu_[-(1:n)], nrow = n, ncol = length(a.vals))
+    mu.mat[i,] <- colMeans(muhat.mat)
   
   }
   
@@ -166,54 +167,60 @@ gps_erc <- function(s, star, y, s.id, id, family = gaussian(),
   tau2 <- tau2[keep]
   omega2 <- omega2[keep]
   a.mat <- a.mat[keep,]
+  mu.mat <- mu.mat[keep,]
   
-  out <- lapply(1:nrow(a.mat), function(i, ...){
-    
-    a <- a.mat[i,]
-
-    xa.new <- rbind(xa, do.call(rbind, xa.new.list))
-    x.new <- xa.new[,1:ncol(x)]
-    a.new <- c(a, rep(a.vals, each = n))
-    colnames(x.new) <- colnames(x)
-    colnames(xa.new) <- colnames(xa)
-    
-    # exposure models
-    pimod.vals <- c(x.new %*% beta[i,])
-    pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2[i]))
-    pihat <- pihat.vals[1:n]
-    pihat.mat <- matrix(pihat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
-    phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
-    phat[which(phat < 0)] <- 1e-6
-    
-    # outcome models
-    muhat.vals <- mu.mat[i,]
-    muhat <- muhat.vals[1:n]
-    muhat.mat <- matrix(muhat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
-    mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
-    
-    # integrate
-    phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
-    mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
-    intfn <- (muhat.mat - mhat.mat) * phat.mat
-    int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
-                   (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
-    
-    # analyze
-    psi <- (y_ - muhat)/(pihat/phat) + mhat
-    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, span = span, se.fit = TRUE)
-    estimate <- dr_out[1,]
-    variance <- dr_out[2,]
-    
-    return(list(estimate = estimate, variance = variance))
-    
-  })
+  # out <- lapply(1:nrow(a.mat), function(i, ...){
+  #   
+  #   a <- a.mat[i,]
+  # 
+  #   xa.new <- rbind(xa, do.call(rbind, xa.new.list))
+  #   x.new <- xa.new[,1:ncol(x)]
+  #   a.new <- c(a, rep(a.vals, each = n))
+  #   colnames(x.new) <- colnames(x)
+  #   colnames(xa.new) <- colnames(xa)
+  #   
+  #   # exposure models
+  #   pimod.vals <- c(x.new %*% beta[i,])
+  #   pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2[i]))
+  #   pihat <- pihat.vals[1:n]
+  #   pihat.mat <- matrix(pihat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
+  #   phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
+  #   phat[which(phat < 0)] <- 1e-6
+  #   
+  #   # outcome models
+  #   muhat.vals <- mu.mat[i,]
+  #   muhat <- muhat.vals[1:n]
+  #   muhat.mat <- matrix(muhat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
+  #   mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
+  #   
+  #   # integrate
+  #   phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
+  #   mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
+  #   intfn <- (muhat.mat - mhat.mat) * phat.mat
+  #   int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
+  #                  (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
+  #   
+  #   # analyze
+  #   psi <- (y_ - muhat)/(pihat/phat) + mhat
+  #   dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, span = span, se.fit = TRUE)
+  #   estimate <- dr_out[1,]
+  #   variance <- dr_out[2,]
+  #   
+  #   return(list(estimate = estimate, variance = variance))
+  #   
+  # })
+  
+  # a.mat <- a.mat[,order(shield)]
+  # est.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$estimate))
+  # var.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$variance))
+  # estimate <- colMeans(est.mat)
+  # variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
+  # hpdi <- apply(est.mat, 2, hpd)
   
   a.mat <- a.mat[,order(shield)]
-  est.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$estimate))
-  var.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$variance))
-  estimate <- colMeans(est.mat)
-  variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
-  hpdi <- apply(est.mat, 2, hpd)
+  estimate <- colMeans(mu.mat)
+  variance <- apply(mu.mat, 2, var)
+  hpdi <- apply(mu.mat, 2, hpd)
   
   rslt <- list(estimate = estimate, variance = variance, hpdi = hpdi,
                mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha,
