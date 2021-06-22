@@ -34,13 +34,10 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   offset <- floor(runif(n, 10, 1000))
   
   if (mult == 10) {
-    # s.id <- rep(id, rep(c(2,4,6,8,12,14,16,18), each = n/8))
-    s.id <- rep(id, rep(c(1,2), each = n/2))
+    s.id <- rep(id, rep(c(2,4,6,8,12,14,16,18), each = n/8))
   } else if (mult == 5){
     s.id <- rep(id, rep(c(1,2,3,4,6,7,8,9), each = n/8))
   }
-
-  rep(c(1,2,3,7,12), each = n/5)
   
   # transformed predictors
   u1 <- as.numeric(scale(exp(x[,1]/2)))
@@ -50,7 +47,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   
   u <- cbind(u1, u2, u3, u4)
   u <- u%*%solve(chol(cov(u)))
-  w2 <- rep(NA, 1.5*n)
+  w2 <- rep(NA, mult*n)
   
   if (gps_scen == "b") {
     
@@ -66,19 +63,19 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
     
   }
 
-  w1 <- stats::rnorm(1.5*n, 1, 1)
+  w1 <- stats::rnorm(mult*n, 1, 1)
   w <- cbind(w1, w2)
   a <- rnorm(n, mu_gps, sig_gps)
   
   stab <- table(s.id)
   a_s <- rep(a, stab)  
   
-  s <- rnorm(1.5*n, a_s, sig_agg)
+  s <- rnorm(mult*n, a_s, sig_agg)
   
   if (pred_scen == "b"){
-    star <- rnorm(1.5*n, s - 1 + 0.5*w1 - 0.5*w2, sig_pred)
+    star <- rnorm(mult*n, s - 1 + 0.5*w1 - 0.5*w2, sig_pred)
   } else {
-    star <- rnorm(1.5*n, s, sig_pred)
+    star <- rnorm(mult*n, s, sig_pred)
   }
   
   if (out_scen == "b") {

@@ -10,6 +10,7 @@ library(SuperLearner)
 library(splines)
 library(scales)
 library(parallel)
+library(dbarts)
 
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
@@ -29,7 +30,7 @@ gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "b"
 span <- 0.2
-mult <- 10
+mult <- 5
 n <- 400
 prob <- 0.2
 
@@ -74,7 +75,7 @@ for (i in 1:n.sim){
   s_tilde <- star <- dat$star
   
   # validation subset
-  s <- dat$s*rbinom(1.5*n, 1, prob)
+  s <- dat$s*rbinom(mult*n, 1, prob)
   s[s == 0] <- NA
   
   # remove clusters w/o exposure data
@@ -107,10 +108,8 @@ for (i in 1:n.sim){
   # Bayesian analysis
   gibbs_hat <- gps_erc(s = s, star = s_tilde, y = y, offset = offset,
                       s.id = s.id, id = id, w = w, x = x, family = family, 
-                      deg.num = deg.num, a.vals = a.vals, span = span,
-                      scale = scale, shape = shape, rate = rate,
-                      h.a = h.a, h.gamma = h.gamma, n.iter = n.iter, 
-                      n.adapt = n.adapt, thin = thin)
+                      a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
+                      h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
