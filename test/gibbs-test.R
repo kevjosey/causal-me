@@ -43,15 +43,15 @@ deg.num <- 2
 # mcmc arguments
 n.iter <- 2000
 n.adapt <- 500
-thin <- 20
+thin <- 10
 h.a <- 0.5
 h.gamma <- 0.03
 scale <- 1e6
 shape <- rate <- 1e-3
 
 # initialize output
-est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
-se <- cp <- array(NA, dim = c(n.sim, 4, length(a.vals)))
+est <- array(NA, dim = c(n.sim, 6, length(a.vals)))
+se <- cp <- array(NA, dim = c(n.sim, 5, length(a.vals)))
 
 for (i in 1:n.sim){
   
@@ -104,8 +104,15 @@ for (i in 1:n.sim){
   blp_hat <- erc(y = y, a = a_hat, x = x, offset = offset, family = family,
                  a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
-  # Bayesian analysis
-  gibbs_hat <- bart_erc(s = s, star = s_tilde, y = y, offset = offset,
+  # Bayes analysis
+  bayes_hat <- bayes_erc(s = s, star = s_tilde, y = y, offset = offset,
+            s.id = s.id, id = id, w = w, x = x, family = family,
+            a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
+            n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
+            h.a = h.a, h.gamma = h.gamma, deg.num = deg.num)
+  
+  # Bart analysis
+  bart_hat <- bart_erc(s = s, star = s_tilde, y = y, offset = offset,
                       s.id = s.id, id = id, w = w, x = x, family = family, 
                       a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                       h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin)
@@ -115,13 +122,15 @@ for (i in 1:n.sim){
   est[i,2,] <- obs_hat$estimate
   est[i,3,] <- naive_hat$estimate
   est[i,4,] <- blp_hat$estimate
-  est[i,5,] <- gibbs_hat$estimate
-
+  est[i,5,] <- bayes_hat$estimate
+  est[i,6,] <- bart_hat$estimate
+  
   # standard error
   se[i,1,] <- sqrt(obs_hat$variance)
   se[i,2,] <- sqrt(naive_hat$variance)
   se[i,3,] <- sqrt(blp_hat$variance)
-  se[i,4,] <- sqrt(gibbs_hat$variance)
+  se[i,4,] <- sqrt(bayes_hat$variance)
+  se[i,5,] <- sqrt(bart_hat$variance)
   
   # coverage
   cp[i,1,] <- as.numeric((est[i,2,] - 1.96*se[i,1,]) < est[i,1,] & 
@@ -132,6 +141,8 @@ for (i in 1:n.sim){
                            (est[i,4,] + 1.96*se[i,3,]) > est[i,1,])
   cp[i,4,] <- as.numeric((est[i,5,] - 1.96*se[i,4,]) < est[i,1,] & 
                            (est[i,5,] + 1.96*se[i,4,]) > est[i,1,])
+  cp[i,5,] <- as.numeric(bart_hat$hpdi[1,] < est[i,1,] & 
+                           bart_hat$hpdi[2,] > est[i,1,])
   
 }
 
@@ -143,14 +154,15 @@ out_cp <- colMeans(cp, na.rm = T)
 colnames(out_cp) <- a.vals
 rownames(out_cp) <- c("DR","Naive","SI","MI")
 
-plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = hue_pal()(5)[1], lwd = 2,
+plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
      ylim = c(0,0.15))
-lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = hue_pal()(5)[2], lwd = 2, lty = 1)
-lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = hue_pal()(5)[3], lwd = 2, lty = 1)
-lines(a.vals, colMeans(est, na.rm = T)[4,], type = "l", col = hue_pal()(5)[4], lwd = 2, lty = 1)
-lines(a.vals, colMeans(est, na.rm = T)[5,], type = "l", col = hue_pal()(5)[5], lwd = 2, lty = 1)
+lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = hue_pal()(6)[2], lwd = 2, lty = 1)
+lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
+lines(a.vals, colMeans(est, na.rm = T)[4,], type = "l", col = hue_pal()(6)[4], lwd = 2, lty = 1)
+lines(a.vals, colMeans(est, na.rm = T)[5,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
+lines(a.vals, colMeans(est, na.rm = T)[6,], type = "l", col = hue_pal()(6)[6], lwd = 2, lty = 1)
 
-legend(6, 0.15, legend=c("True ERF", "Observed", "Naive", "BLP", "BART"),
-       col=hue_pal()(5),
+legend(6, 0.15, legend=c("True ERF", "Observed", "Naive", "BLP", "Bayes", "BART"),
+       col=hue_pal()(6),
        lty = c(1,1,1,1,1), lwd=2, cex=0.8)

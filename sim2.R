@@ -39,7 +39,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   # gibbs sampler stuff
   thin <- 10
-  n.iter <- 2000
+  n.iter <- 1000
   n.adapt <- 500
   h.a <- 0.5
   h.gamma <- 0.03
@@ -61,7 +61,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   dat_list <- replicate(n.sim, gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
                                         pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen))
   
-  out <- mclapply.hack(1:n.sim, function(i,...){
+  out <- lapply(1:n.sim, function(i,...){
 
     dat <- dat_list[,i]
     
@@ -145,7 +145,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     return(list(est = est, se = se, cp = cp))
      
-  }, mc.cores = 25)
+  })
   
   est <- abind(lapply(out, function(lst, ...) lst$est), along = 3)
   se <- abind(lapply(out, function(lst, ...) lst$se), along = 3)
@@ -182,7 +182,7 @@ set.seed(42)
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.mean","SL.glm")
-n.sim <- 1000
+n.sim <- 500
 
 n <- c(400, 800)
 mult <- c(5, 10)
@@ -192,7 +192,7 @@ sig_gps <- c(1, sqrt(4))
 
 scen_mat <- expand.grid(n = n, mult = mult, gps_scen = gps_scen, out_scen = out_scen, sig_gps = sig_gps)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
-est <- lapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib)
+est <- mclapply.hack(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 32)
 rslt <- list(est = est, scen_idx = scen_mat)
 
 save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim_2.RData")

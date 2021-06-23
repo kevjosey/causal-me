@@ -102,7 +102,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
-    # print(i)
+    print(i)
     
     # sample S
     
@@ -219,8 +219,9 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   var.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$variance))
   estimate <- colMeans(est.mat)
   variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
+  hpdi <- apply(est.mat, 2, hpd)
   
-  rslt <- list(estimate = estimate, variance = variance, accept.a = accept.a,
+  rslt <- list(estimate = estimate, variance = variance, hpdi = hpdi, accept.a = accept.a,
                mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha,
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
