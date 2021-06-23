@@ -63,8 +63,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   s.hat <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
-  xa <- cbind(model.matrix( ~ .^2 , data.frame(x = x[,-1], a = a - mean(a))), 
-              poly(a - mean(a), degree = deg.num, raw = TRUE)[,-1])
+  xa <- cbind(x, poly(a, degree = deg.num), (a - mean(a))*x[,2])
   
   # data dimensions
   p <- ncol(x)
@@ -110,8 +109,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     a_ <- rnorm(n, a, h.a)
-    xa_ <- cbind(model.matrix( ~ .^2 , data.frame(x = x[,-1], a = a_ - mean(a_))), 
-                 poly(a_ - mean(a_), degree = deg.num, raw = TRUE)[,-1])
+    xa_ <- cbind(x, poly(a_, degree = deg.num), (a_ - mean(a_))*x[,2])
     
     log.eps <- dfun(y, family$linkinv(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
       dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
@@ -145,8 +143,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     # Sample outcome model while cutting feedback
     
-    xa <- cbind(model.matrix( ~ .^2 , data.frame(x = x[,-1], a = a - mean(a))), 
-                poly(a - mean(a), degree = deg.num, raw = TRUE)[,-1])
+    xa <- cbind(x, poly(a, degree = deg.num), (a - mean(a))*x[,2])
     gamma_ <- gamma0 <- gamma[i - 1,]
     
     for (j in 1:o) {
@@ -191,13 +188,13 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
 
     a <- a.mat[i,]
     mu_a <- mean(a)
-    xa <- cbind(model.matrix( ~ .^2 , data.frame(x = x[,-1], a = a - mu_a)), 
-                poly(a - mu_a, degree = deg.num, raw = TRUE)[,-1])
+    nsa <- poly(a, degree = deg.num)
+    xa <- cbind(x, nsa, (a - mean(a))*x[,2])
 
     xa.new.list <- lapply(a.vals, function(a.tmp, ...) {
 
-      cbind(model.matrix( ~ .^2 , data.frame(x = x[,-1], a = a.tmp - mu_a)), 
-            poly(a.tmp - mu_a, degree = deg.num, raw = TRUE)[,-1])
+      cbind(x, matrix(rep(predict(nsa, a.tmp), n), nrow = n, ncol = deg.num, byrow = T),
+            (a.tmp - mu_a)*x[,2])
       
     })
 
@@ -259,9 +256,8 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   var.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$variance))
   estimate <- colMeans(est.mat)
   variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
-  hpdi <- apply(est.mat, 1, hpd)
   
-  rslt <- list(estimate = estimate, variance = variance, hpdi = hpdi, accept.a = accept.a,
+  rslt <- list(estimate = estimate, variance = variance, accept.a = accept.a, accept.gamma = accept.gamma,
                mcmc = list(a.mat = a.mat, gamma = gamma, beta = beta, alpha = alpha,
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   

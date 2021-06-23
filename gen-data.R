@@ -63,7 +63,8 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
     
   }
 
-  w1 <- stats::rnorm(mult*n, 1, 1)
+  w1 <- stats::rnorm(mult*n, 0, 1)
+  
   w <- cbind(w1, w2)
   a <- rnorm(n, mu_gps, sig_gps)
   
@@ -73,9 +74,9 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   s <- rnorm(mult*n, a_s, sig_agg)
   
   if (pred_scen == "b"){
-    star <- rnorm(mult*n, s - 1 + 0.5*w1 - 0.5*w2, sig_pred)
+    star <- rnorm(mult*n, s - 1 + 0.5*abs(w1) + 0.5*w2, sig_pred)
   } else {
-    star <- rnorm(mult*n, s, sig_pred)
+    star <- rnorm(mult*n, s - 1 + 0.5*w1 + 0.5*w2, sig_pred)
   }
   
   if (out_scen == "b") {

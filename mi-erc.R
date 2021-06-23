@@ -196,8 +196,7 @@ mi_erc <- function(s, star, y, s.id, id, family = gaussian(),
   estimate <- colMeans(est.mat)
   variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
   
-  rslt <- list(estimate = estimate, variance = variance, 
-               accept.a = accept.a, accept.gamma = accept.gamma,
+  rslt <- list(estimate = estimate, variance = variance, accept.a = accept.a, accept.gamma = accept.gamma,
                mcmc = list(a.mat = a.mat, gamma = gamma, beta = beta, alpha = alpha,
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   

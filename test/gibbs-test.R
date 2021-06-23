@@ -16,7 +16,7 @@ library(dbarts)
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/bayes-erc.R")
 source("~/Github/causal-me/mi-erc.R")
-source("~/Github/causal-me/gps-erc.R")
+source("~/Github/causal-me/bart-erc.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 source("~/Github/causal-me/auxiliary.R")
@@ -28,7 +28,7 @@ sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
-pred_scen <- "b"
+pred_scen <- "a"
 span <- 0.2
 mult <- 5
 n <- 400
@@ -36,17 +36,16 @@ prob <- 0.2
 
 # model arguments
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.glm") # for single imputation
+sl.lib <- c("SL.mean","SL.glm") # for single imputation
 family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
-n.iter <- 10000
-n.boot <- 500
-n.adapt <- 1000
-thin <- 10
+n.iter <- 2000
+n.adapt <- 500
+thin <- 20
 h.a <- 0.5
-h.gamma <- rep(0.03, 6)
+h.gamma <- 0.03
 scale <- 1e6
 shape <- rate <- 1e-3
 
@@ -98,7 +97,7 @@ for (i in 1:n.sim){
                    a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
   # real
-  tru_hat <- erc(y = y, a = a, x = x, offset = offset, family = family,
+  obs_hat <- erc(y = y, a = a, x = x, offset = offset, family = family,
                  a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
   # blp
@@ -106,20 +105,20 @@ for (i in 1:n.sim){
                  a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
   # Bayesian analysis
-  gibbs_hat <- gps_erc(s = s, star = s_tilde, y = y, offset = offset,
+  gibbs_hat <- bart_erc(s = s, star = s_tilde, y = y, offset = offset,
                       s.id = s.id, id = id, w = w, x = x, family = family, 
                       a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                       h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
-  est[i,2,] <- tru_hat$estimate
+  est[i,2,] <- obs_hat$estimate
   est[i,3,] <- naive_hat$estimate
   est[i,4,] <- blp_hat$estimate
   est[i,5,] <- gibbs_hat$estimate
 
   # standard error
-  se[i,1,] <- sqrt(tru_hat$variance)
+  se[i,1,] <- sqrt(obs_hat$variance)
   se[i,2,] <- sqrt(naive_hat$variance)
   se[i,3,] <- sqrt(blp_hat$variance)
   se[i,4,] <- sqrt(gibbs_hat$variance)
@@ -152,6 +151,6 @@ lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = hue_pal()(5)[3], l
 lines(a.vals, colMeans(est, na.rm = T)[4,], type = "l", col = hue_pal()(5)[4], lwd = 2, lty = 1)
 lines(a.vals, colMeans(est, na.rm = T)[5,], type = "l", col = hue_pal()(5)[5], lwd = 2, lty = 1)
 
-legend(6, 0.15, legend=c("True ERF", "Observed", "Naive", "Single Imputation", "Multiple Imputation"),
+legend(6, 0.15, legend=c("True ERF", "Observed", "Naive", "BLP", "BART"),
        col=hue_pal()(5),
        lty = c(1,1,1,1,1), lwd=2, cex=0.8)
