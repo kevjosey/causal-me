@@ -23,7 +23,7 @@ source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
 n.sim <- 100
-sig_gps <- sqrt(4)
+sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
@@ -43,7 +43,7 @@ deg.num <- 2
 # mcmc arguments
 n.iter <- 2000
 n.adapt <- 500
-thin <- 10
+thin <- 20
 h.a <- 0.5
 h.gamma <- 0.03
 scale <- 1e6
@@ -141,8 +141,8 @@ for (i in 1:n.sim){
                            (est[i,4,] + 1.96*se[i,3,]) > est[i,1,])
   cp[i,4,] <- as.numeric((est[i,5,] - 1.96*se[i,4,]) < est[i,1,] & 
                            (est[i,5,] + 1.96*se[i,4,]) > est[i,1,])
-  cp[i,5,] <- as.numeric(bart_hat$hpdi[1,] < est[i,1,] & 
-                           bart_hat$hpdi[2,] > est[i,1,])
+  cp[i,5,] <- as.numeric((est[i,6,] - 1.96*se[i,5,]) < est[i,1,] & 
+                           (est[i,6,] + 1.96*se[i,5,]) > est[i,1,])
   
 }
 

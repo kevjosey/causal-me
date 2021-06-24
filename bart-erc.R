@@ -102,7 +102,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
-    print(i)
+    # print(i)
     
     # sample S
     
@@ -113,18 +113,28 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     # sample A
     
+    test <- FALSE
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     
-    log.eps <- dnorm(y_, rowMeans(samples$test[1:n,,drop = FALSE]), mean(samples$sigma), log = TRUE) +
-      dnorm(a_[1:n], c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
-      dnorm(a_[1:n], z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
-      dnorm(y_, rowMeans(samples$train), mean(samples$sigma), log = TRUE) -
-      dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
-      dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
+    while (test == FALSE) {
+      
+      a_ <- c(rnorm(n, a, h.a), rep(a.vals, each = n))
+      sampler$setTestPredictor(x = a_, column = "a")
+      samples <- sampler$run()
+      
+      log.eps <- dnorm(y_, rowMeans(samples$test[1:n,,drop = FALSE]), mean(samples$sigma), log = TRUE) +
+        dnorm(a_[1:n], c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
+        dnorm(a_[1:n], z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
+        dnorm(y_, rowMeans(samples$train), mean(samples$sigma), log = TRUE) -
+        dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
+        dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
+      
+      temp <- ifelse(((log(runif(n)) <= log.eps) & !is.na(log.eps)), a_[1:n], a)
+      test <- sampler$setPredictor(x = temp, column = "a")
+      
+    }
     
-    test <- log(runif(n))
-    a <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_[1:n], a)
-    sampler$setPredictor(x = a, column = "a", forceUpdate = TRUE)
+    a <- temp
     a.s <- rep(a, stab)
     
     # Sample pred parameters
@@ -148,9 +158,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     # Sample outcome trees
     
-    a_ <- c(rnorm(n, a, h.a), rep(a.vals, each = n))
-    sampler$setTestPredictor(x = a_, column = "a")
-    samples <- sampler$run()
+
     
     if (i > n.adapt) {
     
