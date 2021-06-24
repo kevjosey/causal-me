@@ -135,7 +135,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
         test <- sampler$setPredictor(x = temp, column = "a")
       else {
         invisible(sampler$setPredictor(x = temp, column = "a"))
-        test <- FALSE
+        test <- TRUE
       }
       
     }
