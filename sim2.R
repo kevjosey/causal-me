@@ -38,8 +38,8 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   mult <- scenario$mult # c(100, 200)
   
   # gibbs sampler stuff
-  thin <- 10
-  n.iter <- 1000
+  thin <- 20
+  n.iter <- 2000
   n.adapt <- 500
   h.a <- 0.5
   h.gamma <- 0.03
@@ -182,7 +182,7 @@ set.seed(42)
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.mean","SL.glm")
-n.sim <- 500
+n.sim <- 100
 
 n <- c(400, 800)
 mult <- c(5, 10)

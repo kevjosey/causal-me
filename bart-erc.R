@@ -130,7 +130,13 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
         dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
       
       temp <- ifelse(((log(runif(n)) <= log.eps) & !is.na(log.eps)), a_[1:n], a)
-      test <- sampler$setPredictor(x = temp, column = "a")
+      
+      if (i > n.adapt)
+        test <- sampler$setPredictor(x = temp, column = "a")
+      else {
+        invisible(sampler$setPredictor(x = temp, column = "a"))
+        test <- FALSE
+      }
       
     }
     
@@ -156,9 +162,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
     
-    # Sample outcome trees
-    
-
+    # Save output
     
     if (i > n.adapt) {
     
@@ -227,9 +231,8 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   var.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$variance))
   estimate <- colMeans(est.mat)
   variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
-  hpdi <- apply(est.mat, 2, hpd)
   
-  rslt <- list(estimate = estimate, variance = variance, hpdi = hpdi, accept.a = accept.a,
+  rslt <- list(estimate = estimate, variance = variance, accept.a = accept.a,
                mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha,
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
