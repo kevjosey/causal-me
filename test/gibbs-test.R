@@ -16,17 +16,16 @@ library(dbarts)
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/bayes-erc.R")
 source("~/Github/causal-me/mi-erc.R")
-source("~/Github/causal-me/bart-erc.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
-n.sim <- 100
-sig_gps <- 1
+n.sim <- 10
+sig_gps <- 2
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
-gps_scen <- "a"
+gps_scen <- "b"
 out_scen <- "a"
 pred_scen <- "a"
 span <- 0.2
@@ -41,10 +40,10 @@ family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
-n.iter <- 2000
+n.iter <- 1000
 n.adapt <- 500
-thin <- 20
-h.a <- 0.5
+thin <- 10
+h.a <- 1
 h.gamma <- 0.03
 scale <- 1e6
 shape <- rate <- 1e-3
@@ -52,6 +51,8 @@ shape <- rate <- 1e-3
 # initialize output
 est <- array(NA, dim = c(n.sim, 6, length(a.vals)))
 se <- cp <- array(NA, dim = c(n.sim, 5, length(a.vals)))
+
+start <- Sys.time()
 
 for (i in 1:n.sim){
   
@@ -105,17 +106,17 @@ for (i in 1:n.sim){
                  a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
   # Bayes analysis
-  bayes_hat <- bayes_erc(s = s, star = s_tilde, y = y, offset = offset,
-            s.id = s.id, id = id, w = w, x = x, family = family,
-            a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
-            n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-            h.a = h.a, h.gamma = h.gamma, deg.num = deg.num)
+  bayes_hat <- mi_glm_erc(s = s, star = s_tilde, y = y, offset = offset,
+                          s.id = s.id, id = id, w = w, x = x, family = family,
+                          a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
+                          n.iter = n.iter, n.adapt = n.adapt, thin = thin, sl.lib = sl.lib, 
+                          h.a = h.a, h.gamma = h.gamma, deg.num = deg.num)
   
   # Bart analysis
   bart_hat <- bart_erc(s = s, star = s_tilde, y = y, offset = offset,
-                      s.id = s.id, id = id, w = w, x = x, family = family, 
-                      a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
-                      h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin)
+                          s.id = s.id, id = id, w = w, x = x, family = family,
+                          a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
+                          h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
@@ -146,16 +147,18 @@ for (i in 1:n.sim){
   
 }
 
+stop <- Sys.time()
+
 out_est <- colMeans(est, na.rm = T)
 colnames(out_est) <- a.vals
-rownames(out_est) <- c("ERF","DR","Naive","SI","MI")
+rownames(out_est) <- c("ERF","DR","Naive","SI","MI","BART")
 
 out_cp <- colMeans(cp, na.rm = T)
 colnames(out_cp) <- a.vals
-rownames(out_cp) <- c("DR","Naive","SI","MI")
+rownames(out_cp) <- c("DR","Naive","SI","MI","BART")
 
 plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
-     main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
+     main = "Exposure = b, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
      ylim = c(0,0.15))
 lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = hue_pal()(6)[2], lwd = 2, lty = 1)
 lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
@@ -163,6 +166,6 @@ lines(a.vals, colMeans(est, na.rm = T)[4,], type = "l", col = hue_pal()(6)[4], l
 lines(a.vals, colMeans(est, na.rm = T)[5,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
 lines(a.vals, colMeans(est, na.rm = T)[6,], type = "l", col = hue_pal()(6)[6], lwd = 2, lty = 1)
 
-legend(6, 0.15, legend=c("True ERF", "Observed", "Naive", "BLP", "Bayes", "BART"),
+legend(6, 0.15, legend=c("True ERF", "Observed", "RC", "RC+BLP", "Bayes GLM", "BART"),
        col=hue_pal()(6),
        lty = c(1,1,1,1,1), lwd=2, cex=0.8)

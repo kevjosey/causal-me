@@ -4,21 +4,17 @@ rm(list = ls())
 
 ## Preliminaries
 
-library(data.table)
 library(mvtnorm)
 library(SuperLearner)
-library(earth)
-library(splines)
 library(parallel)
 library(abind)
 library(dbarts)
 library(scales)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/mclapply-hack.R")
+source("~/Github/causal-me/auxiliary.R")
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/bayes-erc.R")
-source("~/Github/causal-me/bart-erc.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -38,10 +34,10 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   mult <- scenario$mult # c(100, 200)
   
   # gibbs sampler stuff
-  thin <- 20
-  n.iter <- 2000
+  thin <- 10
+  n.iter <- 1000
   n.adapt <- 500
-  h.a <- 0.5
+  h.a <- 1
   h.gamma <- 0.03
   scale <- 1e6
   shape <- rate <- 1e-3
@@ -55,14 +51,16 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   est <- array(NA, dim = c(n.sim, 6, length(a.vals)))
   se <- array(NA, dim = c(n.sim, 5, length(a.vals)))
   
-  print(scenario)
-  
   # generate data
   dat_list <- replicate(n.sim, gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
                                         pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen))
   
-  out <- lapply(1:n.sim, function(i,...){
+  print(scenario)
+  
+  out <- mclapply(1:n.sim, function(i,...){
 
+    print(i)
+    
     dat <- dat_list[,i]
     
     # zipcode index
@@ -93,7 +91,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     # exposure predictions
     s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
-    a_hat <- blp(s = s_hat, s.id = s.id, x = x)
+    a_hat <- blp(s = s_hat, s.id = s.id, x = x, id = id)$a
     z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
     
     # real
@@ -109,11 +107,10 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
                      a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
     
     # Bayesian Approach
-    bayes_hat <- try(bayes_erc(s = s, star = s_tilde, y = y, offset = offset,
+    bayes_hat <- try(glm_erc(s = s, star = s_tilde, y = y, offset = offset,
                             s.id = s.id, id = id, w = w, x = x, family = family,
                             a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
-                            n.iter = n.iter, n.adapt = n.adapt, thin = thin, 
-                            h.a = h.a, h.gamma = h.gamma, deg.num = deg.num), silent = TRUE)
+                            h.a = h.a, h.gamma = h.gamma, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # BART Approach
     bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset,
@@ -145,7 +142,9 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     return(list(est = est, se = se, cp = cp))
      
-  })
+  }, mc.cores = 25)
+  
+  stop <- Sys.time()
   
   est <- abind(lapply(out, function(lst, ...) lst$est), along = 3)
   se <- abind(lapply(out, function(lst, ...) lst$se), along = 3)
@@ -172,7 +171,9 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   colnames(out_cp) <- a.vals
   rownames(out_se) <- c("DR","Naive","BLP","Bayes","BART")
   
-  return(list(est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp))
+  rslt <- list(sceario = scenario, est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp)
+  filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/", paste(scenario, collapse = "_"),".RData")
+  save(rslt, file = filename)
   
 }
 
@@ -182,74 +183,15 @@ set.seed(42)
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.mean","SL.glm")
-n.sim <- 100
+n.sim <- 1000
 
 n <- c(400, 800)
 mult <- c(5, 10)
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
-sig_gps <- c(1, sqrt(4))
+pred_scen <- "a"
+sig_gps <- c(1, 2)
 
-scen_mat <- expand.grid(n = n, mult = mult, gps_scen = gps_scen, out_scen = out_scen, sig_gps = sig_gps)
+scen_mat <- expand.grid(n = n, mult = mult, gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, sig_gps = sig_gps, stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
-est <- mclapply.hack(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib, mc.cores = 32)
-rslt <- list(est = est, scen_idx = scen_mat)
-
-save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim_2.RData")
-
-# Summary Plot
-
-load(file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim_2.RData")
-plotnames <- c("GPS: \"a\"; Outcome: \"a\"",
-               "GPS: \"b\"; Outcome: \"a\"",
-               "GPS: \"a\"; Outcome: \"b\"",
-               "GPS: \"b\"; Outcome: \"b\"")
-idx <- c(4,8,12,16)
-
-filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_2.pdf")
-pdf(file = filename, width = 9, height = 9)
-par(mfrow = c(2,2))
-
-for (k in 1:4){
-  
-  plot(a.vals, rslt$est[[idx[k]]]$est[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
-       xlab = "Exposure", ylab = "Rate of Event", main = plotnames[k],
-       ylim = c(0,0.12))
-  grid(lty = 1)
-  lines(a.vals, rslt$est[[idx[k]]]$est[2,], type = "l", col = hue_pal()(6)[2], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[[idx[k]]]$est[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[[idx[k]]]$est[4,], type = "l", col = hue_pal()(6)[4], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[[idx[k]]]$est[5,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[[idx[k]]]$est[5,], type = "l", col = hue_pal()(6)[6], lwd = 2, lty = 1)
-  
-  if (k == 4){
-    
-    legend(6, 0.15, legend=c("True ERF", "Observed", "Naive", "BLP", "BART"),
-           col=hue_pal()(5),
-           lty = c(1,1,1,1,1), lwd=2, cex=0.8)
-    
-    
-  }
-  
-}
-
-dev.off()
-
-# Summary Table
-
-tbl <- matrix(NA, nrow = length(rslt$est), ncol = 6)
-
-for (k in 1:length(rslt$est)){
-  
-  bias <- round(colMeans(t(rslt$est[[k]]$bias)/rslt$est[[k]]$est[1,]), 3)
-  se <- round(rowMeans(rslt$est[[k]]$se/rslt$est[[k]]$sd), 3)
-  ci <- round(rowMeans(rslt$est[[k]]$cp), 3)
-  
-  tbl[k,] <- c(bias, se, ci)
-  
-}
-
-colnames(tbl) <- outer(names(bias), c("Bias", "SE", "CI"), FUN = "paste")[1:6]
-final <- cbind(rslt$scen_idx, tbl)
-
-write.csv(final, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/table_2.csv")
+est <- lapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib)

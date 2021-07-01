@@ -19,11 +19,15 @@ blp <- function(s, s.id, x = NULL, id = NULL) {
   id <- z_tmp[,1]
   z <- z_tmp[,2]
   
-  if (!is.null(id.check) & !identical(id, id.check))
-    stop("id provided does not match unique values of s.id")
-  
-  if (nrow(x) != length(id))
-    stop("x provided does not match length of unique s.id")
+  if (!is.null(id.check)) {
+    
+    if (!identical(id, id.check))
+      stop("id provided does not match unique values of s.id")
+    
+    if (nrow(x) != length(id))
+      stop("x provided does not match length of unique s.id")
+    
+  }
   
   # dimensions
   m <- length(s.id)
@@ -86,8 +90,17 @@ blp <- function(s, s.id, x = NULL, id = NULL) {
       
     })
     
-  }
+    cvar <- sapply(1:n, function(i, ...) {
+      
+      V[1,1] <- sigma2 + tau2/wts[i]
+      out <- c(sigma2 - (sigma2)^2/(sigma2 + tau2/wts[i]))
+      
+      return(out)
+      
+    })
     
+  }
+  
   return(list(id = id, a = a, cvar = cvar))
   
 }
@@ -110,13 +123,17 @@ multi_blp <- function(s, s.id, x = NULL, id = NULL) {
   # initialize exposures
   z_tmp <- aggregate(s, by = list(s.id), mean)
   id <- z_tmp[,1]
-  z <- z_tmp[,2]
+  z <- as.matrix(z_tmp[,2:(ncol(s)+1)])
   
-  if (!is.null(id.check) & !identical(id, id.check))
-    stop("id provided does not match unique values of s.id")
-  
-  if (nrow(x) != length(id))
-    stop("x provided does not match length of unique s.id")
+  if (!is.null(id.check)) {
+    
+    if (!identical(id, id.check))
+      stop("id provided does not match unique values of s.id")
+    
+    if (nrow(x) != length(id))
+      stop("x provided does not match length of unique s.id")
+    
+  }
   
   # dimensions
   m <- length(s.id)
