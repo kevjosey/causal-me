@@ -15,9 +15,9 @@ blp <- function(s, s.id, x = NULL, id = NULL) {
     id.check <- NULL
   
   # initialize exposures
-  z_tmp <- aggregate(s, by = list(s.id), mean)
-  id <- z_tmp[,1]
-  z <- z_tmp[,2]
+  z_tmp <- setDT(data.frame(s.id = s.id, s))[, lapply(.SD, mean), by = s.id]
+  id <- c(z_tmp[[1]])
+  z <- c(z_tmp[[2]])
   
   if (!is.null(id.check)) {
     
@@ -48,7 +48,7 @@ blp <- function(s, s.id, x = NULL, id = NULL) {
     
     tau2 <- sum((s - z_s)^2)/(m - n)
     sigma2 <- c(sum(wts*(z - mu_z)^2) - (n - 1)*tau2)/nu
-    psi <- c(crossprod(wts*(z - mu_z), as.matrix(x - muMat_x)))/nu
+    psi <- c(crossprod(as.matrix(wts*(z - mu_z)), as.matrix(x - muMat_x)))/nu
     Omega <- cov(x)
     
     phi <- c(sigma2, psi)
@@ -90,15 +90,6 @@ blp <- function(s, s.id, x = NULL, id = NULL) {
       
     })
     
-    cvar <- sapply(1:n, function(i, ...) {
-      
-      V[1,1] <- sigma2 + tau2/wts[i]
-      out <- c(sigma2 - (sigma2)^2/(sigma2 + tau2/wts[i]))
-      
-      return(out)
-      
-    })
-    
   }
   
   return(list(id = id, a = a, cvar = cvar))
@@ -121,8 +112,8 @@ multi_blp <- function(s, s.id, x = NULL, id = NULL) {
     id.check <- NULL
   
   # initialize exposures
-  z_tmp <- aggregate(s, by = list(s.id), mean)
-  id <- z_tmp[,1]
+  z_tmp <- setDT(data.frame(s.id = s.id, s))[, lapply(.SD, mean), by = s.id]
+  id <- as.character(z_tmp[[1]])
   z <- as.matrix(z_tmp[,2:(ncol(s)+1)])
   
   if (!is.null(id.check)) {
@@ -154,21 +145,25 @@ multi_blp <- function(s, s.id, x = NULL, id = NULL) {
     muMat_z <- matrix(rep(mu_z, n), nrow = n, byrow = TRUE)
     nu <- m - sum(wts^2)/m
     
-    Omega <- crossprod(as.matrix(s - z_s))/(m - n)
-    Sigma <- as.matrix(crossprod(wts*(z - muMat_z), (z - muMat_z)) - (n - 1)*Omega)/nu
-    Psi <- crossprod(wts*(z - muMat_z), as.matrix(x - muMat_x))/nu
+    Omega <- as.matrix(crossprod(as.matrix(s - z_s)))/(m - n)
+    Sigma <- as.matrix(crossprod(c(wts)*(z - muMat_z), (z - muMat_z)) - (n - 1)*Omega)/nu
+    Psi <- as.matrix(crossprod(c(wts)*(z - muMat_z), as.matrix(x - muMat_x)))/nu
     Tau <- cov(x)
     
     Phi <- cbind(Sigma, Psi)
     V <- matrix(NA, p + q, p + q)
-    V[(p+1):(p+q),1:p] <- V[1:p,(p+1):(p+q)] <- Psi
+    V[(p+1):(p+q),1:p] <- t(Psi)
+    V[1:p,(p+1):(p+q)] <- Psi
     V[(p+1):(p+q),(p+1):(p+q)] <- Tau
     
     a <- t(sapply(1:n, function(i, ...) {
       
+      print(i)
+      
+      
       V[1:p,1:p] <- Sigma + Omega/wts[i]
       star <- c(t(z[i,]) - mu_z, t(x[i,]) - mu_x)
-      out <- c(mu_z + Phi %*% solve(V) %*% star)
+      out <- c(mu_z + Phi %*% chol2inv(chol(V)) %*% star)
       
       return(out)
       

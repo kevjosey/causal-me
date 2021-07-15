@@ -1,29 +1,36 @@
+
+library(scales)
+
+# simulation scenarios
+a.vals <- seq(6, 10, by = 0.04)
+filenames <- list.files(path = "~/Dropbox/Projects/ERC-EPE/Output/sim2", full.names = TRUE)
+
 # Summary Plot
 
-load(file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim_2.RData")
 plotnames <- c("GPS: \"a\"; Outcome: \"a\"",
                "GPS: \"b\"; Outcome: \"a\"",
                "GPS: \"a\"; Outcome: \"b\"",
                "GPS: \"b\"; Outcome: \"b\"")
-idx <- c(4,8,12,16)
+idx <- c(5:8)
 
-filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_2.pdf")
-pdf(file = filename, width = 9, height = 9)
+pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_2.pdf", width = 9, height = 9)
 par(mfrow = c(2,2))
 
-for (k in 1:4){
+for (k in idx){
   
-  plot(a.vals, rslt$est[[idx[k]]]$est[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
+  load(file = filenames[[k]])
+  
+  plot(a.vals, rslt$est[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
        xlab = "Exposure", ylab = "Rate of Event", main = plotnames[k],
-       ylim = c(0,0.12))
+       ylim = c(0,0.15))
   grid(lty = 1)
-  lines(a.vals, rslt$est[[idx[k]]]$est[2,], type = "l", col = hue_pal()(6)[2], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[[idx[k]]]$est[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[[idx[k]]]$est[4,], type = "l", col = hue_pal()(6)[4], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[[idx[k]]]$est[5,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[[idx[k]]]$est[5,], type = "l", col = hue_pal()(6)[6], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[2,], type = "l", col = hue_pal()(6)[2], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[4,], type = "l", col = hue_pal()(6)[4], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[5,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[6,], type = "l", col = hue_pal()(6)[6], lwd = 2, lty = 1)
   
-  if (k == 4){
+  if (k == idx[length(idx)]){
     
     legend(6, 0.15, legend=c("True ERF", "Observed", "Naive", "BLP", "BART"),
            col=hue_pal()(5),
@@ -38,19 +45,24 @@ dev.off()
 
 # Summary Table
 
-tbl <- matrix(NA, nrow = length(rslt$est), ncol = 6)
+tbl <- data.frame()
 
-for (k in 1:length(rslt$est)){
+for (k in 1:length(filenames)) {
   
-  bias <- round(colMeans(t(rslt$est[[k]]$bias)/rslt$est[[k]]$est[1,]), 3)
-  se <- round(rowMeans(rslt$est[[k]]$se/rslt$est[[k]]$sd), 3)
-  ci <- round(rowMeans(rslt$est[[k]]$cp), 3)
+  load(filenames[k])
   
-  tbl[k,] <- c(bias, se, ci)
+  tbl[k,1:6] <- rslt$sceario
+  
+  bias <- round(colMeans(t(rslt$bias)/rslt$est[1,]), 3)
+  se <- round(rowMeans(rslt$se/rslt$sd), 3)
+  ci <- round(rowMeans(rslt$cp), 3)
+  
+  tbl[k,7:21] <- c(bias, se, ci)
+  
   
 }
 
-colnames(tbl) <- outer(names(bias), c("Bias", "SE", "CI"), FUN = "paste")[1:6]
-final <- cbind(rslt$scen_idx, tbl)
+colnames(tbl)[1:6] <- colnames(rslt$sceario)
+colnames(tbl)[7:21] <- outer(rownames(rslt$bias), c("Bias", "SE", "CI"), FUN = "paste")[1:15]
 
-write.csv(final, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/table_2.csv")
+write.csv(tbl, file = "~/Dropbox/Projects/ERC-EPE/Output/table_2.csv")

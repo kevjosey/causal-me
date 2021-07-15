@@ -9,7 +9,6 @@ library(SuperLearner)
 library(parallel)
 library(abind)
 library(dbarts)
-library(scales)
 
 # Code for generating and fitting data
 source("~/Github/causal-me/auxiliary.R")
@@ -47,21 +46,12 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   span <- ifelse(n == 800, 0.125, 0.25)
   family <- poisson()
   
-  # initialize output
-  est <- array(NA, dim = c(n.sim, 6, length(a.vals)))
-  se <- array(NA, dim = c(n.sim, 5, length(a.vals)))
-  
-  # generate data
-  dat_list <- replicate(n.sim, gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
-                                        pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen))
-  
   print(scenario)
   
   out <- mclapply(1:n.sim, function(i,...){
-
-    print(i)
     
-    dat <- dat_list[,i]
+    dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
+                    pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
     
     # zipcode index
     s.id <- dat$s.id
@@ -142,7 +132,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     return(list(est = est, se = se, cp = cp))
      
-  }, mc.cores = 25)
+  }, mc.cores = 8, mc.preschedule = FALSE)
   
   stop <- Sys.time()
   
@@ -169,9 +159,9 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   out_cp <- t(apply(cp, 1, rowMeans, na.rm = T))
   colnames(out_cp) <- a.vals
-  rownames(out_se) <- c("DR","Naive","BLP","Bayes","BART")
+  rownames(out_cp) <- c("DR","Naive","BLP","Bayes","BART")
   
-  rslt <- list(sceario = scenario, est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp)
+  rslt <- list(scenario = scenario, est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp)
   filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/", paste(scenario, collapse = "_"),".RData")
   save(rslt, file = filename)
   
