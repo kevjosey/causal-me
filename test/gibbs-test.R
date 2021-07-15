@@ -22,7 +22,7 @@ source("~/Github/causal-me/erc.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
-n.sim <- 32
+n.sim <- 24
 sig_gps <- 2
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
@@ -135,7 +135,7 @@ out <- mclapply(1:n.sim, function(i, ...){
   
   return(list(est = est, se = se, cp = cp))
   
-}, mc.cores = 4, mc.preschedule = FALSE)
+}, mc.cores = 8, mc.preschedule = FALSE)
 
 stop <- Sys.time()
 stop - start
