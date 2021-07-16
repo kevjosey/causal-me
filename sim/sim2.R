@@ -173,7 +173,7 @@ set.seed(42)
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.mean","SL.glm")
-n.sim <- 1000
+n.sim <- 500
 
 n <- c(400, 800)
 mult <- c(5, 10)

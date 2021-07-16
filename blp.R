@@ -158,9 +158,6 @@ multi_blp <- function(s, s.id, x = NULL, id = NULL) {
     
     a <- t(sapply(1:n, function(i, ...) {
       
-      print(i)
-      
-      
       V[1:p,1:p] <- Sigma + Omega/wts[i]
       star <- c(t(z[i,]) - mu_z, t(x[i,]) - mu_x)
       out <- c(mu_z + Phi %*% chol2inv(chol(V)) %*% star)
@@ -189,7 +186,7 @@ multi_blp <- function(s, s.id, x = NULL, id = NULL) {
     
   }
   
-  colnames(a) <- colnames(x)
+  colnames(a) <- colnames(s)
   return(data.frame(id = id, a))
   
 }
