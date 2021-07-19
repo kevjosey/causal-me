@@ -25,7 +25,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   sig_pred <- sqrt(0.5)
   gps_scen <- scenario$gps_scen
   out_scen <- scenario$out_scen
-  pred_scen <- "a"
+  pred_scen <- scenario$pred_scen
   prob <- 0.1
   
   # gen data arguments
