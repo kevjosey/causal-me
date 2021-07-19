@@ -438,12 +438,11 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       # exposure model
       pimod.vals <- c(x %*% beta[i,])
       pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
-      
       pihat.mat <- sapply(a.vals, function(a.tmp, ...) dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
-      
       phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
       phat[which(phat < 0)] <- 1e-6
       
+      # pseudo-outcome
       psi[j,] <- (y_ - muhat)/(pihat/phat) + mhat # pseudo-outcome
       
       # integrate
