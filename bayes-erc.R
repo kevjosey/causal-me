@@ -270,7 +270,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
                      thin = 10, n.iter = 10000, n.adapt = 1000,
                      h.a = 0.5, span = 0.75, 
                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
-                                             n.samples = 1L, n.thin = thin, n.chains = 1L)) {
+                                             n.samples = 1L, n.thin = thin, n.chains = 1L, keepTrees = FALSE)) {
   
   dfun <- dpois
   
@@ -353,20 +353,17 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   # initialize bart
   y_ <- family$linkinv(family$linkfun(y) - offset)
   xa.train <- data.frame(y_ = y_, x = x[,-1], a = a)
-  xa.test <- data.frame(x = x[rep(1:n, length(a.vals) + 1),-1], a = c(a, rep(a.vals, each = n)))
-  sampler <- dbarts::dbarts(y_ ~ ., xa.train, xa.test, control = control)
+  xa.test <- data.frame(x = x[,-1], a = a)
+  sampler <- dbarts::dbarts(y_ ~ ., data = xa.train, control = control)
   
   # run first iteration of tree
-  a.mat[1,] <- a
-  a_ <- c(rnorm(n, a, h.a), rep(a.vals, each = n))
-  sampler$setTestPredictor(x = a_, column = "a")
   samples <- sampler$run()
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
     # print(i)
-    
+  
     # sample S
     
     sig.s <- sqrt((1/omega2[i - 1] + 1/tau2[i - 1])^(-1))
@@ -381,18 +378,18 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     while (test == FALSE) {
       
-      a_ <- c(rnorm(n, a, h.a), rep(a.vals, each = n))
-      sampler$setTestPredictor(x = a_, column = "a")
-      samples <- sampler$run()
+      a_ <- rnorm(n, a, h.a)
+      xa.test <- data.frame(x = x[,-1], a = a_)
+      xa.pred <- sampler$predict(xa.test)
       
-      log.eps <- dnorm(y_, rowMeans(samples$test[1:n,,drop = FALSE]), mean(samples$sigma), log = TRUE) +
-        dnorm(a_[1:n], c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
-        dnorm(a_[1:n], z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
-        dnorm(y_, rowMeans(samples$train), mean(samples$sigma), log = TRUE) -
+      log.eps <- dnorm(y_, xa.pred, mean(samples$sigma), log = TRUE) +
+        dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
+        dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
+        dnorm(y_, samples$train, mean(samples$sigma), log = TRUE) -
         dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
         dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
       
-      temp <- ifelse(((log(runif(n)) <= log.eps) & !is.na(log.eps)), a_[1:n], a)
+      temp <- ifelse(((log(runif(n)) <= log.eps) & !is.na(log.eps)), a_, a)
       test <- sampler$setPredictor(x = temp, column = "a")
       
     }
@@ -419,6 +416,9 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
     
+    # Sample outcome tree
+    samples <- sampler$run()
+    
     # Save output
     
     if (i > n.adapt) {
@@ -428,14 +428,19 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       
       # outcome model
       muhat <- rowMeans(samples$train)
-      muhat.mat <- matrix(rowMeans(samples$test[-(1:n),,drop = FALSE]), nrow = n, ncol = length(a.vals))
+      muhat.mat <- sapply(a.vals, function(a.tmp, ...){
+        xa.tmp <- data.frame(x = x[,-1], a = rep(a.tmp, n))
+        colnames(xa.tmp) <- colnames(xa.test)
+        sampler$predict(xa.tmp)
+      })
       mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
       
       # exposure model
-      pimod.vals <- c(x[rep(1:n, length(a.vals) + 1),] %*% beta[i,])
-      pihat.vals <- dnorm(c(a, rep(a.vals, each = n)), pimod.vals, sqrt(sigma2[i]))
-      pihat <- pihat.vals[1:n]
-      pihat.mat <- matrix(pihat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
+      pimod.vals <- c(x %*% beta[i,])
+      pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
+      
+      pihat.mat <- sapply(a.vals, function(a.tmp, ...) dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
+      
       phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
       phat[which(phat < 0)] <- 1e-6
       
@@ -448,7 +453,6 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       
       int[j,] <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
                          (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
-      
       
     }
     
@@ -499,4 +503,3 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   return(rslt)
   
 }
-

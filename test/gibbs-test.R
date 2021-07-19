@@ -22,7 +22,7 @@ source("~/Github/causal-me/erc.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
-n.sim <- 24
+n.sim <- 12
 sig_gps <- 2
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
@@ -66,7 +66,7 @@ out <- mclapply(1:n.sim, function(i, ...){
   x <- dat$x
   a <- dat$a
   w <- dat$w
-  s_tilde <- dat$star
+  s_tilde <- star <- dat$star
   
   # validation subset
   s <- dat$s*rbinom(mult*n, 1, prob)
@@ -135,7 +135,7 @@ out <- mclapply(1:n.sim, function(i, ...){
   
   return(list(est = est, se = se, cp = cp))
   
-}, mc.cores = 8, mc.preschedule = FALSE)
+}, mc.cores = 4, mc.preschedule = FALSE)
 
 stop <- Sys.time()
 stop - start
