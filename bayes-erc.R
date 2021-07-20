@@ -270,7 +270,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
                      thin = 10, n.iter = 10000, n.adapt = 1000,
                      h.a = 0.5, span = 0.75, 
                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
-                                             n.samples = 1L, n.thin = thin, n.chains = 1L, keepTrees = FALSE)) {
+                                             n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
   dfun <- dpois
   
@@ -348,12 +348,11 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   omega2[1] <- var(s.hat - a.s)
   
   # the good stuff
-  a.mat <- int <- psi <- matrix(NA, nrow = n.iter, ncol = n)
+  a.mat <- int <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
   
   # initialize bart
   y_ <- family$linkinv(family$linkfun(y) - offset)
-  xa.train <- data.frame(y_ = y_, x = x[,-1], a = a)
-  xa.test <- data.frame(x = x[,-1], a = a)
+  xa.train <- data.frame(y_ = y_, x[,-1], a = a)
   sampler <- dbarts::dbarts(y_ ~ ., data = xa.train, control = control)
   
   # run first iteration of tree
@@ -422,16 +421,16 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     # Save output
     
-    if (i > n.adapt) {
+    if (i > n.adapt & (i - n.adapt)%%thin == 0) {
       
-      j <- i - n.adapt
+      j <- (i - n.adapt)/thin
       a.mat[j,] <- a 
       
       # outcome model
       muhat <- rowMeans(samples$train)
       muhat.mat <- sapply(a.vals, function(a.tmp, ...){
-        xa.tmp <- data.frame(x = x[,-1], a = rep(a.tmp, n))
-        colnames(xa.tmp) <- colnames(xa.test)
+        xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
+        colnames(xa.tmp) <- colnames(xa.train)[-1]
         sampler$predict(xa.tmp)
       })
       mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
@@ -461,18 +460,12 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   accept.a <- apply(a.mat, 2, function(x) mean(diff(x) != 0) )
   
   # thinning
-  keep1 <- seq(n.adapt + 1, n.iter + n.adapt, by = thin)
-  beta <- beta[keep1,]
-  alpha <- alpha[keep1,]
-  sigma2 <- sigma2[keep1]
-  tau2 <- tau2[keep1]
-  omega2 <- omega2[keep1]
-  
-  # thinning ERC input
-  keep2 <- seq(1, n.iter, by = thin)
-  a.mat <- a.mat[keep2,]
-  psi <- psi[keep2,]
-  int <- int[keep2,]
+  keep <- seq(n.adapt + 1, n.iter + n.adapt, by = thin)
+  beta <- beta[keep,]
+  alpha <- alpha[keep,]
+  sigma2 <- sigma2[keep]
+  tau2 <- tau2[keep]
+  omega2 <- omega2[keep]
   
   # analyze output
   
