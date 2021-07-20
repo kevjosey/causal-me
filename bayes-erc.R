@@ -380,6 +380,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       
       a_ <- rnorm(n, a, h.a)
       xa.test <- data.frame(x = x[,-1], a = a_)
+      colnames(xa.test) <- colnames(xa.train)[-1]
       xa.pred <- sampler$predict(xa.test)
       
       log.eps <- dnorm(y_, xa.pred, mean(samples$sigma), log = TRUE) +

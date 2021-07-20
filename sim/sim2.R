@@ -132,7 +132,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     return(list(est = est, se = se, cp = cp))
      
-  }, mc.cores = 8, mc.preschedule = FALSE)
+  }, mc.cores = 16, mc.preschedule = FALSE)
   
   stop <- Sys.time()
   
@@ -184,5 +184,5 @@ sig_gps <- c(1, 2)
 
 scen_mat <- expand.grid(n = n, mult = mult, gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, sig_gps = sig_gps, stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
-scenarios <- scenarios[(1:length(scenarios) %% 2) == 0]
+scenarios <- scenarios[(1:length(scenarios) %% 2) == 1]
 est <- lapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib)
