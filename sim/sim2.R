@@ -14,6 +14,7 @@ library(dbarts)
 source("~/Github/causal-me/auxiliary.R")
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/bayes-erc.R")
+source("~/Github/causal-me/mi-erc.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc.R")
 
@@ -35,7 +36,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   # gibbs sampler stuff
   thin <- 20
   n.iter <- 2000
-  n.adapt <- 500
+  n.adapt <- 1000
   h.a <- 1
   h.gamma <- 0.03
   scale <- 1e6
@@ -132,7 +133,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     return(list(est = est, se = se, cp = cp))
      
-  }, mc.cores = 32, mc.preschedule = FALSE)
+  }, mc.cores = 32, mc.preschedule = TRUE)
   
   stop <- Sys.time()
   
