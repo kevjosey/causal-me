@@ -5,7 +5,6 @@ rm(list = ls())
 ## Preliminaries
 
 library(mvtnorm)
-library(data.table)
 library(SuperLearner)
 library(parallel)
 library(abind)
@@ -183,7 +182,6 @@ gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
 pred_scen <- c("a", "b")
 
-
-scen_mat <- expand.grid(n = n, mult = mult, gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, sig_gps = sig_gps, stringsAsFactors = FALSE)
+scen_mat <- expand.grid(n = n, mult = mult, sig_gps = sig_gps,  gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 est <- lapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib)

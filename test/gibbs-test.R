@@ -4,7 +4,6 @@ rm(list = ls())
 
 ## Preliminaries
 
-library(data.table)
 library(mvtnorm)
 library(SuperLearner)
 library(splines)
