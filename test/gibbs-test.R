@@ -22,8 +22,8 @@ source("~/Github/causal-me/erc.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
-n.sim <- 12
-sig_gps <- 2
+n.sim <- 32
+sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
@@ -41,9 +41,9 @@ family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
-n.iter <- 100
+n.iter <- 2000
 n.adapt <- 500
-thin <- 10
+thin <- 20
 h.a <- 1
 h.gamma <- 0.03
 scale <- 1e6
@@ -100,13 +100,13 @@ out <- mclapply(1:n.sim, function(i, ...){
                      a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
   
   # Bayesian Approach
-  bayes_hat <- try(glm_erc(s = s, star = s_tilde, y = y, offset = offset,
+  bayes_hat <- try(mi_glm_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
                            s.id = s.id, id = id, w = w, x = x, family = family,
                            a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                            h.a = h.a, h.gamma = h.gamma, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # BART Approach
-  bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset,
+  bart_hat <- try(mi_bart_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
                            s.id = s.id, id = id, w = w, x = x, family = family, 
                            a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                            h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
@@ -135,7 +135,7 @@ out <- mclapply(1:n.sim, function(i, ...){
   
   return(list(est = est, se = se, cp = cp))
   
-}, mc.cores = 4, mc.preschedule = FALSE)
+}, mc.cores = 32, mc.preschedule = FALSE)
 
 stop <- Sys.time()
 stop - start

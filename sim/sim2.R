@@ -5,6 +5,7 @@ rm(list = ls())
 ## Preliminaries
 
 library(mvtnorm)
+library(data.table)
 library(SuperLearner)
 library(parallel)
 library(abind)
@@ -33,8 +34,8 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   mult <- scenario$mult # c(100, 200)
   
   # gibbs sampler stuff
-  thin <- 10
-  n.iter <- 1000
+  thin <- 20
+  n.iter <- 2000
   n.adapt <- 500
   h.a <- 1
   h.gamma <- 0.03
@@ -97,13 +98,13 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
                      a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
     
     # Bayesian Approach
-    bayes_hat <- try(glm_erc(s = s, star = s_tilde, y = y, offset = offset,
+    bayes_hat <- try(mi_glm_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
                             s.id = s.id, id = id, w = w, x = x, family = family,
                             a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                             h.a = h.a, h.gamma = h.gamma, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # BART Approach
-    bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset,
+    bart_hat <- try(mi_bart_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
                              s.id = s.id, id = id, w = w, x = x, family = family, 
                              a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                              h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
@@ -162,7 +163,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   rownames(out_cp) <- c("DR","Naive","BLP","Bayes","BART")
   
   rslt <- list(scenario = scenario, est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp)
-  filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/", paste(scenario, collapse = "_"),".RData")
+  filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim2/", paste(scenario, collapse = "_"),".RData")
   save(rslt, file = filename)
   
 }
@@ -177,10 +178,11 @@ n.sim <- 1000
 
 n <- c(400, 800)
 mult <- c(5, 10)
+sig_gps <- c(1, 2)
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
-pred_scen <- "a"
-sig_gps <- c(1, 2)
+pred_scen <- c("a", "b")
+
 
 scen_mat <- expand.grid(n = n, mult = mult, gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, sig_gps = sig_gps, stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])

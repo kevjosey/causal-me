@@ -15,9 +15,9 @@ blp <- function(s, s.id, x = NULL, id = NULL) {
     id.check <- NULL
   
   # initialize exposures
-  z_tmp <- setDT(data.frame(s.id = s.id, s))[, lapply(.SD, mean), by = s.id]
-  id <- c(z_tmp[[1]])
-  z <- c(z_tmp[[2]])
+  z_tmp <- aggregate(s, by = list(s.id), mean)
+  id <- c(z_tmp[,1])
+  z <- c(z_tmp[,2])
   
   if (!is.null(id.check)) {
     
@@ -92,7 +92,7 @@ blp <- function(s, s.id, x = NULL, id = NULL) {
     
   }
   
-  return(list(id = id, a = a, cvar = cvar))
+  return(data.frame(id = id, a = a, cvar = cvar))
   
 }
 
@@ -112,9 +112,9 @@ multi_blp <- function(s, s.id, x = NULL, id = NULL) {
     id.check <- NULL
   
   # initialize exposures
-  z_tmp <- setDT(data.frame(s.id = s.id, s))[, lapply(.SD, mean), by = s.id]
-  id <- as.character(z_tmp[[1]])
-  z <- as.matrix(z_tmp[,2:(ncol(s)+1)])
+  z_tmp <- aggregate(s, by = list(s.id), mean)
+  id <- c(z_tmp[,1])
+  z <- as.matrix(z_tmp[,-1])
   
   if (!is.null(id.check)) {
     

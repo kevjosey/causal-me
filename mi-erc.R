@@ -293,14 +293,10 @@ mi_bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   # initialize bart
   y_ <- family$linkinv(family$linkfun(y) - offset)
-  xa.train <- data.frame(y_ = y_, x = x[,-1], a = a)
-  xa.test <- data.frame(x = x[rep(1:n, length(a.vals) + 1),-1], a = c(a, rep(a.vals, each = n)))
-  sampler <- dbarts::dbarts(y_ ~ ., xa.train, xa.test, control = control)
+  xa.train <- data.frame(y_ = y_, x[,-1], a = a)
+  sampler <- dbarts::dbarts(y_ ~ ., data = xa.train, control = control)
   
   # run first iteration of tree
-  a.mat[1,] <- a
-  a_ <- c(rnorm(n, a, h.a), rep(a.vals, each = n))
-  sampler$setTestPredictor(x = a_, column = "a")
   samples <- sampler$run()
   
   # gibbs sampler for predictors
@@ -322,18 +318,19 @@ mi_bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     while (test == FALSE) {
       
-      a_ <- c(rnorm(n, a, h.a), rep(a.vals, each = n))
-      sampler$setTestPredictor(x = a_, column = "a")
-      samples <- sampler$run()
+      a_ <- rnorm(n, a, h.a)
+      xa.test <- data.frame(x = x[,-1], a = a_)
+      colnames(xa.test) <- colnames(xa.train)[-1]
+      xa.pred <- sampler$predict(xa.test)
       
-      log.eps <- dnorm(y_, rowMeans(samples$test[1:n,,drop = FALSE]), mean(samples$sigma), log = TRUE) +
-        dnorm(a_[1:n], c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
-        dnorm(a_[1:n], z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
-        dnorm(y_, rowMeans(samples$train), mean(samples$sigma), log = TRUE) -
+      log.eps <- dnorm(y_, xa.pred, mean(samples$sigma), log = TRUE) +
+        dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
+        dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
+        dnorm(y_, samples$train, mean(samples$sigma), log = TRUE) -
         dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
         dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
       
-      temp <- ifelse(((log(runif(n)) <= log.eps) & !is.na(log.eps)), a_[1:n], a)
+      temp <- ifelse(((log(runif(n)) <= log.eps) & !is.na(log.eps)), a_, a)
       test <- sampler$setPredictor(x = temp, column = "a")
       
     }
@@ -359,6 +356,9 @@ mi_bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     beta[i,] <- rmvnorm(1, beta_var %*% t(x) %*% a, sigma2[i - 1]*beta_var)
     
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
+    
+    # Sample outcome tree
+    samples <- sampler$run()
     
   }
   
