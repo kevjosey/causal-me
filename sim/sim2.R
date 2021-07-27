@@ -133,7 +133,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     return(list(est = est, se = se, cp = cp))
      
-  }, mc.cores = 32, mc.preschedule = TRUE)
+  }, mc.cores = 28, mc.preschedule = TRUE)
   
   stop <- Sys.time()
   
