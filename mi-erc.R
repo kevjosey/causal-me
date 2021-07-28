@@ -3,7 +3,7 @@ mi_glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
                    offset = rep(0, length(id)), w = NULL, x = NULL,
                    thin = 10, n.iter = 10000, n.adapt = 100, mc.cores = 1,
                    sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth"),
-                   a.vals = seq(min(a), max(a), length.out = 100), deg.num = 2, span = 0.75,
+                   a.vals = seq(min(a), max(a), length.out = 100), deg.num = 3, span = 0.75,
                    shape = 1e-3, rate = 1e-3, scale = 1e6, h.a = 1, h.gamma = 0.1) {
   
   dfun <- dpois
@@ -206,7 +206,7 @@ mi_glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
 
 mi_bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
                         offset = rep(0, length(id)), w = NULL, x = NULL,
-                        a.vals = seq(min(a), max(a), length.out = 100),
+                        a.vals = seq(min(a), max(a), length.out = 100), deg.num = 3,
                         thin = 10, n.iter = 10000, n.adapt = 1000,  mc.cores = 1,
                         shape = 1e-3, rate = 1e-3, scale = 1e6, h.a = 1, span = 0.75,
                         sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth"),

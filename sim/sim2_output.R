@@ -11,7 +11,7 @@ plotnames <- c("GPS: \"a\"; Outcome: \"a\"",
                "GPS: \"b\"; Outcome: \"a\"",
                "GPS: \"a\"; Outcome: \"b\"",
                "GPS: \"b\"; Outcome: \"b\"")
-idx <- c(26,28,30,32)
+idx <- c(22,23,24)
 
 pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_2.pdf", width = 9, height = 9)
 par(mfrow = c(2,2))
@@ -28,8 +28,7 @@ for (k in idx){
   lines(a.vals, rslt$est[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
   lines(a.vals, rslt$est[4,], type = "l", col = hue_pal()(6)[4], lwd = 2, lty = 1)
   lines(a.vals, rslt$est[5,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[6,]/2, type = "l", col = hue_pal()(6)[6], lwd = 2, lty = 1)
-  
+  lines(a.vals, rslt$est[6,], type = "l", col = hue_pal()(6)[6], lwd = 2, lty = 1)
   
   if (k == idx[length(idx)]){
     

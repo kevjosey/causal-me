@@ -99,13 +99,13 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     # Bayesian Approach
     bayes_hat <- try(mi_glm_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
-                                s.id = s.id, id = id, w = w, x = x, family = family,
+                                s.id = s.id, id = id, w = w, x = x, family = family, deg.num = deg.num,
                                 a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                                 h.a = h.a, h.gamma = h.gamma, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # BART Approach
     bart_hat <- try(mi_bart_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
-                                s.id = s.id, id = id, w = w, x = x, family = family, 
+                                s.id = s.id, id = id, w = w, x = x, family = family, deg.num = deg.num,
                                 a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                                 h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
@@ -133,9 +133,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     return(list(est = est, se = se, cp = cp))
      
-  }, mc.cores = 29, mc.preschedule = TRUE)
-  
-  stop <- Sys.time()
+  }, mc.cores = 25, mc.preschedule = TRUE)
   
   est <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$est} else {matrix(NA, ncol = length(a.vals), nrow = 6)}), along = 3)
   se <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$se} else {matrix(NA, ncol = length(a.vals), nrow = 5)}), along = 3)
@@ -174,7 +172,7 @@ set.seed(42)
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.mean","SL.glm")
-n.sim <- 200
+n.sim <- 100
 
 n <- c(400, 800)
 mult <- c(5, 10)
