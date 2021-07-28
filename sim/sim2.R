@@ -98,16 +98,16 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
                        a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
     
     # Bayesian Approach
-    bayes_hat <- try(mi_glm_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
-                                s.id = s.id, id = id, w = w, x = x, family = family, deg.num = deg.num,
-                                a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
-                                h.a = h.a, h.gamma = h.gamma, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
+    bayes_hat <- try(glm_erc(s = s, star = s_tilde, y = y, offset = offset,
+                             s.id = s.id, id = id, w = w, x = x, family = family,
+                             a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
+                             h.a = h.a, h.gamma = h.gamma, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # BART Approach
-    bart_hat <- try(mi_bart_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
-                                s.id = s.id, id = id, w = w, x = x, family = family, deg.num = deg.num,
-                                a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
-                                h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
+    bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset,
+                             s.id = s.id, id = id, w = w, x = x, family = family,
+                             a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
+                             h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),

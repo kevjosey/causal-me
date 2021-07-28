@@ -3,7 +3,7 @@ glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
                       offset = rep(0, length(id)), w = NULL, x = NULL,
                       a.vals = seq(min(a), max(a), length.out = 100),
                       shape = 1e-3, rate = 1e-3, scale = 1e6,
-                      thin = 10, n.iter = 10000, n.adapt = 1000, n.boot = 100,
+                      thin = 10, n.iter = 10000, n.adapt = 1000,
                       h.a = 0.5, h.gamma = 0.1, deg.num = 2, span = 0.75) {
   
   dfun <- dpois
@@ -266,9 +266,8 @@ glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
 bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
                      offset = rep(0, length(id)), w = NULL, x = NULL,
                      a.vals = seq(min(a), max(a), length.out = 100),
-                     shape = 1e-3, rate = 1e-3, scale = 1e6,
-                     thin = 10, n.iter = 10000, n.adapt = 1000,
-                     h.a = 0.5, span = 0.75, 
+                     shape = 1e-3, rate = 1e-3, scale = 1e6, thin = 10, 
+                     n.iter = 10000, n.adapt = 1000, h.a = 0.5, span = 0.75, mc.cores = 1,
                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
                                              n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
@@ -469,7 +468,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   # analyze output
   
-  out <- lapply(1:nrow(a.mat), function(i, ...){
+  out <- mclapply(1:nrow(a.mat), function(i, ...){
     
     a <- a.mat[i,]
     psi <- psi[i,]
@@ -481,7 +480,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     return(list(estimate = estimate, variance = variance))
     
-  })
+  }, mc.cores = mc.cores)
   
   a.mat <- a.mat[,order(shield)]
   est.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$estimate))
