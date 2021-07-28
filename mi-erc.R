@@ -1,7 +1,7 @@
 
 mi_glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
                    offset = rep(0, length(id)), w = NULL, x = NULL,
-                   thin = 10, n.iter = 10000, n.adapt = 100,
+                   thin = 10, n.iter = 10000, n.adapt = 100, mc.cores = 1,
                    sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth"),
                    a.vals = seq(min(a), max(a), length.out = 100), deg.num = 2, span = 0.75,
                    shape = 1e-3, rate = 1e-3, scale = 1e6, h.a = 1, h.gamma = 0.1) {
@@ -187,8 +187,8 @@ mi_glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   a.list <- as.list(data.frame(t(a.mat)))
   
-  dr_out <- lapply(a.list, erc, y = y, x = x[,-1], offset = offset, deg.num = deg.num, 
-                   a.vals = a.vals, family = family, span = span, sl.lib = sl.lib)
+  dr_out <- mclapply(a.list, erc, y = y, x = x[,-1], offset = offset, deg.num = deg.num, 
+                   a.vals = a.vals, family = family, span = span, sl.lib = sl.lib, mc.cores = mc.cores)
   
   a.mat <- a.mat[,order(shield)]
   est.mat <- do.call(rbind, lapply(dr_out, function(arg, ...) arg$estimate))
@@ -207,7 +207,7 @@ mi_glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
 mi_bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
                         offset = rep(0, length(id)), w = NULL, x = NULL,
                         a.vals = seq(min(a), max(a), length.out = 100),
-                        thin = 10, n.iter = 10000, n.adapt = 1000,  
+                        thin = 10, n.iter = 10000, n.adapt = 1000,  mc.cores = 1,
                         shape = 1e-3, rate = 1e-3, scale = 1e6, h.a = 1, span = 0.75,
                         sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth"),
                         control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
@@ -375,8 +375,8 @@ mi_bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   a.list <- as.list(data.frame(t(a.mat)))
   
-  dr_out <- lapply(a.list, erc, y = y, x = x[,-1], offset = offset, deg.num = deg.num, 
-                   a.vals = a.vals, family = family, span = span, sl.lib = sl.lib)
+  dr_out <- mclapply(a.list, erc, y = y, x = x[,-1], offset = offset, deg.num = deg.num, 
+                   a.vals = a.vals, family = family, span = span, sl.lib = sl.lib, mc.cores = mc.cores)
   
   a.mat <- a.mat[,order(shield)]
   est.mat <- do.call(rbind, lapply(dr_out, function(arg, ...) arg$estimate))

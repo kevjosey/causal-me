@@ -25,7 +25,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   sig_pred <- scenario$sig_pred
   gps_scen <- "a"
   out_scen <- "a"
-  pred_scen <- "b"
+  pred_scen <- "a"
   
   # gen data arguments
   n <- scenario$n
@@ -93,6 +93,10 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
       
     }
     
+    # real
+    obs_hat <- try(erc(y = y, a = a, x = x, offset = offset, family = family,
+                       a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
+    
     # naive
     naive_tilde <- try(erc(y = y, a = z_tilde, x = x, offset = offset, family = family,
                            a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
@@ -107,24 +111,28 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
+                 if (!inherits(obs_hat, "try-error")) {obs_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(naive_tilde, "try-error")) {naive_tilde$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(blp_tilde, "try-error")) {blp_tilde$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(blp_hat, "try-error")) {blp_hat$estimate} else {rep(NA, length(a.vals))})
     
     # standard errors
-    se <- rbind(if (!inherits(naive_tilde, "try-error")) {sqrt(naive_tilde$variance)} else {rep(NA, length(a.vals))},
+    se <- rbind(if (!inherits(obs_hat, "try-error")) {sqrt(obs_hat$variance)} else {rep(NA, length(a.vals))},
+                if (!inherits(naive_tilde, "try-error")) {sqrt(naive_tilde$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(blp_tilde, "try-error")) {sqrt(blp_tilde$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))})
     
-    cp <- rbind(if (!inherits(naive_tilde, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} 
+    cp <- rbind(if (!inherits(obs_hat, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} 
                 else {rep(NA, length(a.vals))},
-                if (!inherits(naive_hat, "try-error")) {as.numeric((est[3,] - 1.96*se[2,]) < est[1,] & (est[3,] + 1.96*se[2,]) > est[1,])}
+                if (!inherits(naive_tilde, "try-error")) {as.numeric((est[3,] - 1.96*se[2,]) < est[1,] & (est[3,] + 1.96*se[2,]) > est[1,])} 
                 else {rep(NA, length(a.vals))},
-                if (!inherits(blp_tilde, "try-error")) {as.numeric((est[4,] - 1.96*se[3,]) < est[1,] & (est[4,] + 1.96*se[3,]) > est[1,])}
+                if (!inherits(naive_hat, "try-error")) {as.numeric((est[4,] - 1.96*se[3,]) < est[1,] & (est[4,] + 1.96*se[3,]) > est[1,])}
                 else {rep(NA, length(a.vals))},
-                if (!inherits(blp_hat, "try-error")) {as.numeric((est[5,] - 1.96*se[4,]) < est[1,] & (est[5,] + 1.96*se[4,]) > est[1,])}
+                if (!inherits(blp_tilde, "try-error")) {as.numeric((est[5,] - 1.96*se[4,]) < est[1,] & (est[5,] + 1.96*se[4,]) > est[1,])}
+                else {rep(NA, length(a.vals))},
+                if (!inherits(blp_hat, "try-error")) {as.numeric((est[6,] - 1.96*se[5,]) < est[1,] & (est[6,] + 1.96*se[5,]) > est[1,])}
                 else {rep(NA, length(a.vals))})
     
     return(list(est = est, se = se, cp = cp))
@@ -137,26 +145,28 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("ERF", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
+  rownames(out_est) <- c("ERF", "Observed", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
   compare <- matrix(est[1,,], nrow = length(a.vals), ncol = n.sim)
-  out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
+  out_bias <- t(apply(est[2:6,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
   colnames(out_bias) <- a.vals
-  rownames(out_bias) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
+  rownames(out_bias) <- c("Observed", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
-  out_sd <- t(apply(est[2:5,,], 1, function(x) apply(x, 1, sd, na.rm = T)))
+  out_sd <- t(apply(est[2:6,,], 1, function(x) apply(x, 1, sd, na.rm = T)))
   colnames(out_sd) <- a.vals
-  rownames(out_sd) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
+  rownames(out_sd) <- c("Observed", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
   out_se <- t(apply(se, 1, rowMeans, na.rm = T))
   colnames(out_se) <- a.vals
-  rownames(out_se) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
+  rownames(out_se) <- c("Observed", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
   out_cp <- t(apply(cp, 1, rowMeans, na.rm = T))
   colnames(out_cp) <- a.vals
-  rownames(out_cp) <- c("Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
+  rownames(out_cp) <- c("Observed", "Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
   
-  return(list(est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp))
+  rslt <- list(scenario = scenario, est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp)
+  filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim1/", paste(scenario, collapse = "_"),".RData")
+  save(rslt, file = filename)
   
 }
 
@@ -178,6 +188,3 @@ scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pr
 scen_mat <- round(scen_mat, 3)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 est <- lapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib)
-rslt <- list(est = est, scen_idx = scen_mat)
-
-save(rslt, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim_1.RData")

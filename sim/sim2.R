@@ -91,23 +91,23 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     # naive
     naive_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, family = family,
-                     a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num))
+                         a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num))
     
     # blp
     blp_hat <- try(erc(y = y, a = a_hat, x = x, offset = offset, family = family,
-                     a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
+                       a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
     
     # Bayesian Approach
     bayes_hat <- try(mi_glm_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
-                            s.id = s.id, id = id, w = w, x = x, family = family,
-                            a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
-                            h.a = h.a, h.gamma = h.gamma, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
+                                s.id = s.id, id = id, w = w, x = x, family = family,
+                                a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
+                                h.a = h.a, h.gamma = h.gamma, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # BART Approach
     bart_hat <- try(mi_bart_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
-                             s.id = s.id, id = id, w = w, x = x, family = family, 
-                             a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
-                             h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
+                                s.id = s.id, id = id, w = w, x = x, family = family, 
+                                a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
+                                h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
@@ -133,13 +133,13 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     return(list(est = est, se = se, cp = cp))
      
-  }, mc.cores = 28, mc.preschedule = TRUE)
+  }, mc.cores = 29, mc.preschedule = TRUE)
   
   stop <- Sys.time()
   
-  est <- abind(lapply(out, function(lst, ...) lst$est), along = 3)
-  se <- abind(lapply(out, function(lst, ...) lst$se), along = 3)
-  cp <- abind(lapply(out, function(lst, ...) lst$cp), along = 3)
+  est <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$est} else {matrix(NA, ncol = length(a.vals), nrow = 6)}), along = 3)
+  se <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$se} else {matrix(NA, ncol = length(a.vals), nrow = 5)}), along = 3)
+  cp <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$cp} else {matrix(NA, ncol = length(a.vals), nrow = 5)}), along = 3)
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
@@ -174,7 +174,7 @@ set.seed(42)
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.mean","SL.glm")
-n.sim <- 1000
+n.sim <- 200
 
 n <- c(400, 800)
 mult <- c(5, 10)
