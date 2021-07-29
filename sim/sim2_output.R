@@ -7,21 +7,22 @@ filenames <- list.files(path = "~/Dropbox/Projects/ERC-EPE/Output/sim2", full.na
 
 # Summary Plot
 
-plotnames <- c("GPS: \"a\"; Outcome: \"a\"",
-               "GPS: \"b\"; Outcome: \"a\"",
-               "GPS: \"a\"; Outcome: \"b\"",
-               "GPS: \"b\"; Outcome: \"b\"")
-idx <- c(22,23,24)
+plotnames <- c("GPS: \"A\"; Outcome: \"A\"",
+               "GPS: \"B\"; Outcome: \"A\"",
+               "GPS: \"A\"; Outcome: \"B\"",
+               "GPS: \"B\"; Outcome: \"B\"")
+idx <- c(57,59,61,63)
 
-pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_2.pdf", width = 9, height = 9)
+pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_2.pdf", width = 11, height = 9)
 par(mfrow = c(2,2))
+j <- 1
 
 for (k in idx){
   
   load(file = filenames[[k]])
   
   plot(a.vals, rslt$est[1,], type = "l", col = hue_pal()(3)[1], lwd = 2,
-       xlab = "Exposure", ylab = "Rate of Event", main = plotnames[k],
+       xlab = "Exposure", ylab = "Rate of Event", main = plotnames[j],
        ylim = c(0,0.15))
   grid(lty = 1)
   lines(a.vals, rslt$est[5,], type = "l", col = hue_pal()(3)[2], lwd = 2, lty = 1)
@@ -39,6 +40,8 @@ for (k in idx){
     
     
   }
+  
+  j <- j + 1
   
 }
 
