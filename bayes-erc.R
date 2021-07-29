@@ -2,7 +2,7 @@
 glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
                       offset = rep(0, length(id)), w = NULL, x = NULL,
                       a.vals = seq(min(a), max(a), length.out = 100),
-                      shape = 1e-3, rate = 1e-3, scale = 1e6,
+                      shape = 1e-3, rate = 1e-3, scale = 1e6, mc.cores = 1,
                       thin = 10, n.iter = 10000, n.adapt = 1000,
                       h.a = 0.5, h.gamma = 0.1, deg.num = 2, span = 0.75) {
   
@@ -76,22 +76,20 @@ glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
   sigma2 <- rep(NA, n.adapt + n.iter)
   tau2 <- rep(NA, n.adapt + n.iter)
   omega2 <- rep(NA, n.adapt + n.iter)
-  a.mat <- matrix(NA, nrow = n.iter + n.adapt, ncol = n)
   
   beta[1,] <- coef(lm(a ~ 0 + x))
   alpha[1,] <- coef(lm(s.tmp ~ 0 + ws.tmp))
   sigma2[1] <- sigma(lm(a ~ 0 + x))^2
   tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
   omega2[1] <- var(s.hat - a.s)
-  a.mat[1,] <- a
   
   # outcome stuff
   y_ <- family$linkinv(family$linkfun(y) - offset)
   gamma <- matrix(NA, nrow = n.adapt + n.iter, ncol = o)
   gamma[1,] <- coef(glm(y ~ 0 + xa, family = family, offset = offset))
-  # gamma <- array(NA, dim = c(n.adapt + n.iter, n.boot, ncol = o))
-  # gamma[1,,] <- matrix(rep(coef(glm(y ~ 0 + xa, family = family, offset = offset)), n.boot),
-  #                      byrow = TRUE, nrow = n.boot, ncol = o)
+  
+  # the good stuff
+  a.mat <- int <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
@@ -119,7 +117,7 @@ glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
       dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
     
     test <- log(runif(n))
-    a <- a.mat[i,] <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_, a)
+    a <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_, a)
     a.s <- rep(a, stab)
     
     # Sample pred parameters
@@ -163,16 +161,54 @@ glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
     
     gamma[i,] <- gamma_
     
-    # uncertainty design
-    # xa <- cbind(x, predict(nsa, a))
-    # gmod <- rstanarm::stan_glm(y ~ 0 + ., data = data.frame(y = y, xa), family = poisson, QR = TRUE,
-    #                            offset = offset, iter = 2*n.boot, chains = 1, refresh = 0)
-    # gamma[i,,] <- do.call(cbind, split.along.dim(as.array(gmod), 3))
+    # update important things
+    if (i > n.adapt & (i - n.adapt)%%thin == 0) {
+      
+      j <- (i - n.adapt)/thin
+      a.mat[j,] <- a 
+      
+      xa.new.list <- lapply(a.vals, function(a.tmp, ...) {
+        
+        cbind(x, a.tmp - 8, (a.tmp - 8)^2, (a.tmp - 8)*x[,2])
+        
+      })
+      
+      xa.new <- rbind(xa, do.call(rbind, xa.new.list))
+      x.new <- xa.new[,1:ncol(x)]
+      a.new <- c(a, rep(a.vals, each = n))
+      colnames(x.new) <- colnames(x)
+      colnames(xa.new) <- colnames(xa)
+      
+      # outcome models
+      muhat.vals <- family$linkinv(c(xa.new %*% gamma[i,]))
+      muhat <- muhat.vals[1:n]
+      muhat.mat <- matrix(muhat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
+      mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
+      
+      # exposure models
+      pimod.vals <- c(x.new %*% beta[i,])
+      pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2[i]))
+      pihat <- pihat.vals[1:n]
+      pihat.mat <- matrix(pihat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
+      phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
+      phat[which(phat < 0)] <- 1e-6
+      
+      # integrate
+      phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
+      mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
+      intfn <- (muhat.mat - mhat.mat) * phat.mat
+      int[j,] <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
+                     (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
+      
+      # pseudo-outcome
+      psi[j,] <- (y_ - muhat)/(pihat/phat) + mhat
+      
+    }
     
   }
   
-  accept.a <- apply(a.mat[(n.adapt + 1):nrow(a.mat),], 2, function(x) mean(diff(x) != 0) )
-  accept.gamma <- apply(gamma[(n.adapt + 1):nrow(a.mat),], 2, function(x) mean(diff(x) != 0) )
+  accept.a <- apply(a.mat, 2, function(x) mean(diff(x) != 0) )
+  accept.gamma <- apply(gamma[(n.adapt + 1):(n.iter + n.adapt),], 2, function(x) mean(diff(x) != 0) )
   
   # thinning
   keep <- seq(n.adapt + 1, n.iter + n.adapt, by = thin)
@@ -182,71 +218,20 @@ glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
   sigma2 <- sigma2[keep]
   tau2 <- tau2[keep]
   omega2 <- omega2[keep]
-  a.mat <- a.mat[keep,]
   
-  out <- lapply(1:nrow(a.mat), function(i, ...){
-
+  out <- mclapply(1:nrow(a.mat), function(i, ...){
+    
     a <- a.mat[i,]
-    xa <- cbind(x, a - 8, (a - 8)^2, (a - 8)*x[,2])
-
-    xa.new.list <- lapply(a.vals, function(a.tmp, ...) {
-
-      cbind(x, a.tmp - 8, (a.tmp - 8)^2, (a.tmp - 8)*x[,2])
-      
-    })
-
-    xa.new <- rbind(xa, do.call(rbind, xa.new.list))
-    x.new <- xa.new[,1:ncol(x)]
-    a.new <- c(a, rep(a.vals, each = n))
-    colnames(x.new) <- colnames(x)
-    colnames(xa.new) <- colnames(xa)
-
-    # exposure models
-    pimod.vals <- c(x.new %*% beta[i,])
-    pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2[i]))
-    pihat <- pihat.vals[1:n]
-    pihat.mat <- matrix(pihat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
-    phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
-    phat[which(phat < 0)] <- 1e-6
-
-    # outcome models
-    muhat.vals <- family$linkinv(c(xa.new %*% gamma[i,]))
-    muhat <- muhat.vals[1:n]
-    muhat.mat <- matrix(muhat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
-    mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
-
-    # integrate
-    phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
-    mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
-    intfn <- (muhat.mat - mhat.mat) * phat.mat
-    int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
-                   (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
-
-    # analyze
-    psi <- (y_ - muhat)/(pihat/phat) + mhat
+    psi <- psi[i,]
+    int <- int[i,]
+    
     dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, span = span, se.fit = TRUE)
     estimate <- dr_out[1,]
     variance <- dr_out[2,]
     
-    # uncertainty
-    # dr_out <- sapply(1:n.boot, function(j, ...){
-    # 
-    #   muhat.vals <- family$linkinv(c(xa.new %*% gamma[i,j,]))
-    #   muhat <- muhat.vals[1:n]
-    #   muhat.mat <- matrix(muhat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
-    #   mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
-    #   psi <- (y_ - muhat)/(pihat/phat) + mhat
-    #   out <- sapply(a.vals, dr_est, psi = psi, a = a, int = NULL, span = span, se.fit = FALSE)
-    #   return(out)
-    # 
-    # })
-    # 
-    # estimate <- rowMeans(dr_out)
-    # variance <- apply(dr_out, 1, var)
-
     return(list(estimate = estimate, variance = variance))
-
-  })
+    
+  }, mc.cores = mc.cores)
   
   a.mat <- a.mat[,order(shield)]
   est.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$estimate))

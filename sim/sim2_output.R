@@ -20,21 +20,22 @@ for (k in idx){
   
   load(file = filenames[[k]])
   
-  plot(a.vals, rslt$est[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
+  plot(a.vals, rslt$est[1,], type = "l", col = hue_pal()(3)[1], lwd = 2,
        xlab = "Exposure", ylab = "Rate of Event", main = plotnames[k],
        ylim = c(0,0.15))
   grid(lty = 1)
-  lines(a.vals, rslt$est[2,], type = "l", col = hue_pal()(6)[2], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[4,], type = "l", col = hue_pal()(6)[4], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[5,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[6,], type = "l", col = hue_pal()(6)[6], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[5,], type = "l", col = hue_pal()(3)[2], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[6,], type = "l", col = hue_pal()(3)[3], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[5,] - 1.96*rslt$se[4,], type = "l", col = hue_pal()(3)[2], lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[6,] - 1.96*rslt$se[5,], type = "l", col = hue_pal()(3)[3], lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[5,] + 1.96*rslt$se[4,], type = "l", col = hue_pal()(3)[2], lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[6,] + 1.96*rslt$se[5,], type = "l", col = hue_pal()(3)[3], lwd = 2, lty = 2)
   
   if (k == idx[length(idx)]){
     
-    legend(6, 0.15, legend=c("True ERF", "Observed", "Naive", "BLP", "BART"),
-           col=hue_pal()(5),
-           lty = c(1,1,1,1,1), lwd=2, cex=0.8)
+    legend(6, 0.15, legend=c("True ERC", "GLM", "BART", "95% CI"),
+           col= c(hue_pal()(3), "#000000"),
+           lty = c(1,1,1,2), lwd=2, cex=0.8)
     
     
   }
