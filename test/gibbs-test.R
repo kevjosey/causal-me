@@ -21,7 +21,7 @@ source("~/Github/causal-me/erc.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
-n.sim <- 32
+n.sim <- 100
 sig_gps <- 1
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
@@ -40,9 +40,9 @@ family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
-n.iter <- 2000
+n.iter <- 1000
 n.adapt <- 500
-thin <- 20
+thin <- 10
 h.a <- 1
 h.gamma <- 0.03
 scale <- 1e6
@@ -94,18 +94,14 @@ out <- mclapply(1:n.sim, function(i, ...){
   naive_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, family = family,
                        a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num))
   
-  # blp
-  blp_hat <- try(erc(y = y, a = a_hat, x = x, offset = offset, family = family,
-                     a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
-  
   # Bayesian Approach
-  bayes_hat <- try(mi_glm_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
+  bayes_hat <- try(glm_erc(s = s, star = s_tilde, y = y, offset = offset,
                            s.id = s.id, id = id, w = w, x = x, family = family,
                            a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                            h.a = h.a, h.gamma = h.gamma, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # BART Approach
-  bart_hat <- try(mi_bart_erc(s = s, star = s_tilde, y = y, offset = offset, sl.lib = sl.lib,
+  bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset,
                            s.id = s.id, id = id, w = w, x = x, family = family, 
                            a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                            h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
@@ -114,27 +110,27 @@ out <- mclapply(1:n.sim, function(i, ...){
   est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
                if (!inherits(obs_hat, "try-error")) {obs_hat$estimate} else {rep(NA, length(a.vals))},
                if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
-               if (!inherits(blp_hat, "try-error")) {blp_hat$estimate} else {rep(NA, length(a.vals))},
                if (!inherits(bayes_hat, "try-error")) {bayes_hat$estimate} else {rep(NA, length(a.vals))},
-               if (!inherits(bart_hat, "try-error")) {bart_hat$estimate} else {rep(NA, length(a.vals))})
+               if (!inherits(bart_hat, "try-error")) {bart_hat$tree_estimate} else {rep(NA, length(a.vals))},
+               if (!inherits(bart_hat, "try-error")) {bart_hat$smooth_estimate} else {rep(NA, length(a.vals))})
   
   #standard error
   se <- rbind(if (!inherits(obs_hat, "try-error")) {sqrt(obs_hat$variance)} else {rep(NA, length(a.vals))},
               if (!inherits(naive_hat, "try-error")) {sqrt(bayes_hat$variance)} else {rep(NA, length(a.vals))},
-              if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))},
               if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$variance)} else {rep(NA, length(a.vals))},
-              if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$variance)} else {rep(NA, length(a.vals))})
+              if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$tree_variance)} else {rep(NA, length(a.vals))},
+              if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$smooth_variance)} else {rep(NA, length(a.vals))})
   
   # coverage probability
   cp <- rbind(if (!inherits(obs_hat, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} else {rep(NA, length(a.vals))},
               if (!inherits(naive_hat, "try-error")) {as.numeric((est[3,] - 1.96*se[2,]) < est[1,] & (est[3,] + 1.96*se[2,]) > est[1,])} else {rep(NA, length(a.vals))},
-              if (!inherits(blp_hat, "try-error")) {as.numeric((est[4,] - 1.96*se[3,]) < est[1,] & (est[4,] + 1.96*se[3,]) > est[1,])} else {rep(NA, length(a.vals))},
-              if (!inherits(bayes_hat, "try-error")) {as.numeric((est[5,] - 1.96*se[4,]) < est[1,] & (est[5,] + 1.96*se[4,]) > est[1,])} else {rep(NA, length(a.vals))},
-              if (!inherits(bart_hat, "try-error")) {as.numeric((est[6,] - 1.96*se[5,]) < est[1,] & (est[6,] + 1.96*se[5,]) > est[1,])} else {rep(NA, length(a.vals))})
+              if (!inherits(bayes_hat, "try-error")) {as.numeric((est[4,] - 1.96*se[3,]) < est[1,] & (est[4,] + 1.96*se[3,]) > est[1,])} else {rep(NA, length(a.vals))},
+              if (!inherits(bart_hat, "try-error")) {as.numeric(bart_hat$hpdi[1,] < est[1,] & bart_hat$hpdi[2,] > est[1,])} else {rep(NA, length(a.vals))},
+              if (!inherits(bayes_hat, "try-error")) {as.numeric((est[6,] - 1.96*se[5,]) < est[1,] & (est[6,] + 1.96*se[5,]) > est[1,])} else {rep(NA, length(a.vals))})
   
   return(list(est = est, se = se, cp = cp))
   
-}, mc.cores = 32, mc.preschedule = FALSE)
+}, mc.cores = 10, mc.preschedule = FALSE)
 
 stop <- Sys.time()
 stop - start
@@ -160,6 +156,6 @@ lines(a.vals, out_est[4,], type = "l", col = hue_pal()(6)[4], lwd = 2, lty = 1)
 lines(a.vals, out_est[5,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
 lines(a.vals, out_est[6,], type = "l", col = hue_pal()(6)[6], lwd = 2, lty = 1)
 
-legend(6, 0.15, legend=c("True ERF", "Observed", "RC", "RC+BLP", "Bayes GLM", "BART"),
+legend(6, 0.15, legend=c("True ERF", "Observed", "RC", "Bayes GLM", "BART", "BART Smoothed"),
        col=hue_pal()(6),
        lty = c(1,1,1,1,1), lwd=2, cex=0.8)

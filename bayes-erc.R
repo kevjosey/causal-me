@@ -201,7 +201,7 @@ glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
                      (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
       
       # pseudo-outcome
-      psi[j,] <- (y_ - muhat)/(pihat/phat) + mhat
+      psi[j,] <- (y_ - muhat) + mhat
       
     }
     
@@ -239,7 +239,8 @@ glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
   estimate <- colMeans(est.mat)
   variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
   
-  rslt <- list(estimate = estimate, variance = variance, accept.a = accept.a, accept.gamma = accept.gamma,
+  rslt <- list(estimate = estimate, variance = variance, 
+               accept.a = accept.a, accept.gamma = accept.gamma,
                mcmc = list(a.mat = a.mat, gamma = gamma, beta = beta, alpha = alpha,
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
@@ -333,6 +334,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   # the good stuff
   a.mat <- int <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
+  mhat.out <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
   # initialize bart
   y_ <- family$linkinv(family$linkfun(y) - offset)
@@ -415,7 +417,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       muhat.mat <- sapply(a.vals, function(a.tmp, ...){
         xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
         colnames(xa.tmp) <- colnames(xa.train)[-1]
-        sampler$predict(xa.tmp)
+        sampler$predict(xa.tmp) + rnorm(n, 0, samples$sigma)
       })
       mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
       
@@ -427,7 +429,8 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       phat[which(phat < 0)] <- 1e-6
       
       # pseudo-outcome
-      psi[j,] <- (y_ - muhat)/(pihat/phat) + mhat # pseudo-outcome
+      psi[j,] <- (y_ - muhat) + mhat # pseudo-outcome
+      mhat.out[j,] <- colMeans(muhat.mat)
       
       # integrate
       phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
@@ -454,17 +457,17 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   # analyze output
   
   out <- mclapply(1:nrow(a.mat), function(i, ...){
-    
+
     a <- a.mat[i,]
     psi <- psi[i,]
     int <- int[i,]
-    
+
     dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, span = span, se.fit = TRUE)
     estimate <- dr_out[1,]
     variance <- dr_out[2,]
-    
+
     return(list(estimate = estimate, variance = variance))
-    
+
   }, mc.cores = mc.cores)
   
   a.mat <- a.mat[,order(shield)]
@@ -473,9 +476,12 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   estimate <- colMeans(est.mat)
   variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
   
-  rslt <- list(estimate = estimate, variance = variance, accept.a = accept.a,
-               mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha,
-                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
+  estimate_2 <- colMeans(mhat.out)
+  variance_2 <- apply(mhat.out, 2, var)
+  hpdi <- apply(mhat.out, 2, hpd)
+  
+  rslt <- list(smooth_estimate = estimate, smooth_variance = variance, tree_estimate = estimate_2, tree_variance = variance_2, 
+               accept.a = accept.a, hpdi = hpdi, mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
   return(rslt)
   
