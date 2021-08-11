@@ -174,8 +174,8 @@ glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
       })
       
       xa.new <- rbind(xa, do.call(rbind, xa.new.list))
-      x.new <- xa.new[,1:ncol(x)]
-      a.new <- c(a, rep(a.vals, each = n))
+      x.new <- xa.new[-(1:n),1:ncol(x)]
+      a.new <- rep(a.vals, each = n)
       colnames(x.new) <- colnames(x)
       colnames(xa.new) <- colnames(xa)
       
@@ -188,10 +188,7 @@ glm_erc <- function(s, star, y, s.id, id, family = gaussian(),
       # exposure models
       pimod.vals <- c(x.new %*% beta[i,])
       pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2[i]))
-      pihat <- pihat.vals[1:n]
-      pihat.mat <- matrix(pihat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
-      phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
-      phat[which(phat < 0)] <- 1e-6
+      pihat.mat <- matrix(pihat.vals, nrow = n, ncol = length(a.vals))
       
       # integrate
       phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
@@ -414,19 +411,19 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       
       # outcome model
       muhat <- rowMeans(samples$train)
+      
       muhat.mat <- sapply(a.vals, function(a.tmp, ...){
         xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
         colnames(xa.tmp) <- colnames(xa.train)[-1]
         sampler$predict(xa.tmp) + rnorm(n, 0, samples$sigma)
       })
+      
       mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
       
       # exposure model
       pimod.vals <- c(x %*% beta[i,])
-      pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
-      pihat.mat <- sapply(a.vals, function(a.tmp, ...) dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
-      phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
-      phat[which(phat < 0)] <- 1e-6
+      pihat.mat <- sapply(a.vals, function(a.tmp, ...)
+        dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
       
       # pseudo-outcome
       psi[j,] <- (y_ - muhat) + mhat # pseudo-outcome
@@ -462,7 +459,9 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     psi <- psi[i,]
     int <- int[i,]
 
-    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, span = span, se.fit = TRUE)
+    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, 
+                     int = int, span = span, se.fit = TRUE)
+    
     estimate <- dr_out[1,]
     variance <- dr_out[2,]
 
@@ -473,15 +472,17 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   a.mat <- a.mat[,order(shield)]
   est.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$estimate))
   var.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$variance))
-  estimate <- colMeans(est.mat)
-  variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
+  smooth_estimate <- colMeans(est.mat)
+  smooth_variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
   
-  estimate_2 <- colMeans(mhat.out)
-  variance_2 <- apply(mhat.out, 2, var)
+  tree_estimate <- colMeans(mhat.out)
+  tree_variance <- apply(mhat.out, 2, var)
   hpdi <- apply(mhat.out, 2, hpd)
+  rownames(hpdi) <- c("lower", "upper")
   
-  rslt <- list(smooth_estimate = estimate, smooth_variance = variance, tree_estimate = estimate_2, tree_variance = variance_2, 
-               accept.a = accept.a, hpdi = hpdi, mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
+  rslt <- list(smooth_estimate = smooth_estimate, smooth_variance = smooth_variance,
+               tree_estimate = tree_estimate, tree_variance = tree_variance, hpdi = hpdi,
+               accept.a = accept.a, mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
   return(rslt)
   
