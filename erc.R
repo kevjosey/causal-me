@@ -15,8 +15,8 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   pihat <- wrap$pihat
   phat <- wrap$phat
   int <- wrap$int
-  y.new <- family$linkinv(family$linkfun(y) - offset)
-  psi <- c((y.new - muhat) + mhat)
+  y_ <- family$linkinv(family$linkfun(y) - offset)
+  psi <- c((y_ - muhat) + mhat)
   
   if(is.null(span)) {
     
@@ -98,6 +98,7 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   x <- data.frame(x)
   xa <- data.frame(x, a = a)
   colnames(xa) <- c(colnames(x), "a")
+  y_ <- family$linkinv(family$linkfun(y) - offset)
   
   # estimate nuisance GPS functions via super learner
   pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
@@ -128,16 +129,26 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   phat[which(phat < 0)] <- 1e-6
   phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
   
-  # estimate nuisance outcome model with SuperLearner
+  # for accurate simulations
   mumod <- glm(y ~ . - a + poly(a, deg.num) + a:x1, data = xa, family = family, offset = offset)
   muhat <- predict(mumod, newdata = xa, type = "response")
+  
+  # estimate nuisance outcome model with SuperLearner
+  # mumod <- SuperLearner(Y = y_, X = xa, family = gaussian(), SL.library = sl.lib)
+  # muhat <- c(mumod$SL.predict)
   
   # predict marginal outcomes given a.vals (or a.agg)
   muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
     
+    # for simulations
     xa.tmp <- data.frame(x = x, a = a.tmp)
     colnames(xa.tmp) <- colnames(xa) 
     return(predict(mumod, newdata = xa.tmp, type = "response"))
+    
+    # more general
+    # xa.tmp <- data.frame(x = x, a = a.tmp)
+    # colnames(xa.tmp) <- colnames(xa) 
+    # return(predict(mumod, newdata = xa.tmp)$pred)
     
   })
   
