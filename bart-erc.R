@@ -96,7 +96,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
-    # print(i)
+    print(i)
     
     # sample S
     
@@ -155,7 +155,6 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     samples <- sampler$run()
     
     # Save output
-    
     if (i > n.adapt & (i - n.adapt)%%thin == 0) {
       
       j <- (i - n.adapt)/thin
@@ -167,7 +166,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       muhat.mat <- sapply(a.vals, function(a.tmp, ...){
         xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
         colnames(xa.tmp) <- colnames(xa.train)[-1]
-        sampler$predict(xa.tmp) + rnorm(n, 0, samples$sigma)
+        c(sampler$predict(xa.tmp))
       })
       
       mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
@@ -206,6 +205,8 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   # analyze output
   
   out <- mclapply(1:nrow(a.mat), function(i, ...){
+    
+    print(i)
     
     a <- a.mat[i,]
     psi <- psi[i,]

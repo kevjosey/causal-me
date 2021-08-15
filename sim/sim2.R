@@ -34,7 +34,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   # gibbs sampler stuff
   thin <- 20
-  n.iter <- 2000
+  n.iter <- 10000
   n.adapt <- 1000
   h.a <- 1
   h.gamma <- 0.03
@@ -133,14 +133,14 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("ERF","DR","RC","Bayes","BART","LOESS")
+  rownames(out_est) <- c("ERF","DR","RC","BART","LOESS")
   
   compare <- matrix(est[1,,], nrow = length(a.vals), ncol = n.sim)
-  out_bias <- t(apply(est[2:6,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
+  out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
   colnames(out_bias) <- a.vals
   rownames(out_bias) <- c("DR","RC","BART","LOESS")
   
-  out_sd <- t(apply(est[2:6,,], 1, function(x) apply(x, 1, sd, na.rm = T)))
+  out_sd <- t(apply(est[2:5,,], 1, function(x) apply(x, 1, sd, na.rm = T)))
   colnames(out_sd) <- a.vals
   rownames(out_sd) <- c("DR","RC","BART","LOESS")
   
@@ -164,7 +164,7 @@ set.seed(42)
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.mean","SL.glm")
-n.sim <- 1000
+n.sim <- 500
 
 n <- c(400, 800)
 mult <- c(5, 10)

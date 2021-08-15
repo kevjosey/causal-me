@@ -11,7 +11,7 @@ plotnames <- c("GPS: \"A\"; Outcome: \"A\"",
                "GPS: \"B\"; Outcome: \"A\"",
                "GPS: \"A\"; Outcome: \"B\"",
                "GPS: \"B\"; Outcome: \"B\"")
-idx <- c(57,59,61,63)
+idx <- c(50,52,54,56)
 
 pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_2.pdf", width = 11, height = 9)
 par(mfrow = c(2,2))
@@ -21,20 +21,26 @@ for (k in idx){
   
   load(file = filenames[[k]])
   
-  plot(a.vals, rslt$est[1,], type = "l", col = hue_pal()(3)[1], lwd = 2,
+  plot(a.vals, rslt$est[1,], type = "l", col = hue_pal()(5)[1], lwd = 2,
        xlab = "Exposure", ylab = "Rate of Event", main = plotnames[j],
        ylim = c(0,0.15))
   grid(lty = 1)
-  lines(a.vals, rslt$est[5,], type = "l", col = hue_pal()(3)[2], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[6,], type = "l", col = hue_pal()(3)[3], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[5,] - 1.96*rslt$se[4,], type = "l", col = hue_pal()(3)[2], lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[6,] - 1.96*rslt$se[5,], type = "l", col = hue_pal()(3)[3], lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[5,] + 1.96*rslt$se[4,], type = "l", col = hue_pal()(3)[2], lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[6,] + 1.96*rslt$se[5,], type = "l", col = hue_pal()(3)[3], lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[2,], type = "l", col = hue_pal()(5)[2], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[3,], type = "l", col = hue_pal()(5)[3], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[4,], type = "l", col = hue_pal()(5)[4], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[5,], type = "l", col = hue_pal()(5)[5], lwd = 2, lty = 1)
+  # lines(a.vals, rslt$est[2,] - 1.96*rslt$se[1,], type = "l", col = hue_pal()(5)[2], lwd = 2, lty = 2)
+  # lines(a.vals, rslt$est[3,] - 1.96*rslt$se[2,], type = "l", col = hue_pal()(5)[3], lwd = 2, lty = 2)
+  # lines(a.vals, rslt$est[4,] - 1.96*rslt$se[3,], type = "l", col = hue_pal()(5)[4], lwd = 2, lty = 2)
+  # lines(a.vals, rslt$est[5,] - 1.96*rslt$se[4,], type = "l", col = hue_pal()(5)[5], lwd = 2, lty = 2)
+  # lines(a.vals, rslt$est[2,] + 1.96*rslt$se[1,], type = "l", col = hue_pal()(5)[2], lwd = 2, lty = 2)
+  # lines(a.vals, rslt$est[3,] + 1.96*rslt$se[2,], type = "l", col = hue_pal()(5)[3], lwd = 2, lty = 2)
+  # lines(a.vals, rslt$est[4,] + 1.96*rslt$se[3,], type = "l", col = hue_pal()(5)[4], lwd = 2, lty = 2)
+  # lines(a.vals, rslt$est[5,] + 1.96*rslt$se[4,], type = "l", col = hue_pal()(5)[5], lwd = 2, lty = 2)
   
   if (k == idx[length(idx)]){
     
-    legend(6, 0.15, legend=c("True ERC", "GLM", "BART", "95% CI"),
+    legend(6, 0.15, legend=c("True ERC", "BART", "BART+LOESS", "95% CI"),
            col= c(hue_pal()(3), "#000000"),
            lty = c(1,1,1,2), lwd=2, cex=0.8)
     
