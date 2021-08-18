@@ -21,8 +21,8 @@ n.sim <- 100
 sig_gps <- 2
 sig_agg <- sqrt(2)
 sig_pred <- sqrt(0.5)
-gps_scen <- "a"
-out_scen <- "a"
+gps_scen <- "b"
+out_scen <- "b"
 pred_scen <- "b"
 span <- 0.2
 
@@ -32,14 +32,14 @@ n <- 1000
 prob <- 0.2
 
 # dr arguments
-a.vals <- seq(4, 12, by = 0.04)
+a.vals <- seq(6, 10, by = 0.04)
 sl.lib <- c("SL.glm")
 family <- poisson()
 deg.num <- 2
 
 # initialize output
 est <- array(NA, dim = c(n.sim, 5, length(a.vals)))
-se <- array(NA, dim = c(n.sim, 4, length(a.vals)))
+se <- cp <- array(NA, dim = c(n.sim, 4, length(a.vals)))
 
 for (i in 1:n.sim){
   
@@ -53,6 +53,7 @@ for (i in 1:n.sim){
   s.id <- dat$s.id
   id <- dat$id
   offset <- log(dat$offset)
+  n.iter <- 100
   
   # data
   y <- dat$y
@@ -75,61 +76,86 @@ for (i in 1:n.sim){
     id <- dat$id[(id %in% keep)]
   }
   
-  s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
+  s_mat <- pred(s = s, star = s_tilde, w = w, n.iter = n.iter, sl.lib = sl.lib)
   a_tilde <- blp(s = s_tilde, s.id = s.id, x = x)$a
-  a_hat <- blp(s = s_hat, s.id = s.id, x = x)$a
   
   z_tilde_tmp <- aggregate(s_tilde, by = list(s.id), mean)
-  z_hat_tmp <- aggregate(s_hat, by = list(s.id), mean)
+  z_tilde <- rep(NA, length(id))
   
-  z_hat <- z_tilde <- rep(NA, length(id))
-  
-  for (g in id) {
-    
+  for (g in id) 
     z_tilde[id == g] <- z_tilde_tmp[z_tilde_tmp[,1] == g,2]
-    z_hat[id == g] <- z_hat_tmp[z_hat_tmp[,1] == g,2]
-    
-  }
   
   # naive
   naive_tilde <- erc(y = y, a = z_tilde, x = x, offset = offset, family = family,
                      a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
-  naive_hat <- erc(y = y, a = z_hat, x = x, offset = offset, family = family,
+  
+  blp_tilde <- erc(y = y, a = a_tilde, x = x, offset = offset, family = family,
                    a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
-  # blp 
-  blp_tilde <- erc(y = y, a = a_tilde, x = x, offset = offset, family = family,
-               a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
-  blp_hat <- erc(y = y, a = dat$a, x = x, offset = offset, family = family,
-               a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
+  hat <- mclapply(1:ncol(s_mat), function(j, ...){
+    
+    s_hat <- s_mat[,j]
+    z_hat_tmp <- aggregate(s_hat, by = list(s.id), mean)
+    z_hat <- rep(NA, length(id))
+    
+    for (g in id) 
+        z_hat[id == g] <- z_hat_tmp[z_hat_tmp[,1] == g,2]
+    
+    a_hat <- blp(s = s_hat, s.id = s.id, x = x)$a
+      
+    naive_hat <- erc(y = y, a = z_hat, x = x, offset = offset, family = family,
+                     a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
+    blp_hat <- erc(y = y, a = dat$a, x = x, offset = offset, family = family,
+                 a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
+    
+    return(list(naive_est = naive_hat$estimate, blp_est = blp_hat$estimate,
+           naive_var = naive_hat$variance, blp_var = blp_hat$variance))
+    
+  }, mc.cores = 25)
+  
+  naive.est.mat <- do.call(rbind, lapply(hat, function(arg, ...) arg$naive_est))
+  naive.var.mat <- do.call(rbind, lapply(hat, function(arg, ...) arg$naive_var))
+  naive_estimate <- colMeans(naive.est.mat)
+  naive_variance <- colMeans(naive.var.mat) + (1 + 1/n.iter)*apply(naive.est.mat, 2, var)
+  
+  blp.est.mat <- do.call(rbind, lapply(hat, function(arg, ...) arg$blp_est))
+  blp.var.mat <- do.call(rbind, lapply(hat, function(arg, ...) arg$blp_var))
+  blp_estimate <- colMeans(blp.est.mat)
+  blp_variance <- colMeans(blp.var.mat) + (1 + 1/n.iter)*apply(blp.est.mat, 2, var)
   
   # estimates
   est[i,1,] <- predict_example(a = a.vals, x = x, out_scen = out_scen)
   est[i,2,] <- naive_tilde$estimate
-  est[i,3,] <- naive_hat$estimate
+  est[i,3,] <- naive_estimate
   est[i,4,] <- blp_tilde$estimate
-  est[i,5,] <- blp_hat$estimate
+  est[i,5,] <- blp_estimate
   
   se[i,1,] <- sqrt(naive_tilde$variance)
-  se[i,2,] <- sqrt(naive_hat$variance)
+  se[i,2,] <- sqrt(naive_variance)
   se[i,3,] <- sqrt(blp_tilde$variance)
-  se[i,4,] <- sqrt(blp_hat$variance)
+  se[i,4,] <- sqrt(blp_variance)
+  
+  cp[i,1,] <- as.numeric((est[i,2,] - 1.96*se[i,1,]) < est[i,1,] & (est[i,2,] + 1.96*se[i,1,]) > est[i,1,])
+  cp[i,2,] <- as.numeric((est[i,3,] - 1.96*se[i,2,]) < est[i,1,] & (est[i,3,] + 1.96*se[i,2,]) > est[i,1,])
+  cp[i,3,] <- as.numeric((est[i,4,] - 1.96*se[i,3,]) < est[i,1,] & (est[i,4,] + 1.96*se[i,3,]) > est[i,1,])
+  cp[i,4,] <- as.numeric((est[i,5,] - 1.96*se[i,4,]) < est[i,1,] & (est[i,5,] + 1.96*se[i,4,]) > est[i,1,])
   
 }
 
 out_est <- colMeans(est, na.rm = T)
+out_cp <- colMeans(cp, na.rm = T)
 colnames(out_est) <- a.vals
 rownames(out_est) <- c("True ERF","Naive Tilde", "Naive Hat", "BLP Tilde", "BLP Hat")
 
 plot(a.vals, colMeans(est, na.rm = T)[1,], type = "l", col = "darkgreen", lwd = 2,
      main = "Exposure = a, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
-     ylim = c(0,0.1))
+     ylim = c(0,0.12))
 lines(a.vals, colMeans(est, na.rm = T)[2,], type = "l", col = "red", lwd = 2, lty = 2)
 lines(a.vals, colMeans(est, na.rm = T)[3,], type = "l", col = "blue", lwd = 2, lty = 2)
 lines(a.vals, colMeans(est, na.rm = T)[4,], type = "l", col = "red", lwd = 2, lty = 3)
 lines(a.vals, colMeans(est, na.rm = T)[5,], type = "l", col = "blue", lwd = 2, lty = 3)
 
-legend(6, 0.1, legend=c("True ERF", "Without Prediction Correction",
+legend(6, 0.12, legend=c("True ERF", "Without Prediction Correction",
                         "With Prediction Correction", "Without Aggregation Correction",
                         "With Aggregation Correction"),
        col=c("darkgreen", "red", "blue", "black", "black"),

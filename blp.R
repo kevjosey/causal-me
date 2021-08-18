@@ -191,7 +191,7 @@ multi_blp <- function(s, s.id, x = NULL, id = NULL) {
   
 }
 
-pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){
+pred <- function(s, star, w, n.iter = 100, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){
   
   # set up evaluation points & matrices for predictions
   ws <- data.frame(w, star)
@@ -202,8 +202,11 @@ pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction
   # estimate nuisance outcome model with SuperLearner
   mumod <- SuperLearner(Y = s.tmp, X = ws.tmp, SL.library = sl.lib)
   stilde <- c(predict(mumod, newdata = ws)$pred)
-  stilde[!is.na(s)] <- s[!is.na(s)]
+  mumod2 <- SuperLearner(Y = (s.tmp - mumod$SL.predict)^2, X = ws.tmp, SL.library = sl.lib)
+  stilde2 <- sqrt(c(predict(mumod2, newdata = ws)$pred))
+  s.out <- replicate(n.iter, rnorm(nrow(ws), stilde, stilde2))
+  s.out[!is.na(s),] <- rep(s[!is.na(s)], n.sim)
   
-  return(stilde)
+  return(s.out)
   
 }

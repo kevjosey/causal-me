@@ -73,8 +73,7 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
   max.a.std <- max(abs(a.std))
   k.std <- c((1 - abs(a.std/max.a.std)^3)^3)
   gh <- cbind(1, a.std)
-  b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std,
-             psi = psi, gh = gh, family = family)
+  b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh, family = family)
   mu <- family$linkinv(c(b$par[1]))
   
   if (se.fit){
@@ -145,7 +144,7 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
     colnames(xa.tmp) <- colnames(xa) 
     return(predict(mumod, newdata = xa.tmp, type = "response"))
     
-    # more general
+    # general approach corresponding to SuperLearner model
     # xa.tmp <- data.frame(x = x, a = a.tmp)
     # colnames(xa.tmp) <- colnames(xa) 
     # return(predict(mumod, newdata = xa.tmp)$pred)

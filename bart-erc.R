@@ -177,7 +177,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
         dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
       
       # pseudo-outcome
-      psi[j,] <- (y_ - muhat) + mhat # pseudo-outcome
+      psi[j,] <- c(y_ - muhat) + mhat # pseudo-outcome
       mhat.out[j,] <- colMeans(muhat.mat)
       
       # integrate
@@ -212,8 +212,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     psi <- psi[i,]
     int <- int[i,]
     
-    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, 
-                     int = int, span = span, se.fit = TRUE)
+    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, span = span, se.fit = TRUE)
     
     estimate <- dr_out[1,]
     variance <- dr_out[2,]

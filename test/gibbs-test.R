@@ -29,7 +29,7 @@ out_scen <- "a"
 pred_scen <- "a"
 span <- 0.2
 mult <- 5
-n <- 10000
+n <- 400
 prob <- 0.2
 
 # model arguments
@@ -39,9 +39,9 @@ family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
-n.iter <- 1000
+n.iter <- 2000
 n.adapt <- 1000
-thin <- 10
+thin <- 20
 h.a <- 1
 h.gamma <- 0.03
 scale <- 1e6
@@ -81,7 +81,7 @@ out <- mclapply(1:n.sim, function(i, ...){
   }
   
   # exposure predictions
-  s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
+  s_hat <- pred(s = s, star = s_tilde, n.iter = 1, w = w, sl.lib = sl.lib)
   a_hat <- blp(s = s_hat, s.id = s.id, x = x, id = id)$a
   z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
   
@@ -120,7 +120,7 @@ out <- mclapply(1:n.sim, function(i, ...){
   
   return(list(est = est, se = se, cp = cp))
   
-}, mc.cores = 20, mc.preschedule = FALSE)
+}, mc.cores = 25, mc.preschedule = TRUE)
 
 stop <- Sys.time()
 stop - start
