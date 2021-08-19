@@ -81,7 +81,7 @@ out <- mclapply(1:n.sim, function(i, ...){
   }
   
   # exposure predictions
-  s_hat <- pred(s = s, star = s_tilde, n.iter = 1, w = w, sl.lib = sl.lib)
+  s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
   a_hat <- blp(s = s_hat, s.id = s.id, x = x, id = id)$a
   z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
   
@@ -139,7 +139,7 @@ rownames(out_cp) <- c("DR","RC","BART","LOESS")
 
 plot(a.vals, out_est[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
      main = "Exposure = b, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
-     ylim = c(0,0.15))
+     ylim = c(0,0.5))
 lines(a.vals, out_est[2,], type = "l", col = hue_pal()(6)[2], lwd = 2, lty = 1)
 lines(a.vals, out_est[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
 lines(a.vals, out_est[4,], type = "l", col = hue_pal()(6)[4], lwd = 2, lty = 1)

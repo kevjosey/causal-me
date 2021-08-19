@@ -100,7 +100,7 @@ for (i in 1:n.sim){
   # blp 
   blp_tilde <- erc(y = y, a = a_tilde, x = x, offset = offset, family = family,
                a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
-  blp_hat <- erc(y = y, a = dat$a, x = x, offset = offset, family = family,
+  blp_hat <- erc(y = y, a = a_hat, x = x, offset = offset, family = family,
                a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num)
   
   # estimates
