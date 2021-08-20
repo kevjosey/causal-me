@@ -1,12 +1,10 @@
 
 bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
-                      offset = rep(0, length(id)), w = NULL, x = NULL,
+                      offset = NULL, w = NULL, x = NULL,
                       a.vals = seq(min(a), max(a), length.out = 100),
                       shape = 1e-3, rate = 1e-3, scale = 1e6, mc.cores = 1,
                       thin = 10, n.iter = 10000, n.adapt = 1000,
                       h.a = 0.5, h.gamma = 0.1, deg.num = 2, span = 0.75) {
-  
-  dfun <- dpois
   
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
@@ -20,6 +18,9 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   if(length(check) > length(id))
     warning("deleting some exposures without an associated outcome.")
+  
+  if(is.null(offset))
+    offset <- rep(0, times = length(y))
   
   s <- s[s.id %in% id]
   star <- as.matrix(star)[s.id %in% id]
@@ -41,6 +42,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   y <- y[shield]
   x <- x[shield,]
   id <- id[shield]
+  offset <- offset[shield]
   
   if (is.null(w)) {
     ws <- cbind(rep(1, length(s.id)), star = star)
@@ -109,10 +111,10 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     a_ <- rnorm(n, a, h.a)
     xa_ <- cbind(x, a_ - 8, (a_ - 8)^2, (a_ - 8)*x[,2]) # needs to be more general
     
-    log.eps <- dfun(y, family$linkinv(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
+    log.eps <- dpois(y, family$linkinv(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
       dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
       dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
-      dfun(y, family$linkinv(c(xa%*%gamma[i - 1,]) + offset), log = TRUE) -
+      dpois(y, family$linkinv(c(xa%*%gamma[i - 1,]) + offset), log = TRUE) -
       dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
       dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
     
