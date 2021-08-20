@@ -125,7 +125,7 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   phat.vals <- sapply(a.vals, function(a.tmp, ...) 
     mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
   phat <- predict(smooth.spline(a.vals, phat.vals), x = a)$y
-  phat[which(phat < 0)] <- 1e-6
+  phat[which(phat < 0)] <- .Machine$double.eps
   phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
   
   # for accurate simulations

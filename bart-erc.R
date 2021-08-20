@@ -6,8 +6,6 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
                                              n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
-  dfun <- dpois
-  
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
   check <- check[check %in% id]
@@ -41,6 +39,8 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   y <- y[shield]
   x <- x[shield,]
   id <- id[shield]
+  offset <- offset[shield]
+  weights <- family$linkinv(offset)
   
   if (is.null(w)) {
     ws <- cbind(rep(1, length(s.id)), star = star)
@@ -88,7 +88,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   # initialize bart
   y_ <- family$linkinv(family$linkfun(y) - offset)
   xa.train <- data.frame(y_ = y_, x[,-1], a = a)
-  sampler <- dbarts::dbarts(y_ ~ ., data = xa.train, control = control)
+  sampler <- dbarts::dbarts(y_ ~ ., data = xa.train, control = control, weights = weights)
   
   # run first iteration of tree
   samples <- sampler$run()
@@ -117,12 +117,12 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       colnames(xa.test) <- colnames(xa.train)[-1]
       xa.pred <- sampler$predict(xa.test)
       
-      log.eps <- dnorm(y_, xa.pred, mean(samples$sigma), log = TRUE) +
+      log.eps <- dnorm(y_, xa.pred, mean(samples$sigma)/sqrt(weights), log = TRUE) +
         dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
         dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
-        dnorm(y_, samples$train, mean(samples$sigma), log = TRUE) -
+        dnorm(y_, samples$train, mean(samples$sigma)/sqrt(weights), log = TRUE) -
         dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
-        dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
+        dnorm(z.hat, a, sqrt(omega2[i - 1]/stab), log = TRUE)
       
       temp <- ifelse(((log(runif(n)) <= log.eps) & !is.na(log.eps)), a_, a)
       test <- sampler$setPredictor(x = temp, column = "a")

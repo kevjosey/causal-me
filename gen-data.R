@@ -80,10 +80,10 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   }
   
   if (out_scen == "b") {
-    mu_out <- -2 - 0.5*abs(u[,1] - u[,2]) + 0.5*abs(u[,3] - u[,4]) +
+    mu_out <- -3 - 0.5*abs(u[,1] - u[,2]) + 0.5*abs(u[,3] - u[,4]) +
       0.5*(a - 8) - 0.25*(a - 8)^2 - 0.25*(a - 8)*u[,1]
   } else { # y_scen == "b"
-    mu_out <- -2 - 0.5*x[,1] - 0.25*x[,2] + 0.25*x[,3] + 0.5*x[,4] +
+    mu_out <- -3 - 0.5*x[,1] - 0.25*x[,2] + 0.25*x[,3] + 0.5*x[,4] +
       0.5*(a - 8) - 0.25*(a - 8)^2 - 0.25*(a - 8)*x[,1]
   }
   
@@ -113,9 +113,9 @@ predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
     a.vec <- rep(a.vals[i],nrow(x))
 
     if (out_scen == "b") {
-      mu_out <- exp(-2 - u %*% c(-0.5,-0.25,0.25,0.5) + 0.5*(a.vec - 8) - 0.25*(a.vec - 8)^2 - 0.25*(a.vec - 8)*u[,1])
+      mu_out <- exp(-3 - u %*% c(-0.5,-0.25,0.25,0.5) + 0.5*(a.vec - 8) - 0.25*(a.vec - 8)^2 - 0.25*(a.vec - 8)*u[,1])
     } else { # out_scen == "a"
-      mu_out <- exp(-2 + x %*% c(-0.5,-0.25,0.25,0.5) + 0.5*(a.vec - 8) - 0.25*(a.vec - 8)^2 - 0.25*(a.vec - 8)*x[,1])
+      mu_out <- exp(-3 + x %*% c(-0.5,-0.25,0.25,0.5) + 0.5*(a.vec - 8) - 0.25*(a.vec - 8)^2 - 0.25*(a.vec - 8)*x[,1])
     }
 
     out[i] <- mean(mu_out)
