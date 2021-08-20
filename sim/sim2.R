@@ -57,6 +57,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     s.id <- dat$s.id
     id <- dat$id
     offset <- log(dat$offset)
+    weights <- dat$weights
     
     # data
     y <- dat$y
@@ -92,14 +93,8 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     naive_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, family = family,
                          a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num))
     
-    # Bayesian Approach
-    bayes_hat <- try(glm_erc(s = s, star = s_tilde, y = y, offset = offset,
-                             s.id = s.id, id = id, w = w, x = x, family = family,
-                             a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
-                             h.a = h.a, h.gamma = h.gamma, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
-    
     # BART Approach
-    bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset,
+    bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
                              s.id = s.id, id = id, w = w, x = x, family = family,
                              a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                              h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)

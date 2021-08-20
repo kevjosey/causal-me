@@ -1,5 +1,5 @@
 bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
-                     offset = rep(0, length(id)), w = NULL, x = NULL,
+                     offset = NULL, weights = NULL, w = NULL, x = NULL,
                      a.vals = seq(min(a), max(a), length.out = 100),
                      shape = 1e-3, rate = 1e-3, scale = 1e6, thin = 10, 
                      n.iter = 10000, n.adapt = 1000, h.a = 0.5, span = 0.75, mc.cores = 1,
@@ -18,6 +18,12 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   if(length(check) > length(id))
     warning("deleting some exposures without an associated outcome.")
+  
+  if(is.null(weights))
+    weights <- rep(1, times = length(y))
+  
+  if(is.null(offset))
+    offset <- rep(0, times = length(y))
   
   s <- s[s.id %in% id]
   star <- as.matrix(star)[s.id %in% id]
@@ -40,7 +46,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   x <- x[shield,]
   id <- id[shield]
   offset <- offset[shield]
-  weights <- family$linkinv(offset)
+  weights <- weights[shield]
   
   if (is.null(w)) {
     ws <- cbind(rep(1, length(s.id)), star = star)
