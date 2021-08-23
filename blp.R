@@ -90,6 +90,13 @@ blp <- function(s, s.id, x = NULL, id = NULL) {
       
     })
     
+    cvar <- sapply(1:n, function(i, ...) {
+      
+      out <- c(sigma2 - sigma2^2/(sigma2 + tau2/wts[i]))
+      return(out)
+      
+    })
+     
   }
   
   return(data.frame(id = id, a = a, cvar = cvar))

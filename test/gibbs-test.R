@@ -21,8 +21,8 @@ source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
 n.sim <- 100
-sig_gps <- 2
-sig_agg <- sqrt(2)
+sig_gps <- sqrt(2)
+sig_agg <- 2
 sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
@@ -34,14 +34,14 @@ prob <- 0.2
 
 # model arguments
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.mean","SL.glm")
+sl.lib <- c("SL.ranger")
 family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
-n.iter <- 2000
+n.iter <- 5000
 n.adapt <- 1000
-thin <- 20
+thin <- 50
 h.a <- 1
 h.gamma <- 0.03
 scale <- 1e6
@@ -82,40 +82,40 @@ out <- mclapply(1:n.sim, function(i, ...){
   }
   
   # exposure predictions
-  s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
-  a_hat <- blp(s = s_hat, s.id = s.id, x = x, id = id)$a
+  s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = "SL.glm")
+  a_hat <- blp(s = s_hat, s.id = s.id)$a
   z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
-  
-  # real
-  obs_hat <- try(erc(y = y, a = a, x = x, offset = offset, family = family,
-                     a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
   
   # naive
   naive_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, family = family,
                        a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num))
   
+  # real
+  blp_hat <- try(erc(y = y, a = a_hat, x = x, offset = offset, family = family,
+                     a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
+  
   # BART Approach
   bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
-                           s.id = s.id, id = id, w = w, x = x, family = family, 
+                           s.id = s.id, id = id, w = w, x = x, family = family,
                            a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                            h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # estimates
   est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
-               if (!inherits(obs_hat, "try-error")) {obs_hat$estimate} else {rep(NA, length(a.vals))},
                if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
+               if (!inherits(blp_hat, "try-error")) {blp_hat$estimate} else {rep(NA, length(a.vals))},
                if (!inherits(bart_hat, "try-error")) {bart_hat$tree_estimate} else {rep(NA, length(a.vals))},
                if (!inherits(bart_hat, "try-error")) {bart_hat$smooth_estimate} else {rep(NA, length(a.vals))})
   
   #standard error
-  se <- rbind(if (!inherits(obs_hat, "try-error")) {sqrt(obs_hat$variance)} else {rep(NA, length(a.vals))},
-              if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
+  se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
+              if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))},
               if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$tree_variance)} else {rep(NA, length(a.vals))},
               if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$smooth_variance)} else {rep(NA, length(a.vals))})
   
   # coverage probability
-  cp <- rbind(if (!inherits(obs_hat, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} else {rep(NA, length(a.vals))},
-              if (!inherits(naive_hat, "try-error")) {as.numeric((est[3,] - 1.96*se[2,]) < est[1,] & (est[3,] + 1.96*se[2,]) > est[1,])} else {rep(NA, length(a.vals))},
+  cp <- rbind(if (!inherits(naive_hat, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} else {rep(NA, length(a.vals))},
+              if (!inherits(blp_hat, "try-error")) {as.numeric((est[3,] - 1.96*se[2,]) < est[1,] & (est[3,] + 1.96*se[2,]) > est[1,])} else {rep(NA, length(a.vals))},
               if (!inherits(bart_hat, "try-error")) {as.numeric(bart_hat$hpdi[1,] < est[1,] & bart_hat$hpdi[2,] > est[1,])} else {rep(NA, length(a.vals))},
               if (!inherits(bart_hat, "try-error")) {as.numeric((est[5,] - 1.96*se[4,]) < est[1,] & (est[5,] + 1.96*se[4,]) > est[1,])} else {rep(NA, length(a.vals))})
   
@@ -146,6 +146,6 @@ lines(a.vals, out_est[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
 lines(a.vals, out_est[4,], type = "l", col = hue_pal()(6)[4], lwd = 2, lty = 1)
 lines(a.vals, out_est[5,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
 
-legend(6, 0.15, legend=c("True ERF", "Observed", "RC", "BART", "LOESS"),
+legend(6, 0.15, legend=c("True ERF", "RC", "RC+BLP", "BART", "LOESS"),
        col=hue_pal()(6),
        lty = c(1,1,1,1,1), lwd=2, cex=0.8)

@@ -20,8 +20,8 @@ source("~/Github/causal-me/erc.R")
 simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   # simulation arguments
-  sig_gps <- scenario$sig_gps
-  sig_agg <- sqrt(2)
+  sig_gps <- sqrt(2)
+  sig_agg <- scenario$sig_agg
   sig_pred <- sqrt(0.5)
   gps_scen <- scenario$gps_scen
   out_scen <- scenario$out_scen
@@ -33,8 +33,8 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   mult <- scenario$mult # c(100, 200)
   
   # gibbs sampler stuff
-  thin <- 20
-  n.iter <- 10000
+  thin <- 50
+  n.iter <- 5000
   n.adapt <- 1000
   h.a <- 1
   h.gamma <- 0.03
@@ -81,17 +81,17 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     }
     
     # exposure predictions
-    s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = sl.lib)
-    a_hat <- blp(s = s_hat, s.id = s.id, x = x, id = id)$a
+    s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = "SL.glm")
+    a_hat <- blp(s = s_hat, s.id = s.id)$a
     z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
-    
-    # real
-    obs_hat <- try(erc(y = y, a = a, x = x, offset = offset, family = family,
-                       a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
     
     # naive
     naive_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, family = family,
                          a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num))
+    
+    # real
+    blp_hat <- try(erc(y = y, a = a_hat, x = x, offset = offset, family = family,
+                       a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
     
     # BART Approach
     bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
@@ -101,20 +101,20 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
     
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
-                 if (!inherits(obs_hat, "try-error")) {obs_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
+                 if (!inherits(blp_hat, "try-error")) {blp_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(bart_hat, "try-error")) {bart_hat$tree_estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(bart_hat, "try-error")) {bart_hat$smooth_estimate} else {rep(NA, length(a.vals))})
     
     #standard error
-    se <- rbind(if (!inherits(obs_hat, "try-error")) {sqrt(obs_hat$variance)} else {rep(NA, length(a.vals))},
-                if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
+    se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
+                if (!inherits(blp_hat, "try-error")) {sqrt(blp_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$tree_variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$smooth_variance)} else {rep(NA, length(a.vals))})
     
     # coverage probability
-    cp <- rbind(if (!inherits(obs_hat, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} else {rep(NA, length(a.vals))},
-                if (!inherits(naive_hat, "try-error")) {as.numeric((est[3,] - 1.96*se[2,]) < est[1,] & (est[3,] + 1.96*se[2,]) > est[1,])} else {rep(NA, length(a.vals))},
+    cp <- rbind(if (!inherits(naive_hat, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} else {rep(NA, length(a.vals))},
+                if (!inherits(blp_hat, "try-error")) {as.numeric((est[3,] - 1.96*se[2,]) < est[1,] & (est[3,] + 1.96*se[2,]) > est[1,])} else {rep(NA, length(a.vals))},
                 if (!inherits(bart_hat, "try-error")) {as.numeric(bart_hat$hpdi[1,] < est[1,] & bart_hat$hpdi[2,] > est[1,])} else {rep(NA, length(a.vals))},
                 if (!inherits(bart_hat, "try-error")) {as.numeric((est[5,] - 1.96*se[4,]) < est[1,] & (est[5,] + 1.96*se[4,]) > est[1,])} else {rep(NA, length(a.vals))})
     
@@ -122,30 +122,30 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
      
   }, mc.cores = 30, mc.preschedule = TRUE)
   
-  est <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$est} else {matrix(NA, ncol = length(a.vals), nrow = 6)}), along = 3)
-  se <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$se} else {matrix(NA, ncol = length(a.vals), nrow = 5)}), along = 3)
-  cp <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$cp} else {matrix(NA, ncol = length(a.vals), nrow = 5)}), along = 3)
+  est <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$est} else {matrix(NA, ncol = length(a.vals), nrow = 5)}), along = 3)
+  se <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$se} else {matrix(NA, ncol = length(a.vals), nrow = 4)}), along = 3)
+  cp <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$cp} else {matrix(NA, ncol = length(a.vals), nrow = 4)}), along = 3)
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("ERF","DR","RC","BART","LOESS")
+  rownames(out_est) <- c("ERF","NAIVE","BLP","BART","LOESS")
   
   compare <- matrix(est[1,,], nrow = length(a.vals), ncol = n.sim)
   out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
   colnames(out_bias) <- a.vals
-  rownames(out_bias) <- c("DR","RC","BART","LOESS")
+  rownames(out_bias) <- c("NAIVE","BLP","BART","LOESS")
   
   out_sd <- t(apply(est[2:5,,], 1, function(x) apply(x, 1, sd, na.rm = T)))
   colnames(out_sd) <- a.vals
-  rownames(out_sd) <- c("DR","RC","BART","LOESS")
+  rownames(out_sd) <- c("NAIVE","BLP","BART","LOESS")
   
-  out_se <- t(apply(se, 1, rowMeans, na.rm = T))
+  out_se <- t(apply(se, 1, rowMeans, na.rm = TRUE))
   colnames(out_se) <- a.vals
-  rownames(out_se) <- c("DR","RC","BART","LOESS")
+  rownames(out_se) <- c("NAIVE","BLP","BART","LOESS")
   
-  out_cp <- t(apply(cp, 1, rowMeans, na.rm = T))
+  out_cp <- t(apply(cp, 1, rowMeans, na.rm = TRUE))
   colnames(out_cp) <- a.vals
-  rownames(out_cp) <- c("DR","RC","BART","LOESS")
+  rownames(out_cp) <- c("NAIVE","BLP","BART","LOESS")
   
   rslt <- list(scenario = scenario, est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp)
   filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim2/", paste(scenario, collapse = "_"),".RData")
@@ -158,16 +158,16 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.mean","SL.glm")
-n.sim <- 500
+sl.lib <- c("SL.ranger")
+n.sim <- 1000
 
 n <- c(400, 800)
 mult <- c(5, 10)
-sig_gps <- c(1, 2)
+sig_agg <- c(1, 2)
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
 pred_scen <- c("a", "b")
 
-scen_mat <- expand.grid(n = n, mult = mult, sig_gps = sig_gps,  gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, stringsAsFactors = FALSE)
+scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 est <- lapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib)
