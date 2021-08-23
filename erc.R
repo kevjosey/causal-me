@@ -50,7 +50,7 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
   }
   
   dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, 
-                   span = span, family = family, se.fit = TRUE)
+                   span = span, family = gaussian(), se.fit = TRUE)
   
   estimate <- dr_out[1,]
   variance <- dr_out[2,]
