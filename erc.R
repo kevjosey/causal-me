@@ -102,19 +102,8 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   # estimate nuisance GPS functions via super learner
   pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
   pimod.vals <- c(pimod$SL.predict)
-  
-  pi2mod <- try(SuperLearner(Y = (a - pimod.vals)^2, X = x, family = gaussian(),
-                             SL.library = sl.lib), silent = TRUE)
-  
-  if (inherits(pi2mod, "try-error")) {
-    
-    pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
-                           family = gaussian(), SL.library = "SL.mean")
-    
-  }
-  
+  pi2mod <- mean((a - pimod.vals)^2)
   pi2mod.vals <- c(pi2mod$SL.predict)
-  pi2mod.vals[pi2mod.vals <= 0] <- .Machine$double.eps
   
   # exposure models
   pihat <- dnorm(a, pimod.vals, sqrt(pi2mod.vals))
