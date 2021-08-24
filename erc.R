@@ -113,14 +113,8 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
     
   }
   
-  if (any(pi2mod$SL.predict <= 0)) {
-    
-    pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
-                           family = gaussian(), SL.library = "SL.mean")
-    
-  }
-  
   pi2mod.vals <- c(pi2mod$SL.predict)
+  pi2mod.vals[pi2mod$SL.predict <= 0] <- .Machine$double.eps
   
   # exposure models
   pihat <- dnorm(a, pimod.vals, sqrt(pi2mod.vals))
