@@ -111,7 +111,9 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
     pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
                            family = gaussian(), SL.library = "SL.mean")
     
-  } else if (any(pi2mod$SL.predict <= 0)) {
+  }
+  
+  if (any(pi2mod$SL.predict <= 0)) {
     
     pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, 
                            family = gaussian(), SL.library = "SL.mean")
@@ -128,26 +130,17 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   phat[which(phat < 0)] <- .Machine$double.eps
   phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
   
-  # for accurate simulations
-  mumod <- glm(y ~ . - a + poly(a, deg.num) + a:x1, data = xa, family = family, offset = offset)
-  muhat <- predict(mumod, newdata = xa, type = "response")
-  
   # estimate nuisance outcome model with SuperLearner
-  # mumod <- SuperLearner(Y = y_, X = xa, family = gaussian(), SL.library = sl.lib)
-  # muhat <- c(mumod$SL.predict)
+  mumod <- SuperLearner(Y = y_, X = xa, family = gaussian(), SL.library = sl.lib)
+  muhat <- c(mumod$SL.predict)
   
   # predict marginal outcomes given a.vals (or a.agg)
   muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
     
-    # for simulations
-    xa.tmp <- data.frame(x = x, a = a.tmp)
-    colnames(xa.tmp) <- colnames(xa) 
-    return(predict(mumod, newdata = xa.tmp, type = "response"))
-    
     # general approach corresponding to SuperLearner model
-    # xa.tmp <- data.frame(x = x, a = a.tmp)
-    # colnames(xa.tmp) <- colnames(xa) 
-    # return(predict(mumod, newdata = xa.tmp)$pred)
+    xa.tmp <- data.frame(x = x, a = a.tmp)
+    colnames(xa.tmp) <- colnames(xa)
+    return(predict(mumod, newdata = xa.tmp)$pred)
     
   })
   

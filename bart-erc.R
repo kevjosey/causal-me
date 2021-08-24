@@ -102,7 +102,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
-    print(i)
+    # print(i)
     
     # sample S
     
@@ -212,7 +212,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   out <- mclapply(1:nrow(a.mat), function(i, ...){
     
-    print(i)
+    # print(i)
     
     a <- a.mat[i,]
     psi <- psi[i,]

@@ -37,7 +37,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   n.iter <- 4000
   n.adapt <- 1000
   h.a <- 1
-  h.gamma <- 0.03
+  h.gamma <- 0.05
   scale <- 1e6
   shape <- rate <- 1e-3
   deg.num <- 2

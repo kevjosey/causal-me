@@ -39,11 +39,11 @@ family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
-n.iter <- 5000
+n.iter <- 4000
 n.adapt <- 1000
-thin <- 50
+thin <- 40
 h.a <- 1
-h.gamma <- 0.03
+h.gamma <- 0.05
 scale <- 1e6
 shape <- rate <- 1e-3
 
