@@ -33,11 +33,10 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   mult <- scenario$mult # c(100, 200)
   
   # gibbs sampler stuff
-  thin <- 40
-  n.iter <- 4000
+  thin <- 10
+  n.iter <- 1000
   n.adapt <- 1000
-  h.a <- 1
-  h.gamma <- 0.05
+  h.a <- 0.5
   scale <- 1e6
   shape <- rate <- 1e-3
   deg.num <- 2
