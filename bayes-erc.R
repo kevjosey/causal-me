@@ -1,6 +1,6 @@
 
 bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
-                      offset = NULL, w = NULL, x = NULL,
+                      offset = NULL, weights = NULL, w = NULL, x = NULL,
                       a.vals = seq(min(a), max(a), length.out = 100),
                       shape = 1e-3, rate = 1e-3, scale = 1e6, mc.cores = 1,
                       thin = 10, n.iter = 10000, n.adapt = 1000,
@@ -18,6 +18,9 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   if(length(check) > length(id))
     warning("deleting some exposures without an associated outcome.")
+  
+  if(is.null(weights))
+    weights <- rep(1, times = length(y))
   
   if(is.null(offset))
     offset <- rep(0, times = length(y))
@@ -42,6 +45,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   y <- y[shield]
   x <- x[shield,]
   id <- id[shield]
+  weights <- weights[shield]
   offset <- offset[shield]
   
   if (is.null(w)) {
@@ -200,7 +204,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
                      (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
       
       # pseudo-outcome
-      psi[j,] <- (y_ - muhat) + mhat
+      psi[j,] <- (y_ - muhat)*(phat/pihat) + mhat
       
     }
     
@@ -224,7 +228,9 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
     psi <- psi[i,]
     int <- int[i,]
     
-    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, span = span, se.fit = TRUE)
+    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int,
+                     span = span, family = gaussian(), se.fit = TRUE)
+    
     estimate <- dr_out[1,]
     variance <- dr_out[2,]
     
