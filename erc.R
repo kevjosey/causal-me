@@ -49,7 +49,7 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
     
   }
   
-  dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, 
+  dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int,
                    span = span, family = gaussian(), se.fit = TRUE)
   
   estimate <- dr_out[1,]
@@ -63,15 +63,19 @@ erc <- function(a, y, x, family = gaussian(), offset = rep(0, length(a)),
 }
 
 # LOESS function
-dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE) {
+dr_est <- function(newa, a, psi, int, span, weights = NULL, family = gaussian(), se.fit = FALSE) {
+  
+  if(is.null(weights))
+    weights <- rep(1, times = length(a))
   
   a.std <- a - newa
   k <- floor(min(span, 1)*length(a))
   idx <- order(abs(a.std))[1:k]
   a.std <- a.std[idx]
   psi <- psi[idx]
+  weights <- weights[idx]
   max.a.std <- max(abs(a.std))
-  k.std <- c((1 - abs(a.std/max.a.std)^3)^3)
+  k.std <- weights*c((1 - abs(a.std/max.a.std)^3)^3)
   gh <- cbind(1, a.std)
   b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh, family = family)
   mu <- family$linkinv(c(b$par[1]))
@@ -118,10 +122,6 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   mumod <- glm(y ~ . - a + poly(a, deg.num) + a:x1, data = xa, family = family, offset = offset)
   muhat <- predict(mumod, newdata = xa, type = "response")
   
-  # estimate nuisance outcome model with SuperLearner
-  # mumod <- SuperLearner(Y = y_, X = xa, family = gaussian(), SL.library = sl.lib)
-  # muhat <- c(mumod$SL.predict)
-  
   # predict marginal outcomes given a.vals (or a.agg)
   muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
     
@@ -129,11 +129,6 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
     xa.tmp <- data.frame(x = x, a = a.tmp)
     colnames(xa.tmp) <- colnames(xa)
     return(predict(mumod, newdata = xa.tmp, type = "response"))
-    
-    # general approach corresponding to SuperLearner model
-    # xa.tmp <- data.frame(x = x, a = a.tmp)
-    # colnames(xa.tmp) <- colnames(xa)
-    # return(predict(mumod, newdata = xa.tmp)$pred)
     
   })
   
@@ -160,4 +155,3 @@ opt_fun <- function(par, k.std, psi, gh, family) {
   sum(k.std*(psi - family$linkinv(c(gh %*% par)))^2)
   
 }
-

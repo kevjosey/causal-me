@@ -22,15 +22,15 @@ source("~/Github/causal-me/auxiliary.R")
 # simulation arguments
 n.sim <- 100
 sig_gps <- sqrt(2)
-sig_agg <- sqrt(2)
+sig_agg <- 1
 sig_pred <- 1
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "a"
 span <- 0.2
-mult <- 5
-n <- 400
-prob <- 0.2
+mult <- 10
+n <- 800
+prob <- 0.1
 
 # model arguments
 a.vals <- seq(6, 10, by = 0.04)
@@ -39,9 +39,9 @@ family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
-n.iter <- 1000
+n.iter <- 2000
 n.adapt <- 1000
-thin <- 10
+thin <- 20
 h.a <- 0.5
 scale <- 1e6
 shape <- rate <- 1e-3
@@ -56,9 +56,9 @@ out <- mclapply(1:n.sim, function(i, ...){
   # zipcode index
   s.id <- dat$s.id
   id <- dat$id
-  offset <- log(dat$offset)
   weights <- dat$offset
-  
+  offset <- log(dat$offset)
+
   # data
   y <- dat$y
   x <- dat$x
