@@ -218,7 +218,8 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
     psi <- psi[i,]
     int <- int[i,]
     
-    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, span = span, family = gaussian(), se.fit = TRUE)
+    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int, 
+                     span = span, family = gaussian(), se.fit = TRUE)
     
     estimate <- dr_out[1,]
     variance <- dr_out[2,]

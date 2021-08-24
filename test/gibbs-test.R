@@ -22,8 +22,8 @@ source("~/Github/causal-me/auxiliary.R")
 # simulation arguments
 n.sim <- 100
 sig_gps <- sqrt(2)
-sig_agg <- 2
-sig_pred <- sqrt(0.5)
+sig_agg <- sqrt(2)
+sig_pred <- 1
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "a"
@@ -39,9 +39,9 @@ family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
-n.iter <- 4000
+n.iter <- 1000
 n.adapt <- 1000
-thin <- 40
+thin <- 10
 h.a <- 1
 h.gamma <- 0.05
 scale <- 1e6

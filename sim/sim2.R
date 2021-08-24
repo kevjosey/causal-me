@@ -22,7 +22,7 @@ simulate <- function(scenario, n.sim, a.vals, sl.lib){
   # simulation arguments
   sig_gps <- sqrt(2)
   sig_agg <- scenario$sig_agg
-  sig_pred <- sqrt(0.5)
+  sig_pred <- 1
   gps_scen <- scenario$gps_scen
   out_scen <- scenario$out_scen
   pred_scen <- scenario$pred_scen
@@ -163,7 +163,7 @@ n.sim <- 1000
 
 n <- c(400, 800)
 mult <- c(5, 10)
-sig_agg <- c(1, 2)
+sig_agg <- c(sqrt(1), sqrt(2))
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
 pred_scen <- c("a", "b")
