@@ -14,34 +14,33 @@ library(abind)
 
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/bart-erc.R")
+source("~/Github/causal-me/bart-erc-2.R")
 source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("~/Github/causal-me/erc-2.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
 n.sim <- 100
-sig_gps <- sqrt(2)
+sig_gps <- 1
 sig_agg <- 1
-sig_pred <- 1
+sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "a"
-span <- 0.2
-mult <- 10
+span <- 0.1
+mult <- 5
 n <- 800
 prob <- 0.1
 
 # model arguments
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.ranger")
 family <- poisson()
 deg.num <- 2
 
 # mcmc arguments
-n.iter <- 2000
+n.iter <- 1000
 n.adapt <- 1000
-thin <- 20
+thin <- 10
 h.a <- 0.5
 scale <- 1e6
 shape <- rate <- 1e-3
@@ -86,12 +85,12 @@ out <- mclapply(1:n.sim, function(i, ...){
   z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
   
   # naive
-  naive_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, family = family,
-                       a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num))
+  naive_hat <- try(erc(y = y, a = a, x = x, offset = offset, family = family,
+                       a.vals = a.vals, span = span, deg.num = deg.num))
   
   # real
   blp_hat <- try(erc(y = y, a = a_hat, x = x, offset = offset, family = family,
-                     a.vals = a.vals, sl.lib = sl.lib, span = span, deg.num = deg.num), silent = TRUE)
+                     a.vals = a.vals, span = span, deg.num = deg.num), silent = TRUE)
   
   # BART Approach
   bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
@@ -131,11 +130,11 @@ cp <- abind(lapply(out, function(lst, ...) lst$cp), along = 3)
 
 out_est <- t(apply(est, 1, rowMeans, na.rm = T))
 colnames(out_est) <- a.vals
-rownames(out_est) <- c("ERF","DR","RC","BART","LOESS")
+rownames(out_est) <- c("ERF","RC","RC+BLP","BART","LOESS")
 
 out_cp <- t(apply(cp, 1, rowMeans, na.rm = T))
 colnames(out_cp) <- a.vals
-rownames(out_cp) <- c("DR","RC","BART","LOESS")
+rownames(out_cp) <- c("RC","RC+BLP","BART","LOESS")
 
 plot(a.vals, out_est[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
      main = "Exposure = b, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 

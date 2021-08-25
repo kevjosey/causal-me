@@ -20,9 +20,9 @@ source("~/Github/causal-me/erc.R")
 simulate <- function(scenario, n.sim, a.vals, sl.lib){
   
   # simulation arguments
-  sig_gps <- sqrt(2)
+  sig_gps <- 1
   sig_agg <- scenario$sig_agg
-  sig_pred <- 1
+  sig_pred <- scenario$sig_pred
   gps_scen <- scenario$gps_scen
   out_scen <- scenario$out_scen
   pred_scen <- scenario$pred_scen
@@ -157,16 +157,17 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 10, by = 0.04)
-sl.lib <- c("SL.ranger")
-n.sim <- 1000
+sl.lib <- c("SL.glm")
+n.sim <- 500
 
-n <- c(400, 800)
+n <- 400
 mult <- c(5, 10)
 sig_agg <- c(sqrt(1), sqrt(2))
+sig_pred <- c(sqrt(0.5), sqrt(1))
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
 pred_scen <- c("a", "b")
 
-scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, stringsAsFactors = FALSE)
+scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred, gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 est <- lapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals, sl.lib = sl.lib)

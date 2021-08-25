@@ -1,4 +1,3 @@
-
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
 erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
                 a.vals = seq(min(a), max(a), length.out = 100), deg.num = 2,
@@ -70,28 +69,24 @@ erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
 }
 
 # LOESS function
-dr_est <- function(newa, a, psi, int, span, weights = NULL, family = gaussian(), se.fit = FALSE) {
-  
-  if(is.null(weights))
-    weights <- rep(1, times = length(a))
+dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE) {
   
   a.std <- a - newa
   k <- floor(min(span, 1)*length(a))
   idx <- order(abs(a.std))[1:k]
   a.std <- a.std[idx]
   psi <- psi[idx]
-  weights <- weights[idx]
   max.a.std <- max(abs(a.std))
-  k.std <- weights*c((1 - abs(a.std/max.a.std)^3)^3)
+  k.std <- c((1 - abs(a.std/max.a.std)^3)^3)
   gh <- cbind(1, a.std)
-  b <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh, family = family)
-  mu <- family$linkinv(c(b$par[1]))
+  bh <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh, family = family)
+  mu <- family$linkinv(c(bh$par[1]))
   
   if (se.fit){
     
     int <- int[idx]
     gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
-    v.inf <- (psi + int - family$linkinv(c(gh%*%b$par)))^2
+    v.inf <- (psi + int - family$linkinv(c(gh%*%bh$par)))^2
     sig <- gh.inv %*% t(gh) %*% diag(k.std) %*% diag(v.inf) %*% diag(k.std) %*% gh %*% gh.inv
     return(c(mu = mu, sig = sig[1,1]))
     
