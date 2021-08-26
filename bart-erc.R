@@ -179,11 +179,10 @@ bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       
       # pseudo-outcome
       psi[j,] <- c(y_ - muhat) + mhat # pseudo-outcome
-      # mhat.out[j,] <- sapply(a.vals, function(a.tmp, ...){
-      #   xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
-      #   colnames(xa.tmp) <- colnames(xa.train)[-1]
-      #   mean(sampler$predict(xa.tmp))})
-      mhat.out[j,] <- rep(NA, times = length(a.vals))
+      mhat.out[j,] <- sapply(a.vals, function(a.tmp, ...){
+        xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
+        colnames(xa.tmp) <- colnames(xa.train)[-1]
+        mean(sampler$predict(xa.tmp))})
       
       dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, family = gaussian(), 
                        span = span, int.mat = int.mat, se.fit = TRUE)
