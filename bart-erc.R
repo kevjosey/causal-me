@@ -1,8 +1,8 @@
 bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
                      offset = NULL, weights = NULL, family = gaussian(),
                      a.vals = seq(min(a), max(a), length.out = 100),
-                     shape = 1e-3, rate = 1e-3, scale = 1e6, thin = 10, 
-                     n.iter = 10000, n.adapt = 1000, h.a = 0.5, span = 0.5,
+                     shape = 1e-3, rate = 1e-3, scale = 1e6, h.a = 0.5, span = 0.75, 
+                     n.iter = 10000, n.adapt = 1000, thin = 10, 
                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
                                              n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
@@ -102,7 +102,7 @@ bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
-    print(i)
+    # print(i)
     
     # sample S
     
@@ -184,8 +184,8 @@ bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
         colnames(xa.tmp) <- colnames(xa.train)[-1]
         mean(sampler$predict(xa.tmp))})
       
-      dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, family = gaussian(), 
-                       span = span, int.mat = int.mat, se.fit = TRUE)
+      dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, span = span, 
+                       family = gaussian(), se.fit = TRUE, int.mat = int.mat)
       
       est.mat[j,] <- dr_out[1,]
       var.mat[j,] <- dr_out[2,]

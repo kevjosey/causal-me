@@ -1,6 +1,7 @@
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
 erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
                 a.vals = seq(min(a), max(a), length.out = 100),
+                n.iter = 10000, n.adapt = 1000, thin = 10, 
                 span = NULL, span.seq = seq(0.05, 1, by = 0.05), k = 5){	
   
   
@@ -13,7 +14,8 @@ erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
   n <- length(a)
   
   wrap <- np_est(y = y, a = a, x = x, a.vals = a.vals, 
-                 family = family, offset = offset, weights = weights)
+                 family = family, offset = offset, weights = weights,
+                 n.iter = n.iter, n.adapt = n.adapt, thin = thin)
   
   muhat <- wrap$muhat
   mhat <- wrap$mhat
@@ -51,8 +53,8 @@ erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
 
   }
   
-  dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, family = gaussian(), 
-                   span = span, int.mat = int.mat, se.fit = TRUE)
+  dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, span = span, 
+                   family = gaussian(), se.fit = TRUE, int.mat = int.mat)
   
   estimate <- dr_out[1,]
   variance <- dr_out[2,]
@@ -127,7 +129,8 @@ dr_est <- function(newa, a, psi, span, family = gaussian(), se.fit = FALSE, int.
 #   
 # }
 
-np_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = gaussian()) {
+np_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = gaussian(),
+                   n.iter = 1000, n.adapt = 1000, thin = 10) {
   
   if (is.null(weights))
     weights <- rep(1, nrow(x))
@@ -143,7 +146,8 @@ np_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = gaus
   y_ <- family$linkinv(family$linkfun(y) - offset)
   
   # for accurate simulations
-  mumod <- dbarts::bart(y.train = y_, x.train = xa, weights = weights, keeptrees = TRUE, verbose = FALSE)
+  mumod <- dbarts::bart(y.train = y_, x.train = xa, weights = weights, keeptrees = TRUE,
+                        ndpost = n.iter, nskip = n.adapt, keepevery = thin, verbose = FALSE)
   muhat <- mumod$yhat.train.mean
   
   muhat.mat <- sapply(a, function(a.tmp, ...) {

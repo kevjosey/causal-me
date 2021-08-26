@@ -1,9 +1,8 @@
-
 bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
                       offset = NULL, weights = NULL, family = gaussian(),
                       a.vals = seq(min(a), max(a), length.out = 100),
                       shape = 1e-3, rate = 1e-3, scale = 1e6,
-                      thin = 10, n.iter = 10000, n.adapt = 1000,
+                      n.iter = 10000, n.adapt = 1000, thin = 10, 
                       h.a = 0.5, h.gamma = 0.1, span = 0.75) {
   
   # remove any s.id not present in id

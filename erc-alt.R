@@ -1,6 +1,7 @@
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
 erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
                 a.vals = seq(min(a), max(a), length.out = 100),
+                n.iter = 10000, n.adapt = 1000, thin = 10, 
                 span = NULL, span.seq = seq(0.05, 1, by = 0.05), k = 5){	
   
   
@@ -13,7 +14,8 @@ erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
   n <- length(a)
   
   wrap <- np_est(y = y, a = a, x = x, a.vals = a.vals, 
-                 family = family, offset = offset, weights = weights)
+                 family = family, offset = offset, weights = weights,
+                 n.iter = n.iter, n.adapt = n.adapt, thin = thin)
   
   muhat <- wrap$muhat
   mhat <- wrap$mhat
@@ -137,7 +139,8 @@ dr_est <- function(newa, a, psi, span, family = gaussian(), se.fit = FALSE, int.
 #   
 # }
 
-np_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = gaussian()) {
+np_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = gaussian(),
+                   n.iter = 1000, n.adapt = 1000, thin = 10) {
   
   if (is.null(weights))
     weights <- rep(1, nrow(x))
@@ -168,7 +171,8 @@ np_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = gaus
   phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
   
   # for accurate simulations
-  mumod <- bart(y.train = y_, x.train = xa, weights = weights, keeptrees = TRUE, verbose = FALSE)
+  mumod <- bart(y.train = y_, x.train = xa, weights = weights, keeptrees = TRUE, 
+                ndpost = n.iter, nskip = n.adapt, keepevery = thin, verbose = FALSE)
   muhat <- mumod$yhat.train.mean
   
   # predict marginal outcomes given a.vals (or a.agg)

@@ -36,7 +36,7 @@ simulate <- function(scenario, n.sim, a.vals){
   n.iter <- 2000
   n.adapt <- 1000
   thin <- 20
-  h.a <- 1
+  h.a <- 0.5
   scale <- 1e6
   shape <- rate <- 1e-3
   
@@ -85,11 +85,13 @@ simulate <- function(scenario, n.sim, a.vals){
     
     # naive
     naive_hat <- try(erc(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
-                         family = family, a.vals = a.vals, span = span), silent = TRUE)
+                         family = family, a.vals = a.vals, span = span,
+                         n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # real
     rc_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, weights = weights,
-                      family = family, a.vals = a.vals, span = span), silent = TRUE)
+                      family = family, a.vals = a.vals, span = span,
+                      n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # BART Approach
     bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
@@ -156,7 +158,7 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 14, by = 0.04)
-n.sim <- 300
+n.sim <- 1000
 
 n <- 400
 mult <- c(5, 10)

@@ -14,9 +14,9 @@ library(abind)
 
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/bart-erc.R")
+source("~/Github/causal-me/bart-erc-alt.R")
 source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc.R")
+source("~/Github/causal-me/erc-alt.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
@@ -33,15 +33,14 @@ n <- 400
 prob <- 0.1
 
 # model arguments
-a.vals <- seq(6, 14, by = 0.08)
+a.vals <- seq(6, 14, by = 0.04)
 family <- poisson()
-deg.num <- 4
 
 # mcmc arguments
 n.iter <- 2000
 n.adapt <- 1000
 thin <- 20
-h.a <- 1
+h.a <- 0.5
 scale <- 1e6
 shape <- rate <- 1e-3
 
@@ -86,11 +85,13 @@ out <- mclapply(1:n.sim, function(i, ...){
   
   # naive
   naive_hat <- try(erc(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
-                       family = family, a.vals = a.vals, span = span), silent = TRUE)
+                       family = family, a.vals = a.vals, span = span,
+                       n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # real
   rc_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, weights = weights,
-                     family = family, a.vals = a.vals, span = span), silent = TRUE)
+                    family = family, a.vals = a.vals, span = span,
+                    n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # BART Approach
   bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
