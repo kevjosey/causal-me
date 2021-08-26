@@ -1,8 +1,8 @@
-bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
-                     offset = NULL, weights = NULL, w = NULL, x = NULL,
+bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
+                     offset = NULL, weights = NULL, family = gaussian(),
                      a.vals = seq(min(a), max(a), length.out = 100),
                      shape = 1e-3, rate = 1e-3, scale = 1e6, thin = 10, 
-                     n.iter = 10000, n.adapt = 1000, h.a = 0.5, bw = 0.75,
+                     n.iter = 10000, n.adapt = 1000, h.a = 0.5, span = 0.75,
                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
                                              n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
@@ -191,7 +191,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
       int.mat <- (muhat.mat - mhat.mat) * phat.mat
       
-      dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, bw = bw, 
+      dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, span = span, 
                         family = gaussian(), se.fit = TRUE, int.mat = int.mat)
       
       est.mat[j,] <- dr_out[1,]

@@ -1,5 +1,5 @@
-bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
-                     offset = NULL, weights = NULL, w = NULL, x = NULL,
+bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
+                     offset = NULL, weights = NULL, family = gaussian(),
                      a.vals = seq(min(a), max(a), length.out = 100),
                      shape = 1e-3, rate = 1e-3, scale = 1e6, thin = 10, 
                      n.iter = 10000, n.adapt = 1000, h.a = 0.5, span = 0.5,
@@ -168,17 +168,6 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       
       muhat <- rowMeans(samples$train)
       
-      # muhat.mat <- sapply(a.vals, function(a.tmp, ...){
-      #   xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
-      #   colnames(xa.tmp) <- colnames(xa.train)[-1]
-      #   c(sampler$predict(xa.tmp))
-      # })
-      # 
-      # mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
-      # int.mat <- t(apply(muhat.mat, 1, function(val,...)
-      #   predict(smooth.spline(a.vals, val), x = a)$y)) -
-      #   matrix(rep(mhat, n), byrow = T, nrow = n)
-      
       muhat.mat <- sapply(a, function(a.tmp, ...) {
         xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
         colnames(xa.tmp) <- colnames(xa.train)[-1]
@@ -190,10 +179,11 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       
       # pseudo-outcome
       psi[j,] <- c(y_ - muhat) + mhat # pseudo-outcome
-      mhat.out[j,] <- sapply(a.vals, function(a.tmp, ...){
-        xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
-        colnames(xa.tmp) <- colnames(xa.train)[-1]
-        mean(sampler$predict(xa.tmp))})
+      # mhat.out[j,] <- sapply(a.vals, function(a.tmp, ...){
+      #   xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
+      #   colnames(xa.tmp) <- colnames(xa.train)[-1]
+      #   mean(sampler$predict(xa.tmp))})
+      mhat.out[j,] <- rep(NA, times = length(a.vals))
       
       dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, family = gaussian(), 
                        span = span, int.mat = int.mat, se.fit = TRUE)

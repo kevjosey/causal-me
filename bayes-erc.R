@@ -1,10 +1,10 @@
 
-bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
-                      offset = NULL, weights = NULL, w = NULL, x = NULL,
+bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
+                      offset = NULL, weights = NULL, family = gaussian(),
                       a.vals = seq(min(a), max(a), length.out = 100),
-                      shape = 1e-3, rate = 1e-3, scale = 1e6, mc.cores = 1,
+                      shape = 1e-3, rate = 1e-3, scale = 1e6,
                       thin = 10, n.iter = 10000, n.adapt = 1000,
-                      h.a = 0.5, h.gamma = 0.1, deg.num = 2, span = 0.75) {
+                      h.a = 0.5, h.gamma = 0.1, span = 0.75) {
   
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
@@ -95,7 +95,8 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   gamma[1,] <- coef(glm(y ~ 0 + xa, family = family, offset = offset))
   
   # the good stuff
-  a.mat <- int <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
+  a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
+  mhat.out <- est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
@@ -196,15 +197,18 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
       pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2[i]))
       pihat.mat <- matrix(pihat.vals, nrow = n, ncol = length(a.vals))
       
-      # integrate
-      phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
-      mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
-      intfn <- (muhat.mat - mhat.mat) * phat.mat
-      int[j,] <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
-                     (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
-      
       # pseudo-outcome
       psi[j,] <- (y_ - muhat)*(phat/pihat) + mhat
+      
+      # integrate
+      mhat.out[j,] <- colMeans(muhat.mat)
+      int.mat <- muhat.mat - matrix(rep(mhat, n), byrow = T, nrow = n)
+      
+      dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, family = gaussian(), 
+                       span = span, int.mat = int.mat, se.fit = TRUE)
+      
+      est.mat[j,] <- dr_out[1,]
+      var.mat[j,] <- dr_out[2,]
       
     }
     
@@ -222,25 +226,7 @@ bayes_erc <- function(s, star, y, s.id, id, family = gaussian(),
   tau2 <- tau2[keep]
   omega2 <- omega2[keep]
   
-  out <- mclapply(1:nrow(a.mat), function(i, ...){
-    
-    a <- a.mat[i,]
-    psi <- psi[i,]
-    int <- int[i,]
-    
-    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int,
-                     span = span, family = gaussian(), se.fit = TRUE)
-    
-    estimate <- dr_out[1,]
-    variance <- dr_out[2,]
-    
-    return(list(estimate = estimate, variance = variance))
-    
-  }, mc.cores = mc.cores)
-  
   a.mat <- a.mat[,order(shield)]
-  est.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$estimate))
-  var.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$variance))
   estimate <- colMeans(est.mat)
   variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
   

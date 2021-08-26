@@ -1,8 +1,7 @@
-
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
 erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
-                a.vals = seq(min(a), max(a), length.out = 100), deg.num = 2,
-                span = 0.5, span.seq = seq(0.05, 1, by = 0.05), k = 5){	
+                a.vals = seq(min(a), max(a), length.out = 100),
+                span = NULL, span.seq = seq(0.05, 1, by = 0.05), k = 5){	
   
   
   if(is.null(weights))
@@ -13,8 +12,8 @@ erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
   
   n <- length(a)
   
-  wrap <- glm_est(y = y, a = a, x = x, offset = offset, deg.num = deg.num,
-                 a.vals = a.vals, family = family)
+  wrap <- np_est(y = y, a = a, x = x, a.vals = a.vals, 
+                 family = family, offset = offset, weights = weights)
   
   muhat <- wrap$muhat
   mhat <- wrap$mhat
@@ -23,36 +22,34 @@ erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
   y_ <- family$linkinv(family$linkfun(y) - offset)
   psi <- c((y_ - muhat) + mhat)
   
-  # if(is.null(span)) {
-  #   
-  #   idx <- sample(x = n, size = min(n, 1000), replace = FALSE)
-  #   
-  #   a.sub <- a[idx]
-  #   psi.sub <- psi[idx]
-  #   int.sub <- int[idx]
-  #   
-  #   folds <- sample(x = k, size = min(n, 1000), replace = TRUE)
-  #   
-  #   cv.mat <- sapply(span.seq, function(h, ...) {
-  #     
-  #     cv.vec <- rep(NA, k)
-  #     
-  #     for(j in 1:k) {
-  #       
-  #       preds <- sapply(j, a.sub, dr_est, psi = psi.sub[folds != j], a = a.sub[folds != j], 
-  #                       int = int.sub[folds != j], span = h, family = family, se.fit = FALSE)
-  #       cv.vec[j] <- mean((psi.sub[folds == j] - preds)^2, na.rm = TRUE)
-  #       
-  #     }
-  #     
-  #     return(cv.vec)
-  #     
-  #   })
-  #   
-  #   cv.err <- colMeans(cv.mat)
-  #   span <- span.seq[which.min(cv.err)]
-  #   
-  # }
+  if(is.null(span)) {
+
+    idx <- sample(x = n, size = min(n, 1000), replace = FALSE)
+
+    a.sub <- a[idx]
+    psi.sub <- psi[idx]
+
+    folds <- sample(x = k, size = min(n, 1000), replace = TRUE)
+
+    cv.mat <- sapply(span.seq, function(h, ...) {
+
+      cv.vec <- rep(NA, k)
+
+      for(j in 1:k) {
+
+        preds <- sapply(j, a.sub, dr_est, psi = psi.sub[folds != j], a = a.sub[folds != j], span = h, family = gaussian(), se.fit = FALSE)
+        cv.vec[j] <- mean((psi.sub[folds == j] - preds)^2, na.rm = TRUE)
+
+      }
+
+      return(cv.vec)
+
+    })
+
+    cv.err <- colMeans(cv.mat)
+    span <- span.seq[which.min(cv.err)]
+
+  }
   
   dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, family = gaussian(), 
                    span = span, int.mat = int.mat, se.fit = TRUE)
@@ -130,7 +127,13 @@ dr_est <- function(newa, a, psi, span, family = gaussian(), se.fit = FALSE, int.
 #   
 # }
 
-glm_est <- function(a, y, x, a.vals, family = gaussian(), offset = rep(0, length(a)), deg.num = 2) {
+np_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = gaussian()) {
+  
+  if (is.null(weights))
+    weights <- rep(1, nrow(x))
+  
+  if (is.null(offset))
+    offset <- rep(1, nrow(x))
   
   # set up evaluation points & matrices for predictions
   n <- nrow(x)
@@ -140,26 +143,15 @@ glm_est <- function(a, y, x, a.vals, family = gaussian(), offset = rep(0, length
   y_ <- family$linkinv(family$linkfun(y) - offset)
   
   # for accurate simulations
-  mumod <- glm(y ~ . - a + poly(a, deg.num) + a:x1, data = xa, family = family, offset = offset)
-  muhat <- predict(mumod, newdata = xa, type = "response")
-  
-  # muhat.mat <- sapply(a.vals, function(a.tmp, ...){
-  #   xa.tmp <- data.frame(x = x, a = a.tmp)
-  #   colnames(xa.tmp) <- colnames(xa)
-  #   return(predict(mumod, newdata = xa.tmp, type = "response"))
-  # })
-  # 
-  # mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
-  # int.mat <- t(apply(muhat.mat, 1, function(val,...) 
-  #   predict(smooth.spline(a.vals, val), x = a)$y)) - 
-  #   matrix(rep(mhat, n), byrow = T, nrow = n)
+  mumod <- dbarts::bart(y.train = y_, x.train = xa, weights = weights, keeptrees = TRUE, verbose = FALSE)
+  muhat <- mumod$yhat.train.mean
   
   muhat.mat <- sapply(a, function(a.tmp, ...) {
     
     # for simulations
     xa.tmp <- data.frame(x = x, a = a.tmp)
     colnames(xa.tmp) <- colnames(xa)
-    return(predict(mumod, newdata = xa.tmp, type = "response"))
+    return(colMeans(predict(mumod, newdata = xa.tmp, type = "ev")))
     
   })
   
