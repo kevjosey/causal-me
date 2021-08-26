@@ -14,33 +14,33 @@ library(abind)
 
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/bart-erc-2.R")
+source("~/Github/causal-me/bart-erc.R")
 source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc-2.R")
+source("~/Github/causal-me/erc.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
 n.sim <- 100
-sig_gps <- 1
-sig_agg <- 1
-sig_pred <- sqrt(0.5)
+sig_gps <- 2
+sig_agg <- sqrt(2)
+sig_pred <- 1
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "a"
 span <- 0.1
 mult <- 5
-n <- 800
+n <- 400
 prob <- 0.1
 
 # model arguments
-a.vals <- seq(6, 10, by = 0.04)
+a.vals <- seq(6, 14, by = 0.04)
 family <- poisson()
-deg.num <- 2
+deg.num <- 4
 
 # mcmc arguments
-n.iter <- 1000
+n.iter <- 2000
 n.adapt <- 1000
-thin <- 10
+thin <- 20
 h.a <- 0.5
 scale <- 1e6
 shape <- rate <- 1e-3
@@ -85,7 +85,7 @@ out <- mclapply(1:n.sim, function(i, ...){
   z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
   
   # naive
-  naive_hat <- try(erc(y = y, a = a, x = x, offset = offset, family = family,
+  naive_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, family = family,
                        a.vals = a.vals, span = span, deg.num = deg.num))
   
   # real
@@ -132,18 +132,22 @@ out_est <- t(apply(est, 1, rowMeans, na.rm = T))
 colnames(out_est) <- a.vals
 rownames(out_est) <- c("ERF","RC","RC+BLP","BART","LOESS")
 
+out_se <- t(apply(se, 1, rowMeans, na.rm = T))
+colnames(out_se) <- a.vals
+rownames(out_se) <- c("RC","RC+BLP","BART","LOESS")
+
 out_cp <- t(apply(cp, 1, rowMeans, na.rm = T))
 colnames(out_cp) <- a.vals
 rownames(out_cp) <- c("RC","RC+BLP","BART","LOESS")
 
 plot(a.vals, out_est[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
      main = "Exposure = b, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
-     ylim = c(0,0.15))
+     ylim = c(0,0.1))
 lines(a.vals, out_est[2,], type = "l", col = hue_pal()(6)[2], lwd = 2, lty = 1)
 lines(a.vals, out_est[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
 lines(a.vals, out_est[4,], type = "l", col = hue_pal()(6)[4], lwd = 2, lty = 1)
 lines(a.vals, out_est[5,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
 
-legend(6, 0.15, legend=c("True ERF", "RC", "RC+BLP", "BART", "LOESS"),
+legend(6, 0.1, legend=c("True ERF", "RC", "RC+BLP", "BART", "LOESS"),
        col=hue_pal()(6),
        lty = c(1,1,1,1,1), lwd=2, cex=0.8)

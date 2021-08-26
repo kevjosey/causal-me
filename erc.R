@@ -1,8 +1,8 @@
+
 # wrapper function to fit a hierarchical, doubly-robust ERC using LOESS regression on a nonparametric model
 erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
                 a.vals = seq(min(a), max(a), length.out = 100), deg.num = 2,
-                span = NULL, span.seq = seq(0.05, 1, by = 0.05), k = 5,
-                sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){	
+                span = 0.5, span.seq = seq(0.05, 1, by = 0.05), k = 5){	
   
   
   if(is.null(weights))
@@ -13,50 +13,49 @@ erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
   
   n <- length(a)
   
-  wrap <- np_est(y = y, a = a, x = x, offset = offset, deg.num = deg.num,
-                 a.vals = a.vals, family = family, sl.lib = sl.lib)
+  wrap <- glm_est(y = y, a = a, x = x, offset = offset, deg.num = deg.num,
+                 a.vals = a.vals, family = family)
   
   muhat <- wrap$muhat
   mhat <- wrap$mhat
-  pihat <- wrap$pihat
-  phat <- wrap$phat
-  int <- wrap$int
+  int.mat <- wrap$int.mat
+  
   y_ <- family$linkinv(family$linkfun(y) - offset)
   psi <- c((y_ - muhat) + mhat)
   
-  if(is.null(span)) {
-    
-    idx <- sample(x = n, size = min(n, 1000), replace = FALSE)
-    
-    a.sub <- a[idx]
-    psi.sub <- psi[idx]
-    int.sub <- int[idx]
-    
-    folds <- sample(x = k, size = min(n, 1000), replace = TRUE)
-    
-    cv.mat <- sapply(span.seq, function(h, ...) {
-      
-      cv.vec <- rep(NA, k)
-      
-      for(j in 1:k) {
-        
-        preds <- sapply(a.sub[folds == j], dr_est, psi = psi.sub[folds != j], a = a.sub[folds != j], 
-                        int = int.sub[folds != j], span = h, family = family, se.fit = FALSE)
-        cv.vec[j] <- mean((psi.sub[folds == j] - preds)^2, na.rm = TRUE)
-        
-      }
-      
-      return(cv.vec)
-      
-    })
-    
-    cv.err <- colMeans(cv.mat)
-    span <- span.seq[which.min(cv.err)]
-    
-  }
+  # if(is.null(span)) {
+  #   
+  #   idx <- sample(x = n, size = min(n, 1000), replace = FALSE)
+  #   
+  #   a.sub <- a[idx]
+  #   psi.sub <- psi[idx]
+  #   int.sub <- int[idx]
+  #   
+  #   folds <- sample(x = k, size = min(n, 1000), replace = TRUE)
+  #   
+  #   cv.mat <- sapply(span.seq, function(h, ...) {
+  #     
+  #     cv.vec <- rep(NA, k)
+  #     
+  #     for(j in 1:k) {
+  #       
+  #       preds <- sapply(j, a.sub, dr_est, psi = psi.sub[folds != j], a = a.sub[folds != j], 
+  #                       int = int.sub[folds != j], span = h, family = family, se.fit = FALSE)
+  #       cv.vec[j] <- mean((psi.sub[folds == j] - preds)^2, na.rm = TRUE)
+  #       
+  #     }
+  #     
+  #     return(cv.vec)
+  #     
+  #   })
+  #   
+  #   cv.err <- colMeans(cv.mat)
+  #   span <- span.seq[which.min(cv.err)]
+  #   
+  # }
   
-  dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int,
-                   span = span, family = gaussian(), se.fit = TRUE)
+  dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, family = gaussian(), 
+                   span = span, int.mat = int.mat, se.fit = TRUE)
   
   estimate <- dr_out[1,]
   variance <- dr_out[2,]
@@ -69,8 +68,8 @@ erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
 }
 
 # LOESS function
-dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE) {
-  
+dr_est <- function(newa, a, psi, span, family = gaussian(), se.fit = FALSE, int.mat = NULL) {
+
   a.std <- a - newa
   k <- floor(min(span, 1)*length(a))
   idx <- order(abs(a.std))[1:k]
@@ -81,22 +80,57 @@ dr_est <- function(newa, a, psi, int, span, family = gaussian(), se.fit = FALSE)
   gh <- cbind(1, a.std)
   bh <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh, family = family)
   mu <- family$linkinv(c(bh$par[1]))
-  
-  if (se.fit){
-    
-    int <- int[idx]
-    gh.inv <- solve(t(gh) %*% diag(k.std) %*% gh)
-    v.inf <- (psi + int - family$linkinv(c(gh%*%bh$par)))^2
-    sig <- gh.inv %*% t(gh) %*% diag(k.std) %*% diag(v.inf) %*% diag(k.std) %*% gh %*% gh.inv
+
+  if (se.fit & !is.null(int.mat)){
+
+    intfn1.mat <- k.std*t(int.mat[idx,idx])
+    intfn2.mat <- a.std*k.std*t(int.mat[idx,idx])
+    int1 <- colMeans(intfn1.mat)
+    int2 <- colMeans(intfn2.mat)
+
+    Dh <- solve(t(gh) %*% diag(k.std) %*% gh)
+    V <- crossprod(cbind(k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int1,
+                         a.std * k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int2))
+
+    sig <- Dh%*%V%*%Dh
+
     return(c(mu = mu, sig = sig[1,1]))
-    
+
   } else
     return(mu)
-  
+
 }
 
-np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0, length(a)), deg.num = 2,
-                   sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")) {
+# Gaussian kernel
+# dr_est <- function(newa, a, psi, span, family = gaussian(), se.fit = FALSE, int.mat = NULL) {
+#   
+#   a.std <- c(a - newa)/span
+#   k.std <- dnorm(a.std)/span
+#   gh <- cbind(1, a.std)
+#   bh <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh, family = family)
+#   mu <- family$linkinv(c(bh$par[1]))
+#   
+#   if (se.fit & !is.null(int.mat)){
+#     
+#     intfn1.mat <- k.std*t(int.mat)
+#     intfn2.mat <- a.std*k.std*t(int.mat)
+#     int1 <- colMeans(intfn1.mat)
+#     int2 <- colMeans(intfn2.mat)
+#     
+#     Dh <- solve(t(gh) %*% diag(k.std) %*% gh)
+#     V <- crossprod(cbind(k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int1,
+#                          a.std * k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int2))
+#     
+#     sig <- Dh%*%V%*%Dh
+#     
+#     return(c(mu = mu, sig = sig[1,1]))
+#     
+#   } else
+#     return(mu)
+#   
+# }
+
+glm_est <- function(a, y, x, a.vals, family = gaussian(), offset = rep(0, length(a)), deg.num = 2) {
   
   # set up evaluation points & matrices for predictions
   n <- nrow(x)
@@ -105,27 +139,22 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
   colnames(xa) <- c(colnames(x), "a")
   y_ <- family$linkinv(family$linkfun(y) - offset)
   
-  # estimate nuisance GPS functions via super learner
-  pimod <- SuperLearner(Y = a, X = x, family = gaussian(), SL.library = sl.lib)
-  pimod.vals <- c(pimod$SL.predict)
-  pi2mod <- SuperLearner(Y = (a - pimod.vals)^2, X = x, family = gaussian(), SL.library = sl.lib)
-  pi2mod.vals <- c(pi2mod$SL.predict)
-  pi2mod.vals[pi2mod.vals <= 0] <- .Machine$double.eps
-  
-  # exposure models
-  pihat <- dnorm(a, pimod.vals, sqrt(pi2mod.vals))
-  phat.vals <- sapply(a.vals, function(a.tmp, ...) 
-    mean(dnorm(a.tmp, pimod.vals, sqrt(pi2mod.vals))))
-  phat <- predict(smooth.spline(a.vals, phat.vals), x = a)$y
-  phat[which(phat < 0)] <- .Machine$double.eps
-  phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
-  
   # for accurate simulations
   mumod <- glm(y ~ . - a + poly(a, deg.num) + a:x1, data = xa, family = family, offset = offset)
   muhat <- predict(mumod, newdata = xa, type = "response")
   
-  # predict marginal outcomes given a.vals (or a.agg)
-  muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
+  # muhat.mat <- sapply(a.vals, function(a.tmp, ...){
+  #   xa.tmp <- data.frame(x = x, a = a.tmp)
+  #   colnames(xa.tmp) <- colnames(xa)
+  #   return(predict(mumod, newdata = xa.tmp, type = "response"))
+  # })
+  # 
+  # mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
+  # int.mat <- t(apply(muhat.mat, 1, function(val,...) 
+  #   predict(smooth.spline(a.vals, val), x = a)$y)) - 
+  #   matrix(rep(mhat, n), byrow = T, nrow = n)
+  
+  muhat.mat <- sapply(a, function(a.tmp, ...) {
     
     # for simulations
     xa.tmp <- data.frame(x = x, a = a.tmp)
@@ -134,18 +163,10 @@ np_est <- function(a, y, x, a.vals = a.vals, family = gaussian(), offset = rep(0
     
   })
   
-  # aggregate muhat.vals and integrate for influence function
-  mhat.vals <- colMeans(muhat.mat)
-  mhat <- predict(smooth.spline(a.vals, mhat.vals), x = a)$y
-  mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
+  mhat <- colMeans(muhat.mat)
+  int.mat <- muhat.mat - matrix(rep(mhat, n), byrow = T, nrow = n)
   
-  # integrate
-  intfn <- (muhat.mat - mhat.mat) * phat.mat
-  int <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
-                 (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
-  
-  out <- list(muhat = muhat, mhat = mhat, pihat = pihat, phat = phat, int = int, 
-              mhat.vals = mhat.vals, phat.vals = phat.vals)
+  out <- list(muhat = muhat, mhat = mhat, int.mat = int.mat)
   
   return(out)
   

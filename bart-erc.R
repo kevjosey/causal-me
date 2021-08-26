@@ -2,7 +2,7 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
                      offset = NULL, weights = NULL, w = NULL, x = NULL,
                      a.vals = seq(min(a), max(a), length.out = 100),
                      shape = 1e-3, rate = 1e-3, scale = 1e6, thin = 10, 
-                     n.iter = 10000, n.adapt = 1000, h.a = 0.5, span = 0.75, mc.cores = 1,
+                     n.iter = 10000, n.adapt = 1000, h.a = 0.5, span = 0.5,
                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
                                              n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
@@ -88,8 +88,8 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   omega2[1] <- var(s.hat - a.s)
   
   # the good stuff
-  a.mat <- int <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
-  mhat.out <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
+  a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
+  mhat.out <- est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
   # initialize bart
   y_ <- family$linkinv(family$linkfun(y) - offset)
@@ -166,33 +166,40 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
       j <- (i - n.adapt)/thin
       a.mat[j,] <- a 
       
-      # outcome model
       muhat <- rowMeans(samples$train)
       
-      muhat.mat <- sapply(a.vals, function(a.tmp, ...){
+      # muhat.mat <- sapply(a.vals, function(a.tmp, ...){
+      #   xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
+      #   colnames(xa.tmp) <- colnames(xa.train)[-1]
+      #   c(sampler$predict(xa.tmp))
+      # })
+      # 
+      # mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
+      # int.mat <- t(apply(muhat.mat, 1, function(val,...)
+      #   predict(smooth.spline(a.vals, val), x = a)$y)) -
+      #   matrix(rep(mhat, n), byrow = T, nrow = n)
+      
+      muhat.mat <- sapply(a, function(a.tmp, ...) {
         xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
         colnames(xa.tmp) <- colnames(xa.train)[-1]
         c(sampler$predict(xa.tmp))
       })
-      
-      mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
-      
-      # exposure model
-      pimod.vals <- c(x %*% beta[i,])
-      pihat.mat <- sapply(a.vals, function(a.tmp, ...)
-        dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
+
+      mhat <- colMeans(muhat.mat)
+      int.mat <- muhat.mat - matrix(rep(mhat, n), byrow = T, nrow = n)
       
       # pseudo-outcome
       psi[j,] <- c(y_ - muhat) + mhat # pseudo-outcome
-      mhat.out[j,] <- colMeans(muhat.mat)
+      mhat.out[j,] <- sapply(a.vals, function(a.tmp, ...){
+        xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
+        colnames(xa.tmp) <- colnames(xa.train)[-1]
+        mean(sampler$predict(xa.tmp))})
       
-      # integrate
-      phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
-      mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
-      intfn <- (muhat.mat - mhat.mat) * phat.mat
+      dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, family = gaussian(), 
+                       span = span, int.mat = int.mat, se.fit = TRUE)
       
-      int[j,] <- apply(matrix(rep((a.vals[-1]-a.vals[-length(a.vals)]), n), byrow = T, nrow = n) *
-                         (intfn[,-1] + intfn[,-length(a.vals)]) / 2, 1, sum)
+      est.mat[j,] <- dr_out[1,]
+      var.mat[j,] <- dr_out[2,]
       
     }
     
@@ -210,30 +217,9 @@ bart_erc <- function(s, star, y, s.id, id, family = gaussian(),
   
   # analyze output
   
-  out <- mclapply(1:nrow(a.mat), function(i, ...){
-    
-    # print(i)
-    
-    a <- a.mat[i,]
-    psi <- psi[i,]
-    int <- int[i,]
-    
-    dr_out <- sapply(a.vals, dr_est, psi = psi, a = a, int = int,
-                     span = span, family = gaussian(), se.fit = TRUE)
-    
-    estimate <- dr_out[1,]
-    variance <- dr_out[2,]
-    
-    return(list(estimate = estimate, variance = variance))
-    
-  }, mc.cores = mc.cores)
-  
   a.mat <- a.mat[,order(shield)]
-  est.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$estimate))
-  var.mat <- do.call(rbind, lapply(out, function(arg, ...) arg$variance))
   smooth_estimate <- colMeans(est.mat)
   smooth_variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
-  
   tree_estimate <- colMeans(mhat.out)
   tree_variance <- apply(mhat.out, 2, var)
   hpdi <- apply(mhat.out, 2, hpd)
