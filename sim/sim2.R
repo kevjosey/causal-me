@@ -158,7 +158,7 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 14, by = 0.04)
-n.sim <- 1000
+n.sim <- 500
 
 n <- 400
 mult <- c(5, 10)
