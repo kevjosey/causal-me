@@ -87,10 +87,6 @@ bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
   omega2[1] <- var(s.hat - a.s)
   
-  # the good stuff
-  a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
-  mhat.out <- est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
-  
   # initialize bart
   y_ <- family$linkinv(family$linkfun(y) - offset)
   xa.train <- data.frame(y_ = y_, x[,-1], a = a)
@@ -98,6 +94,10 @@ bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   
   # run first iteration of tree
   samples <- sampler$run()
+  
+  # the good stuff
+  a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
+  mhat.out <- est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {

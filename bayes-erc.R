@@ -68,7 +68,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   s.hat <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
-  xa <- cbind(x, a - 8, (a - 8)^2, (a - 8)*x[,2]) # needs to be more general
+  xa <- cbind(x, a - 10, (a - 10)^2, (a - 10)^3, (a - 10)*x[,2]) # needs to be more general
   
   # data dimensions
   p <- ncol(x)
@@ -100,7 +100,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
-    # print(i)
+    print(i)
     
     # sample S
     
@@ -113,7 +113,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     a_ <- rnorm(n, a, h.a)
-    xa_ <- cbind(x, a_ - 8, (a_ - 8)^2, (a_ - 8)*x[,2]) # needs to be more general
+    xa_ <- cbind(x, a_ - 10, (a_ - 10)^2, (a_ - 10)^3, (a_ - 10)*x[,2]) # needs to be more general
     
     log.eps <- dpois(y, family$linkinv(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
       dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
@@ -147,15 +147,15 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     
     # Sample outcome model while cutting feedback
     
-    xa <- cbind(x, a - 8, (a - 8)^2, (a - 8)*x[,2]) # needs to be more general
+    xa <- cbind(x, a - 10, (a - 10)^2, (a - 10)^3, (a - 10)*x[,2]) # needs to be more general
     gamma_ <- gamma0 <- gamma[i - 1,]
     
     for (j in 1:o) {
       
       gamma_[j] <- c(rnorm(1, gamma0[j], h.gamma))
       
-      log.eps <- sum(dfun(y, family$linkinv(c(xa %*% gamma_) + offset), log = TRUE)) -
-        sum(dfun(y, family$linkinv(c(xa %*% gamma0) + offset), log = TRUE)) +
+      log.eps <- sum(dpois(y, family$linkinv(c(xa %*% gamma_) + offset), log = TRUE)) -
+        sum(dpois(y, family$linkinv(c(xa %*% gamma0) + offset), log = TRUE)) +
         dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma0[j], 0 , scale, log = TRUE)
       
       if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
@@ -175,13 +175,13 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       
       xa.new.list <- lapply(a.vals, function(a.tmp, ...) {
         
-        cbind(x, a.tmp - 8, (a.tmp - 8)^2, (a.tmp - 8)*x[,2]) # needs to be more general
+        cbind(x, a.tmp - 10, (a.tmp - 10)^2, (a.tmp - 10)^2, (a.tmp - 10)*x[,2]) # needs to be more general
         
       })
       
       xa.new <- rbind(xa, do.call(rbind, xa.new.list))
-      x.new <- xa.new[-(1:n),1:ncol(x)]
-      a.new <- rep(a.vals, each = n)
+      x.new <- xa.new[,1:ncol(x)]
+      a.new <- c(a, rep(a.vals, each = n))
       colnames(x.new) <- colnames(x)
       colnames(xa.new) <- colnames(xa)
       
@@ -194,14 +194,20 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       # exposure models
       pimod.vals <- c(x.new %*% beta[i,])
       pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2[i]))
-      pihat.mat <- matrix(pihat.vals, nrow = n, ncol = length(a.vals))
+      pihat <- pihat.vals[1:n]
+      pihat.mat <- matrix(pihat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
+      phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
+      phat[phat <= 0] <- .Machine$double.eps
       
       # pseudo-outcome
       psi[j,] <- (y_ - muhat)*(phat/pihat) + mhat
+      mhat.out[j,] <- colMeans(muhat.mat)
       
       # integrate
-      mhat.out[j,] <- colMeans(muhat.mat)
-      int.mat <- muhat.mat - matrix(rep(mhat, n), byrow = T, nrow = n)
+      mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
+      phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
+
+      int.mat <- (muhat.mat - mhat.mat)*phat.mat
       
       dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, family = gaussian(), 
                        span = span, int.mat = int.mat, se.fit = TRUE)
@@ -226,13 +232,17 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   omega2 <- omega2[keep]
   
   a.mat <- a.mat[,order(shield)]
-  estimate <- colMeans(est.mat)
-  variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
+  smooth_estimate <- colMeans(est.mat)
+  smooth_variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
+  tree_estimate <- colMeans(mhat.out)
+  tree_variance <- apply(mhat.out, 2, var)
+  hpdi <- apply(mhat.out, 2, hpd)
+  rownames(hpdi) <- c("lower", "upper")
   
-  rslt <- list(estimate = estimate, variance = variance, 
+  rslt <- list(smooth_estimate = smooth_estimate, smooth_variance = smooth_variance,
+               tree_estimate = tree_estimate, tree_variance = tree_variance, hpdi = hpdi,
                accept.a = accept.a, accept.gamma = accept.gamma,
-               mcmc = list(a.mat = a.mat, gamma = gamma, beta = beta, alpha = alpha,
-                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
+               mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
   return(rslt)
   

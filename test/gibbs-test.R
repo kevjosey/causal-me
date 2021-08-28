@@ -14,7 +14,7 @@ library(abind)
 
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/bart-erc-alt.R")
+source("~/Github/causal-me/bayes_erc.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc-alt.R")
 source("~/Github/causal-me/auxiliary.R")
@@ -41,6 +41,7 @@ n.iter <- 2000
 n.adapt <- 1000
 thin <- 20
 h.a <- 0.5
+h.gamma <- 0.05
 scale <- 1e6
 shape <- rate <- 1e-3
 
@@ -94,8 +95,8 @@ out <- mclapply(1:n.sim, function(i, ...){
                     n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # BART Approach
-  bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
-                           s.id = s.id, id = id, w = w, x = x, family = family,
+  bart_hat <- try(bayes_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
+                           s.id = s.id, id = id, w = w, x = x, family = family, h.gamma = h.gamma,
                            a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                            h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
@@ -103,8 +104,8 @@ out <- mclapply(1:n.sim, function(i, ...){
   est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
                if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
                if (!inherits(rc_hat, "try-error")) {rc_hat$estimate} else {rep(NA, length(a.vals))},
-               if (!inherits(bart_hat, "try-error")) {bart_hat$tree_estimate} else {rep(NA, length(a.vals))},
-               if (!inherits(bart_hat, "try-error")) {bart_hat$smooth_estimate} else {rep(NA, length(a.vals))})
+               if (!inherits(bart_hat, "try-error")) {bayes_hat$tree_estimate} else {rep(NA, length(a.vals))},
+               if (!inherits(bart_hat, "try-error")) {bar_hat$smooth_estimate} else {rep(NA, length(a.vals))})
   
   #standard error
   se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},

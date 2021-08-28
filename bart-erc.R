@@ -87,10 +87,6 @@ bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
   omega2[1] <- var(s.hat - a.s)
   
-  # the good stuff
-  a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
-  mhat.out <- est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
-  
   # initialize bart
   y_ <- family$linkinv(family$linkfun(y) - offset)
   xa.train <- data.frame(y_ = y_, x[,-1], a = a)
@@ -98,6 +94,10 @@ bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   
   # run first iteration of tree
   samples <- sampler$run()
+  
+  # the good stuff
+  a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
+  mhat.out <- est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
@@ -179,10 +179,7 @@ bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       
       # pseudo-outcome
       psi[j,] <- c(y_ - muhat) + mhat # pseudo-outcome
-      mhat.out[j,] <- sapply(a.vals, function(a.tmp, ...){
-        xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
-        colnames(xa.tmp) <- colnames(xa.train)[-1]
-        mean(sampler$predict(xa.tmp))})
+      mhat.out[j,] <- predict(smooth.spline(a, colMeans(muhat.mat)), x = a.vals)$y
       
       dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, span = span, 
                        family = gaussian(), se.fit = TRUE, int.mat = int.mat)

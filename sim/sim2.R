@@ -158,15 +158,15 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 14, by = 0.04)
-n.sim <- 500
+n.sim <- 1000
 
-n <- 400
+n <- c(400, 800)
 mult <- c(5, 10)
-sig_agg <- c(sqrt(1), sqrt(2))
-sig_pred <- c(sqrt(0.5), sqrt(1))
-gps_scen <- c("a", "b")
-out_scen <- c("a", "b")
-pred_scen <- c("a", "b")
+sig_agg <- c(sqrt(1), sqrt(2), 2)
+sig_pred <- c(sqrt(0.5), sqrt(1), sqrt(2))
+gps_scen <- "a"
+out_scen <- "a"
+pred_scen <- "a"
 
 scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred, gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
