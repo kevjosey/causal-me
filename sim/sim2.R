@@ -162,8 +162,8 @@ n.sim <- 1000
 
 n <- c(400, 800)
 mult <- c(5, 10)
-sig_agg <- c(sqrt(1), sqrt(2), 2)
-sig_pred <- c(sqrt(0.5), sqrt(1), sqrt(2))
+sig_agg <- c(1, sqrt(2), 2)
+sig_pred <- c(sqrt(0.5), 1)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "a"

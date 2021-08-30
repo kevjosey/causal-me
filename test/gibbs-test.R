@@ -14,7 +14,7 @@ library(abind)
 
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/bayes_erc.R")
+source("~/Github/causal-me/bayes-erc.R")
 source("~/Github/causal-me/blp.R")
 source("~/Github/causal-me/erc-alt.R")
 source("~/Github/causal-me/auxiliary.R")
@@ -22,8 +22,8 @@ source("~/Github/causal-me/auxiliary.R")
 # simulation arguments
 n.sim <- 100
 sig_gps <- 2
-sig_agg <- sqrt(2)
-sig_pred <- 1
+sig_agg <- 1
+sig_pred <- sqrt(0.5)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "a"
@@ -37,9 +37,9 @@ a.vals <- seq(6, 14, by = 0.04)
 family <- poisson()
 
 # mcmc arguments
-n.iter <- 2000
+n.iter <- 1000
 n.adapt <- 1000
-thin <- 20
+thin <- 10
 h.a <- 0.5
 h.gamma <- 0.05
 scale <- 1e6
@@ -104,19 +104,19 @@ out <- mclapply(1:n.sim, function(i, ...){
   est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
                if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
                if (!inherits(rc_hat, "try-error")) {rc_hat$estimate} else {rep(NA, length(a.vals))},
-               if (!inherits(bart_hat, "try-error")) {bayes_hat$tree_estimate} else {rep(NA, length(a.vals))},
-               if (!inherits(bart_hat, "try-error")) {bar_hat$smooth_estimate} else {rep(NA, length(a.vals))})
+               if (!inherits(bart_hat, "try-error")) {bart_hat$smooth_estimate} else {rep(NA, length(a.vals))},
+               if (!inherits(bart_hat, "try-error")) {bart_hat$dr_estimate} else {rep(NA, length(a.vals))})
   
   #standard error
   se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
               if (!inherits(rc_hat, "try-error")) {sqrt(rc_hat$variance)} else {rep(NA, length(a.vals))},
-              if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$tree_variance)} else {rep(NA, length(a.vals))},
-              if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$smooth_variance)} else {rep(NA, length(a.vals))})
+              if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$smooth_variance)} else {rep(NA, length(a.vals))},
+              if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$dr_variance)} else {rep(NA, length(a.vals))})
   
   # coverage probability
   cp <- rbind(if (!inherits(naive_hat, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} else {rep(NA, length(a.vals))},
               if (!inherits(rc_hat, "try-error")) {as.numeric((est[3,] - 1.96*se[2,]) < est[1,] & (est[3,] + 1.96*se[2,]) > est[1,])} else {rep(NA, length(a.vals))},
-              if (!inherits(bart_hat, "try-error")) {as.numeric(bart_hat$hpdi[1,] < est[1,] & bart_hat$hpdi[2,] > est[1,])} else {rep(NA, length(a.vals))},
+              if (!inherits(bart_hat, "try-error")) {as.numeric((est[4,] - 1.96*se[3,]) < est[1,] & (est[4,] + 1.96*se[3,]) > est[1,])} else {rep(NA, length(a.vals))},
               if (!inherits(bart_hat, "try-error")) {as.numeric((est[5,] - 1.96*se[4,]) < est[1,] & (est[5,] + 1.96*se[4,]) > est[1,])} else {rep(NA, length(a.vals))})
   
   return(list(est = est, se = se, cp = cp))
