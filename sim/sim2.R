@@ -13,9 +13,9 @@ library(dbarts)
 # Code for generating and fitting data
 source("~/Github/causal-me/auxiliary.R")
 source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/bart-erc-alt.R")
+source("~/Github/causal-me/bart-erc.R")
 source("~/Github/causal-me/blp.R")
-source("~/Github/causal-me/erc-alt.R")
+source("~/Github/causal-me/erc.R")
 
 simulate <- function(scenario, n.sim, a.vals){
   
@@ -148,7 +148,7 @@ simulate <- function(scenario, n.sim, a.vals){
   rownames(out_cp) <- c("NAIVE","RC","BART","LOESS")
   
   rslt <- list(scenario = scenario, est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp)
-  filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim2/", paste(scenario, collapse = "_"),".RData")
+  filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim_1/", paste(scenario, collapse = "_"),".RData")
   save(rslt, file = filename)
   
 }
@@ -158,7 +158,7 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 14, by = 0.04)
-n.sim <- 1000
+n.sim <- 500
 
 n <- c(400, 800)
 mult <- c(5, 10)

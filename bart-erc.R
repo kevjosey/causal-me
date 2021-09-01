@@ -102,7 +102,7 @@ bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
-    # print(i)
+    print(i)
     
     # sample S
     
