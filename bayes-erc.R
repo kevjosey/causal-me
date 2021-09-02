@@ -95,7 +95,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   
   # the good stuff
   a.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
-  est.dr.mat <- var.dr.mat <- est.smooth.mat <- var.smooth.mat <-matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
+  est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
@@ -199,23 +199,20 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
       phat[phat <= 0] <- .Machine$double.eps
       
+      # pseudo-outcome
+      psi <- (y_ - muhat)*(phat/pihat)
+      
       # integrate
       mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
       phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
 
       int.mat <- (muhat.mat - mhat.mat)*phat.mat
       
-      smooth_out <- sapply(a.vals, dr_est, psi = (y_ - muhat) + mhat, a = a, family = gaussian(), 
-                           span = span, int.mat = int.mat, se.fit = TRUE)
-      
-      est.smooth.mat[j,] <- smooth_out[1,]
-      var.smooth.mat[j,] <- smooth_out[2,]
-      
-      dr_out <- sapply(a.vals, dr_est, psi = (y_ - muhat)*(phat/pihat) + mhat, a = a, family = gaussian(), 
+      dr_out <- sapply(a.vals, dr_est_alt, psi = psi, a = a, family = gaussian(), 
                        span = span, int.mat = int.mat, se.fit = TRUE)
       
-      est.dr.mat[j,] <- dr_out[1,]
-      var.dr.mat[j,] <- dr_out[2,]
+      est.mat[j,] <- dr_out[1,]
+      var.mat[j,] <- dr_out[2,]
       
     }
     
@@ -234,13 +231,10 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   omega2 <- omega2[keep]
   
   a.mat <- a.mat[,order(shield)]
-  smooth_estimate <- colMeans(est.smooth.mat)
-  smooth_variance <- colMeans(var.smooth.mat) + (1 + 1/nrow(a.mat))*apply(est.smooth.mat, 2, var)
-  dr_estimate <- colMeans(est.dr.mat)
-  dr_variance <- colMeans(var.dr.mat) + (1 + 1/nrow(a.mat))*apply(est.dr.mat, 2, var)
+  dr_estimate <- colMeans(est.mat)
+  dr_variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
   
-  rslt <- list(smooth_estimate = smooth_estimate, smooth_variance = smooth_variance,
-               dr_estimate = dr_estimate, dr_variance = dr_variance,
+  rslt <- list(dr_estimate = dr_estimate, dr_variance = dr_variance,
                accept.a = accept.a, accept.gamma = accept.gamma,
                mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, gamma = gamma,
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
