@@ -148,7 +148,7 @@ simulate <- function(scenario, n.sim, a.vals){
   rownames(out_cp) <- c("NAIVE","RC","BART","LOESS")
   
   rslt <- list(scenario = scenario, est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp)
-  filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim_1/", paste(scenario, collapse = "_"),".RData")
+  filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim_2/", paste(scenario, collapse = "_"),".RData")
   save(rslt, file = filename)
   
 }
@@ -161,12 +161,12 @@ a.vals <- seq(6, 14, by = 0.04)
 n.sim <- 500
 
 n <- 400
-mult <- c(5, 10)
-sig_agg <- c(0, 1, 2)
-sig_pred <- c(0, sqrt(0.5), 1)
-gps_scen <- "a"
-out_scen <- "a"
-pred_scen <- "a"
+mult <- 10
+sig_agg <- 1
+sig_pred <- sqrt(0.5)
+gps_scen <- c("a", "b")
+out_scen <- c("a", "b")
+pred_scen <- c("a", "b")
 
 scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred, gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
