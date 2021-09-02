@@ -39,7 +39,8 @@ erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
 
       for(j in 1:k) {
 
-        preds <- sapply(j, a.sub, dr_est, psi = psi.sub[folds != j], a = a.sub[folds != j], span = h, family = gaussian(), se.fit = FALSE)
+        preds <- sapply(j, a.sub, dr_est, psi = psi.sub[folds != j], a = a.sub[folds != j], 
+                        span = h, family = gaussian(), se.fit = FALSE)
         cv.vec[j] <- mean((psi.sub[folds == j] - preds)^2, na.rm = TRUE)
 
       }

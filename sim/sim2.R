@@ -160,10 +160,10 @@ set.seed(42)
 a.vals <- seq(6, 14, by = 0.04)
 n.sim <- 500
 
-n <- c(400, 800)
+n <- 400
 mult <- c(5, 10)
-sig_agg <- c(0, 1, sqrt(2), 2)
-sig_pred <- c(0, 1)
+sig_agg <- c(0, 1, 2)
+sig_pred <- c(0, sqrt(0.5), 1)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "a"
