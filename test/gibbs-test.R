@@ -22,8 +22,8 @@ source("~/Github/causal-me/auxiliary.R")
 # simulation arguments
 n.sim <- 100
 sig_gps <- 2
-sig_agg <- 1
-sig_pred <- sqrt(0.5)
+sig_agg <- 0
+sig_pred <- 0
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "a"
@@ -85,7 +85,7 @@ out <- mclapply(1:n.sim, function(i, ...){
   z_tilde <- aggregate(s_tilde, by = list(s.id), mean)[,2]
   
   # naive
-  naive_hat <- try(erc(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
+  naive_hat <- try(erc(y = y, a = a, x = x, offset = offset, weights = weights, 
                        family = family, a.vals = a.vals, span = span,
                        n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   

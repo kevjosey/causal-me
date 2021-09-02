@@ -51,13 +51,13 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   
   if (gps_scen == "b") {
     
-    mu_gps <- 8 + 0.5*u[,1] - 0.5*u[,2] - 0.5*u[,3] + 0.5*u[,4]
+    mu_gps <- 10 + 0.5*u[,1] - 0.5*u[,2] - 0.5*u[,3] + 0.5*u[,4]
     for (g in 1:n)
       w2[s.id == g] <- rnorm(sum(s.id == g), u[id == g,2], 1)
     
   } else {
     
-    mu_gps <- 8 + 0.5*x[,1] - 0.5*x[,2] - 0.5*x[,3] + 0.5*x[,4]
+    mu_gps <- 10 + 0.5*x[,1] - 0.5*x[,2] - 0.5*x[,3] + 0.5*x[,4]
     for (g in 1:n)
       w2[s.id == g] <- rnorm(sum(s.id == g), x[id == g,2], 1)
     
@@ -113,7 +113,7 @@ predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
     a.vec <- rep(a.vals[i],nrow(x))
 
     if (out_scen == "b") {
-      mu_out <- exp(-4 + u %*% c(-0.5,-0.25,0.25,0.5) + 0.25*(a.vec - 10) - 0.75*cos(pi*(a.vec - 6)/4) - 0.25*(a.vec - 10)*x[,1])
+      mu_out <- exp(-4 + u %*% c(-0.5,-0.25,0.25,0.5) + 0.25*(a.vec - 10) - 0.75*cos(pi*(a.vec - 6)/4) - 0.25*(a.vec - 10)*u[,1])
     } else { # out_scen == "a"
       mu_out <- exp(-4 + x %*% c(-0.5,-0.25,0.25,0.5) + 0.25*(a.vec - 10) - 0.75*cos(pi*(a.vec - 6)/4) - 0.25*(a.vec - 10)*x[,1])
     }
