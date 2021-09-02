@@ -33,9 +33,9 @@ simulate <- function(scenario, n.sim, a.vals){
   mult <- scenario$mult # c(100, 200)
   
   # gibbs sampler stuff
-  n.iter <- 2000
+  n.iter <- 1000
   n.adapt <- 1000
-  thin <- 20
+  thin <- 10
   h.a <- 0.5
   scale <- 1e6
   shape <- rate <- 1e-3
@@ -162,8 +162,8 @@ n.sim <- 500
 
 n <- c(400, 800)
 mult <- c(5, 10)
-sig_agg <- c(1, sqrt(2), 2)
-sig_pred <- c(sqrt(0.5), 1)
+sig_agg <- c(0, 1, sqrt(2), 2)
+sig_pred <- c(0, 1)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "a"
