@@ -18,10 +18,10 @@ source("~/Github/causal-me/bayes-erc.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
-n.sim <- 100
+n.sim <- 50
 sig_gps <- 2
-sig_agg <- 1
-sig_pred <- sqrt(0.5)
+sig_agg <- 0
+sig_pred <- 0
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "a"

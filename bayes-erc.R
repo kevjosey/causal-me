@@ -68,7 +68,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   s.hat <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
-  xa <- cbind(x, a - 10, (a - 10)^2, (a - 10)^3, (a - 10)*x[,2]) # needs to be more general
+  xa <- cbind(x, a - 10, (a - 10)^2, (a - 10)^3, (a - 10)^4, (a - 10)*x[,2]) # needs to be more general
   
   # data dimensions
   p <- ncol(x)
@@ -114,7 +114,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     a_ <- rnorm(n, a, h.a)
-    xa_ <- cbind(x, a_ - 10, (a_ - 10)^2, (a_ - 10)^3, (a_ - 10)*x[,2]) # needs to be more general
+    xa_ <- cbind(x, a_ - 10, (a_ - 10)^2, (a_ - 10)^3, (a_ - 10)^4, (a_ - 10)*x[,2]) # needs to be more general
     
     log.eps <- dpois(y, family$linkinv(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
       dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
@@ -148,7 +148,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     
     # Sample outcome model while cutting feedback
     
-    xa <- cbind(x, a - 10, (a - 10)^2, (a - 10)^3, (a - 10)*x[,2]) # needs to be more general
+    xa <- cbind(x, a - 10, (a - 10)^2, (a - 10)^3, (a - 10)^4, (a - 10)*x[,2]) # needs to be more general
     gamma_ <- gamma0 <- gamma[i - 1,]
     
     for (j in 1:o) {
@@ -176,7 +176,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       
       xa.new.list <- lapply(a.vals, function(a.tmp, ...) {
         
-        cbind(x, a.tmp - 10, (a.tmp - 10)^2, (a.tmp - 10)^3, (a.tmp - 10)*x[,2]) # needs to be more general
+        cbind(x, a.tmp - 10, (a.tmp - 10)^2, (a.tmp - 10)^3, (a.tmp - 10)^4, (a.tmp - 10)*x[,2]) # needs to be more general
         
       })
       
