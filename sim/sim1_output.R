@@ -1,36 +1,40 @@
-# Summary Plot
+library(scales)
 
-load(file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/sim_1.RData")
+#### Measurement Error
+
+a.vals <- seq(6, 14, by = 0.04)
+filenames <- list.files(path = "~/Dropbox/Projects/ERC-EPE/Output/sim_1", full.names = TRUE)
 plotnames <- c("No Measurement Error",
-               "Classical Error but No Prediction Error",
-               "Prediction Error but No Classical Error",
+               "Prediction Error but No Aggregation Error",
+               "Aggregation Error but No Prediction Error",
                "Both Classical and Prediction Error")
-idx <- c(20,24,28,32)
+idx <- c(1, 3, 7, 9)
 
-filename <- paste0("~/Dropbox (Personal)/Projects/ERC-EPE/Output/plot_1.pdf")
-pdf(file = filename, width = 9, height = 9)
+pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_3.pdf", width = 9, height = 9)
 par(mfrow = c(2,2))
+j <- 1
 
-for (k in 1:4){
+for (k in idx){
   
-  plot(a.vals, rslt$est[[idx[k]]]$est[1,], type = "l", col = "darkgreen", lwd = 2,
-       xlab = "Exposure", ylab = "Rate of Event", main = plotnames[k],
-       ylim = c(0,0.08))
+  load(file = filenames[[k]])
+  
+  plot(a.vals, rslt$est[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
+       xlab = "Exposure", ylab = "Rate of Event", main = plotnames[j],
+       ylim = c(0,0.1))
   grid(lty = 1)
-  lines(a.vals, rslt$est[[idx[k]]]$est[2,], type = "l", col = "red", lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[[idx[k]]]$est[3,], type = "l", col = "blue", lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[[idx[k]]]$est[4,], type = "l", col = "red", lwd = 2, lty = 3)
-  lines(a.vals, rslt$est[[idx[k]]]$est[5,], type = "l", col = "blue", lwd = 2, lty = 3)
+  lines(a.vals, rslt$est[2,], type = "l", col = hue_pal()(6)[2], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[5,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
   
-  if (k == 4){
+  if (k == idx[length(idx)]){
     
-    legend(x = 7.7, y = 0.025, legend=c("True ERF", "Without Prediction Correction",
-                                        "With Prediction Correction", "Without Classical Correction",
-                                        "With Classical Correction"),
-           col=c("darkgreen", "red", "blue", "black", "black"),
-           lty = c(1,1,1,2,3), lwd=2, cex=0.8)
+    legend(6, 0.1, legend=c("True ERC", "Naive", "RC", "BART+LOESS"),
+           lty = hue_pal()(6)[c(1,2,3,5)], lwd=2, cex=0.8)
+    
     
   }
+  
+  j <- j + 1
   
 }
 

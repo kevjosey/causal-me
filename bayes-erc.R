@@ -3,7 +3,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
                       a.vals = seq(min(a), max(a), length.out = 100),
                       shape = 1e-3, rate = 1e-3, scale = 1e6,
                       n.iter = 10000, n.adapt = 1000, thin = 10, 
-                      h.a = 0.5, h.gamma = 0.1, span = 0.75) {
+                      h.a = 0.5, span = 0.75) {
   
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
@@ -68,7 +68,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   s.hat <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
-  xa <- cbind(x, a - 10, (a - 10)^2, (a - 10)^3, (a - 10)^4, (a - 10)*x[,2]) # needs to be more general
+  xa <- cbind(x, a - 10, (a - 10)^2, (a - 10)^3, (a - 10)*x[,2]) # needs to be more general
   
   # data dimensions
   p <- ncol(x)
@@ -92,6 +92,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   y_ <- family$linkinv(family$linkfun(y) - offset)
   gamma <- matrix(NA, nrow = n.adapt + n.iter, ncol = o)
   gamma[1,] <- coef(glm(y ~ 0 + xa, family = family, offset = offset))
+  h.gamma <- sqrt(diag(vcov(glm(y ~ 0 + xa, family = family, offset = offset))))
   
   # the good stuff
   a.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
@@ -113,7 +114,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     a_ <- rnorm(n, a, h.a)
-    xa_ <- cbind(x, a_ - 10, (a_ - 10)^2, (a_ - 10)^3, (a_ - 10)^4, (a_ - 10)*x[,2]) # needs to be more general
+    xa_ <- cbind(x, a_ - 10, (a_ - 10)^2, (a_ - 10)^3, (a_ - 10)*x[,2]) # needs to be more general
     
     log.eps <- dpois(y, family$linkinv(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
       dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
@@ -147,12 +148,12 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     
     # Sample outcome model while cutting feedback
     
-    xa <- cbind(x, a - 10, (a - 10)^2, (a - 10)^3, (a - 10)^4, (a - 10)*x[,2]) # needs to be more general
+    xa <- cbind(x, a - 10, (a - 10)^2, (a - 10)^3, (a - 10)*x[,2]) # needs to be more general
     gamma_ <- gamma0 <- gamma[i - 1,]
     
     for (j in 1:o) {
       
-      gamma_[j] <- c(rnorm(1, gamma0[j], h.gamma))
+      gamma_[j] <- c(rnorm(1, gamma0[j], h.gamma[j]))
       
       log.eps <- sum(dpois(y, family$linkinv(c(xa %*% gamma_) + offset), log = TRUE)) -
         sum(dpois(y, family$linkinv(c(xa %*% gamma0) + offset), log = TRUE)) +
@@ -175,7 +176,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       
       xa.new.list <- lapply(a.vals, function(a.tmp, ...) {
         
-        cbind(x, a.tmp - 10, (a.tmp - 10)^2, (a.tmp - 10)^3, (a.tmp - 10)^4, (a.tmp - 10)*x[,2]) # needs to be more general
+        cbind(x, a.tmp - 10, (a.tmp - 10)^2, (a.tmp - 10)^3, (a.tmp - 10)*x[,2]) # needs to be more general
         
       })
       
@@ -200,7 +201,7 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       phat[phat <= 0] <- .Machine$double.eps
       
       # pseudo-outcome
-      psi <- (y_ - muhat)*(phat/pihat)
+      psi <- (y_ - muhat)*(phat/pihat) + mhat
       
       # integrate
       mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)

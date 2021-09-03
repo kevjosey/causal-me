@@ -35,11 +35,10 @@ a.vals <- seq(6, 14, by = 0.04)
 family <- poisson()
 
 # mcmc arguments
-n.iter <- 2000
+n.iter <- 1000
 n.adapt <- 1000
-thin <- 20
+thin <- 10
 h.a <- 0.5
-h.gamma <- 0.05
 scale <- 1e6
 shape <- rate <- 1e-3
 
@@ -83,7 +82,7 @@ out <- mclapply(1:n.sim, function(i, ...){
   z_tilde <- aggregate(s_tilde, by = list(s.id), mean)[,2]
   
   # naive
-  naive_hat <- try(erc(y = y, a = a, x = x, offset = offset, weights = weights, 
+  naive_hat <- try(erc(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
                        family = family, a.vals = a.vals, span = span,
                        n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
@@ -100,7 +99,7 @@ out <- mclapply(1:n.sim, function(i, ...){
   
   # Bayes DR Approach
   bayes_hat <- try(bayes_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
-                             s.id = s.id, id = id, w = w, x = x, family = family, h.gamma = h.gamma,
+                             s.id = s.id, id = id, w = w, x = x, family = family,
                              a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                              h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
