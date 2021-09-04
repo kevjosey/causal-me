@@ -95,8 +95,8 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   h.gamma <- sqrt(diag(vcov(glm(y ~ 0 + xa, family = family, offset = offset))))
   
   # the good stuff
-  a.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
-  est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
+  a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
+  mhat.out <- est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
@@ -201,15 +201,15 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       phat[phat <= 0] <- .Machine$double.eps
       
       # pseudo-outcome
-      psi <- (y_ - muhat)*(phat/pihat) + mhat
+      psi[j,] <- (y_ - muhat)*(phat/pihat) + mhat
+      mhat.out[j,] <- colMeans(muhat.mat)
       
       # integrate
       mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
       phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
-
       int.mat <- (muhat.mat - mhat.mat)*phat.mat
       
-      dr_out <- sapply(a.vals, dr_est_alt, psi = psi, a = a, family = gaussian(), 
+      dr_out <- sapply(a.vals, dr_est_alt, psi = psi[j,], a = a, family = gaussian(), 
                        span = span, int.mat = int.mat, se.fit = TRUE)
       
       est.mat[j,] <- dr_out[1,]
@@ -234,8 +234,13 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   a.mat <- a.mat[,order(shield)]
   dr_estimate <- colMeans(est.mat)
   dr_variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
+  g_estimate <- colMeans(mhat.out)
+  g_variance <- apply(mhat.out, 2, var)
+  hpdi <- apply(mhat.out, 2, hpd)
+  rownames(hpdi) <- c("lower", "upper")
   
   rslt <- list(dr_estimate = dr_estimate, dr_variance = dr_variance,
+               g_estimate = g_estimate, g_variance = g_variance, hpdi = hpdi,
                accept.a = accept.a, accept.gamma = accept.gamma,
                mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, gamma = gamma,
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2))

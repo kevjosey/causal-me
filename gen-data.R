@@ -51,13 +51,13 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   
   if (gps_scen == "b") {
     
-    mu_gps <- 9 + 0.5*u[,1] - 0.5*u[,2] - 0.5*u[,3] + 0.5*u[,4]
+    mu_gps <- 10 + 0.5*u[,1] - 0.5*u[,2] - 0.5*u[,3] + 0.5*u[,4]
     for (g in 1:n)
       w2[s.id == g] <- rnorm(sum(s.id == g), u[id == g,2], 1)
     
   } else {
     
-    mu_gps <- 9 + 0.5*x[,1] - 0.5*x[,2] - 0.5*x[,3] + 0.5*x[,4]
+    mu_gps <- 10 + 0.5*x[,1] - 0.5*x[,2] - 0.5*x[,3] + 0.5*x[,4]
     for (g in 1:n)
       w2[s.id == g] <- rnorm(sum(s.id == g), x[id == g,2], 1)
     

@@ -179,7 +179,7 @@ bart_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       
       # pseudo-outcome
       psi[j,] <- c(y_ - muhat) + mhat # pseudo-outcome
-      mhat.out[j,] <- predict(smooth.spline(a, colMeans(muhat.mat)), x = a.vals)$y
+      mhat.out[j,] <- predict(smooth.spline(a, mhat), x = a.vals)$y
       
       dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, span = span, 
                        family = gaussian(), se.fit = TRUE, int.mat = int.mat)

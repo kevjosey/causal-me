@@ -32,9 +32,9 @@ simulate <- function(scenario, n.sim, a.vals){
   mult <- scenario$mult # c(100, 200)
   
   # gibbs sampler stuff
-  n.iter <- 1000
+  n.iter <- 2000
   n.adapt <- 1000
-  thin <- 10
+  thin <- 20
   h.a <- 0.5
   scale <- 1e6
   shape <- rate <- 1e-3
@@ -132,6 +132,8 @@ simulate <- function(scenario, n.sim, a.vals){
                 if (!inherits(bart_hat, "try-error")) {as.numeric((est[5,] - 1.96*se[4,]) < est[1,] & (est[5,] + 1.96*se[4,]) > est[1,])} else {rep(NA, length(a.vals))},
                 if (!inherits(bayes_hat, "try-error")) {as.numeric((est[6,] - 1.96*se[5,]) < est[1,] & (est[6,] + 1.96*se[5,]) > est[1,])} else {rep(NA, length(a.vals))})
      
+    return(list(est = est, se = se, cp = cp))
+    
   }, mc.cores = 30, mc.preschedule = TRUE)
   
   est <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$est} else {matrix(NA, ncol = length(a.vals), nrow = 6)}), along = 3)
@@ -172,10 +174,10 @@ set.seed(42)
 a.vals <- seq(6, 14, by = 0.04)
 n.sim <- 500
 
-n <- 400
-mult <- 10
+n <- 800
+mult <- 5
 sig_agg <- 1
-sig_pred <- sqrt(0.5)
+sig_pred <- 1
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
 pred_scen <- c("a", "b")

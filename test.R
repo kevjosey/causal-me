@@ -18,16 +18,16 @@ source("~/Github/causal-me/bayes-erc.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
-n.sim <- 50
+n.sim <- 25
 sig_gps <- 2
-sig_agg <- 0
-sig_pred <- 0
+sig_agg <- sqrt(2)
+sig_pred <- sqrt(2)
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "a"
 span <- 0.1
 mult <- 5
-n <- 400
+n <- 800
 prob <- 0.1
 
 # model arguments
@@ -35,9 +35,9 @@ a.vals <- seq(6, 14, by = 0.04)
 family <- poisson()
 
 # mcmc arguments
-n.iter <- 1000
+n.iter <- 2000
 n.adapt <- 1000
-thin <- 10
+thin <- 20
 h.a <- 0.5
 scale <- 1e6
 shape <- rate <- 1e-3

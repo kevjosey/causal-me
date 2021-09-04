@@ -8,7 +8,7 @@ plotnames <- c("No Measurement Error",
                "Prediction Error but No Aggregation Error",
                "Aggregation Error but No Prediction Error",
                "Both Classical and Prediction Error")
-idx <- c(1, 3, 7, 9)
+idx <- c(1,2,7,8)
 
 pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_3.pdf", width = 9, height = 9)
 par(mfrow = c(2,2))
@@ -28,8 +28,8 @@ for (k in idx){
   
   if (k == idx[length(idx)]){
     
-    legend(6, 0.1, legend=c("True ERC", "Naive", "RC", "BART+LOESS"),
-           lty = hue_pal()(6)[c(1,2,3,5)], lwd=2, cex=0.8)
+    legend(6, 0.1, legend=c("True ERF", "Naive", "Regression Calibration", "Multiple Imputation"),
+           col = hue_pal()(6)[c(1,2,3,5)], lwd=2, cex=0.8)
     
     
   }
@@ -42,19 +42,21 @@ dev.off()
 
 # Summary Table
 
-tbl <- matrix(NA, nrow = length(rslt$est), ncol = 12)
+tbl <- data.frame()
 
-for (k in 1:length(rslt$est)){
+for (k in 1:length(filenames)){
   
-  bias <- round(colMeans(t(rslt$est[[k]]$bias)/rslt$est[[k]]$est[1,]), 3)
-  se <- round(rowMeans(rslt$est[[k]]$se/rslt$est[[k]]$sd), 3)
-  ci <- round(rowMeans(rslt$est[[k]]$cp), 3)
+  load(file = filenames[[k]])
   
-  tbl[k,] <- c(bias, se, ci)
+  tbl[k,1:7] <- rslt$scenario
+  tbl[k,8:11] <- round(colMeans(t(rslt$bias)/rslt$est[1,]), 3)
+  tbl[k,12:15] <- round(rowMeans(rslt$se), 3)
+  tbl[k,16:19] <- round(rowMeans(rslt$sd), 3)
+  tbl[k,20:23] <- round(rowMeans(rslt$cp), 3)
   
 }
 
-colnames(tbl) <- outer(names(bias), c("Bias", "SE", "CI"), FUN = "paste")[1:12]
+colnames(tbl)[8:23] <- outer(names(bias), c("Bias", "SE", "SD", "CI"), FUN = "paste")[1:16]
 final <- cbind(rslt$scen_idx, tbl)
 
 write.csv(final, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/table_1.csv")
