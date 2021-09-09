@@ -32,7 +32,7 @@ simulate <- function(scenario, n.sim, a.vals){
   
   # gibbs sampler stuff
   n.iter <- 2000
-  n.adapt <- 1000
+  n.adapt <- 2000
   thin <- 20
   h.a <- 0.5
   scale <- 1e6
