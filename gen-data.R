@@ -28,7 +28,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   x3 <- stats::rnorm(n, 0, 1)
   x4 <- stats::rnorm(n, 0, 1)
   x <- cbind(x1, x2, x3, x4)
-  x <- x%*%solve(chol(cov(x)))
+  # x <- x%*%solve(chol(cov(x)))
   
   id <- 1:n
   offset <- floor(runif(n, 10, 1000))
@@ -46,7 +46,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   u4 <- as.numeric(scale((x[,2] + x[,4] + 20)^2))
   
   u <- cbind(u1, u2, u3, u4)
-  u <- u%*%solve(chol(cov(u)))
+  # u <- u%*%solve(chol(cov(u)))
   w2 <- rep(NA, mult*n)
   
   if (gps_scen == "b") {

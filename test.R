@@ -18,10 +18,10 @@ source("~/Github/causal-me/bayes-erc.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
-n.sim <- 25
+n.sim <- 50
 sig_gps <- 2
 sig_agg <- sqrt(2)
-sig_pred <- sqrt(2)
+sig_pred <- 1
 gps_scen <- "a"
 out_scen <- "a"
 pred_scen <- "a"
@@ -82,17 +82,17 @@ out <- mclapply(1:n.sim, function(i, ...){
   z_tilde <- aggregate(s_tilde, by = list(s.id), mean)[,2]
   
   # naive
-  naive_hat <- try(erc(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
+  naive_hat <- try(erc_alt(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
                        family = family, a.vals = a.vals, span = span,
                        n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # real
-  rc_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, weights = weights,
+  rc_hat <- try(erc_alt(y = y, a = z_hat, x = x, offset = offset, weights = weights,
                     family = family, a.vals = a.vals, span = span,
                     n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # BART Approach
-  bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
+  bart_hat <- try(bart_erc_alt(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
                            s.id = s.id, id = id, w = w, x = x, family = family, 
                            a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                            h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)

@@ -89,10 +89,10 @@ dr_est <- function(newa, a, psi, span, family = gaussian(), se.fit = FALSE, int.
     int2 <- colMeans(intfn2.mat)
 
     Dh <- solve(t(gh) %*% diag(k.std) %*% gh)
-    V <- crossprod(cbind(k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int1,
-                         a.std * k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int2))
+    V <- rbind(k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int1,
+               a.std * k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int2)
 
-    sig <- Dh%*%V%*%Dh
+    sig <- cov(Dh%*%V)
 
     return(c(mu = mu, sig = sig[1,1]))
 

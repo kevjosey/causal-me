@@ -7,8 +7,12 @@ filenames <- list.files(path = "~/Dropbox/Projects/ERC-EPE/Output/sim_1", full.n
 plotnames <- c("No Measurement Error",
                "Prediction Error but No Aggregation Error",
                "Aggregation Error but No Prediction Error",
-               "Both Classical and Prediction Error")
+               "Both Aggregation and Prediction Error")
 idx <- c(1,2,7,8)
+idx <- c(10,11,16,17)
+idx <- c(19,20,25,26)
+# idx <- c(28,29,34,36)
+
 
 pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_3.pdf", width = 9, height = 9)
 par(mfrow = c(2,2))
@@ -28,7 +32,7 @@ for (k in idx){
   
   if (k == idx[length(idx)]){
     
-    legend(6, 0.1, legend=c("True ERF", "Naive", "Regression Calibration", "Multiple Imputation"),
+    legend(6, 0.1, legend=c("True ERF", "No Correction", "Regression Calibration", "Multiple Imputation"),
            col = hue_pal()(6)[c(1,2,3,5)], lwd=2, cex=0.8)
     
     
@@ -56,12 +60,17 @@ for (k in 1:length(filenames)){
   
 }
 
-colnames(tbl)[8:23] <- outer(names(bias), c("Bias", "SE", "SD", "CI"), FUN = "paste")[1:16]
-final <- cbind(rslt$scen_idx, tbl)
+colnames(tbl)[8:23] <- outer(rownames(rslt$bias), c("Bias", "SE", "SD", "CI"), FUN = "paste")[1:16]
 
-write.csv(final, file = "~/Dropbox (Personal)/Projects/ERC-EPE/Output/table_1.csv")
+write.csv(tbl, file = "~/Dropbox/Projects/ERC-EPE/Output/table_1.csv")
+
+
+### Model Misspecification
 
 # Summary Plot
+
+a.vals <- seq(6, 14, by = 0.04)
+filenames <- list.files(path = "~/Dropbox/Projects/ERC-EPE/Output/sim_2", full.names = TRUE)
 
 plotnames <- c("GPS: \"A\"; Outcome: \"A\"; EPE: \"B\"",
                "GPS: \"A\"; Outcome: \"B\"; EPE: \"A\"",
@@ -69,9 +78,9 @@ plotnames <- c("GPS: \"A\"; Outcome: \"A\"; EPE: \"B\"",
                "GPS: \"B\"; Outcome: \"A\"; EPE: \"A\"",
                "GPS: \"B\"; Outcome: \"A\"; EPE: \"B\"",
                "GPS: \"B\"; Outcome: \"B\"; EPE: \"A\"")
-idx <- c(50:55)
+idx <- c(2:7)
 
-pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_2.pdf", width = 11, height = 9)
+pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_mis.pdf", width = 11, height = 9)
 par(mfrow = c(3,2))
 j <- 1
 
@@ -79,22 +88,16 @@ for (k in idx){
   
   load(file = filenames[[k]])
   
-  plot(a.vals, rslt$est[1,], type = "l", col = hue_pal()(3)[1], lwd = 2,
+  plot(a.vals, rslt$est[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
        xlab = "Exposure", ylab = "Rate of Event", main = plotnames[j],
        ylim = c(0,0.15))
   grid(lty = 1)
-  # lines(a.vals, rslt$est[2,], type = "l", col = hue_pal()(5)[2], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[3,], type = "l", col = hue_pal()(3)[2], lwd = 2, lty = 1)
-  # lines(a.vals, rslt$est[4,], type = "l", col = hue_pal()(5)[4], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[5,], type = "l", col = hue_pal()(3)[3], lwd = 2, lty = 1)
-  # lines(a.vals, rslt$est[2,] - 1.96*rslt$se[1,], type = "l", col = hue_pal()(5)[2], lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[3,] - 1.96*rslt$se[2,], type = "l", col = hue_pal()(3)[2], lwd = 2, lty = 2)
-  # lines(a.vals, rslt$est[4,] - 1.96*rslt$se[3,], type = "l", col = hue_pal()(5)[4], lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[5,] - 1.96*rslt$se[4,], type = "l", col = hue_pal()(3)[3], lwd = 2, lty = 2)
-  # lines(a.vals, rslt$est[2,] + 1.96*rslt$se[1,], type = "l", col = hue_pal()(5)[2], lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[3,] + 1.96*rslt$se[2,], type = "l", col = hue_pal()(3)[2], lwd = 2, lty = 2)
-  # lines(a.vals, rslt$est[4,] + 1.96*rslt$se[3,], type = "l", col = hue_pal()(5)[4], lwd = 2, lty = 2)
-  lines(a.vals, rslt$est[5,] + 1.96*rslt$se[4,], type = "l", col = hue_pal()(3)[3], lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[5,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[3,] - 1.96*rslt$se[2,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[5,] - 1.96*rslt$se[4,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[3,] + 1.96*rslt$se[2,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[5,] + 1.96*rslt$se[4,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 2)
   
   if (k == idx[length(idx)]){
     
@@ -112,6 +115,8 @@ for (k in idx){
 dev.off()
 
 # Summary Table
+
+filenames <- list.files(path = "~/Dropbox/Projects/ERC-EPE/Output/sim_2", full.names = TRUE)
 
 tbl <- data.frame()
 
