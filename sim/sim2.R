@@ -105,12 +105,6 @@ simulate <- function(scenario, n.sim, a.vals){
                                a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                                h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
-    # Bayes DR Approach
-    bayes_hat <- try(bayes_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
-                               s.id = s.id, id = id, w = w, x = x, family = family, h.gamma = h.gamma,
-                               a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
-                               h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
-    
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
                  if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},

@@ -69,6 +69,7 @@ erc_alt <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
   
 }
 
+# LOESS function
 dr_est_alt <- function(newa, a, psi, span, family = gaussian(), se.fit = FALSE, int.mat = NULL) {
 
   a.std <- a - newa
