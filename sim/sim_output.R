@@ -11,8 +11,7 @@ plotnames <- c("No Measurement Error",
 idx <- c(1,2,7,8)
 idx <- c(10,11,16,17)
 idx <- c(19,20,25,26)
-# idx <- c(28,29,34,36)
-
+idx <- c(28,29,34,35)
 
 pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_3.pdf", width = 9, height = 9)
 par(mfrow = c(2,2))

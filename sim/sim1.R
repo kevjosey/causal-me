@@ -124,26 +124,27 @@ simulate <- function(scenario, n.sim, a.vals){
   se <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$se} else {matrix(NA, ncol = length(a.vals), nrow = 4)}), along = 3)
   cp <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$cp} else {matrix(NA, ncol = length(a.vals), nrow = 4)}), along = 3)
   
+  compare <- matrix(est[1,,], nrow = length(a.vals), ncol = n.sim)
+  
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
   rownames(out_est) <- c("ERF","NAIVE","RC","BART","LOESS")
   
-  compare <- matrix(est[1,,], nrow = length(a.vals), ncol = n.sim)
   out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
   colnames(out_bias) <- a.vals
   rownames(out_bias) <- c("NAIVE","RC","BART","LOESS")
   
-  out_sd <- t(apply(est[2:5,,], 1, function(x) apply(x, 1, sd, na.rm = T)))
-  colnames(out_sd) <- a.vals
-  rownames(out_sd) <- c("NAIVE","RC","BART","LOESS")
+  out_mse <- t(apply(est[2:6,,], 1, function(x) rowMeans((x - compare)^2, na.rm = T)))
+  colnames(out_mse) <- a.vals
+  rownames(out_mse) <- c("NAIVE","RC","BART","LOESS","DR")
   
-  out_se <- t(apply(se, 1, rowMeans, na.rm = TRUE))
-  colnames(out_se) <- a.vals
-  rownames(out_se) <- c("NAIVE","RC","BART","LOESS")
-  
-  out_cp <- t(apply(cp, 1, rowMeans, na.rm = TRUE))
+  out_cp_1 <- t(apply(cp, 1, rowMeans, na.rm = TRUE))
   colnames(out_cp) <- a.vals
-  rownames(out_cp) <- c("NAIVE","RC","BART","LOESS")
+  rownames(out_cp) <- c("NAIVE","RC","BART","LOESS","DR")
+  
+  out_cp_2 <- t(apply(cp, 1, rowMeans, na.rm = TRUE))
+  colnames(out_cp) <- a.vals
+  rownames(out_cp) <- c("NAIVE","RC","BART","LOESS","DR")
   
   rslt <- list(scenario = scenario, est = out_est, bias = out_bias, sd = out_sd, se = out_se, cp = out_cp)
   filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim_1/", paste(scenario, collapse = "_"),".RData")
