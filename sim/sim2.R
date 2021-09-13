@@ -12,6 +12,7 @@ library(dbarts)
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/erc.R")
+source("~/Github/causal-me/erc-alt.R")
 source("~/Github/causal-me/bart-erc.R")
 source("~/Github/causal-me/bayes-erc.R")
 source("~/Github/causal-me/auxiliary.R")
@@ -125,44 +126,38 @@ simulate <- function(scenario, n.sim, a.vals){
                 if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$smooth_variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$dr_variance)} else {rep(NA, length(a.vals))})
     
-    # coverage probability
-    cp <- rbind(if (!inherits(naive_hat, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} else {rep(NA, length(a.vals))},
-                if (!inherits(rc_hat, "try-error")) {as.numeric((est[3,] - 1.96*se[2,]) < est[1,] & (est[3,] + 1.96*se[2,]) > est[1,])} else {rep(NA, length(a.vals))},
-                if (!inherits(bart_hat, "try-error")) {as.numeric(bart_hat$hpdi[1,] < est[1,] & bart_hat$hpdi[2,] > est[1,])} else {rep(NA, length(a.vals))},
-                if (!inherits(bart_hat, "try-error")) {as.numeric((est[5,] - 1.96*se[4,]) < est[1,] & (est[5,] + 1.96*se[4,]) > est[1,])} else {rep(NA, length(a.vals))},
-                if (!inherits(bayes_hat, "try-error")) {as.numeric((est[6,] - 1.96*se[5,]) < est[1,] & (est[6,] + 1.96*se[5,]) > est[1,])} else {rep(NA, length(a.vals))})
-     
-    return(list(est = est, se = se, cp = cp))
+    return(list(est = est, se = se))
     
   }, mc.cores = 30, mc.preschedule = TRUE)
   
   est <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$est} else {matrix(NA, ncol = length(a.vals), nrow = 6)}), along = 3)
   se <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$se} else {matrix(NA, ncol = length(a.vals), nrow = 5)}), along = 3)
-  cp <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$cp} else {matrix(NA, ncol = length(a.vals), nrow = 5)}), along = 3)
+  mu.mat <- matrix(rep(rowMeans(est[1,,]), n.sim), nrow = length(a.vals), ncol = n.sim)
   
-  compare <- matrix(est[1,,], nrow = length(a.vals), ncol = n.sim)
+  # coverage probability
+  cp <- list(as.matrix((est[2,,] - 1.96*se[1,,]) < mu.mat & (est[2,,] + 1.96*se[1,,]) > mu.mat),
+             as.matrix((est[3,,] - 1.96*se[2,,]) < mu.mat & (est[3,,] + 1.96*se[2,,]) > mu.mat),
+             as.matrix((est[4,,] - 1.96*se[3,,]) < mu.mat & (est[5,,] + 1.96*se[4,,]) > mu.mat),
+             as.matrix((est[5,,] - 1.96*se[4,,]) < mu.mat & (est[5,,] + 1.96*se[4,,]) > mu.mat),
+             as.matrix((est[6,,] - 1.96*se[5,,]) < mu.mat & (est[6,,] + 1.96*se[5,,]) > mu.mat))
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
   rownames(out_est) <- c("ERF","NAIVE","RC","BART","LOESS","DR")
-
-  out_bias <- t(apply(est[2:6,,], 1, function(x) rowMeans(abs(x - compare), na.rm = T)))
+  
+  out_bias <- t(apply(est[2:6,,], 1, function(x) rowMeans(abs(x - mu.mat), na.rm = T)))
   colnames(out_bias) <- a.vals
   rownames(out_bias) <- c("NAIVE","RC","BART","LOESS","DR")
   
-  out_mse <- t(apply(est[2:6,,], 1, function(x) rowMeans((x - compare)^2, na.rm = T)))
+  out_mse <- t(apply(est[2:6,,], 1, function(x) rowMeans((x - mu.mat)^2, na.rm = T)))
   colnames(out_mse) <- a.vals
   rownames(out_mse) <- c("NAIVE","RC","BART","LOESS","DR")
   
-  out_cp_1 <- t(apply(cp, 1, rowMeans, na.rm = TRUE))
+  out_cp <- do.call(rbind, lapply(cp, rowMeans, na.rm = T))
   colnames(out_cp) <- a.vals
   rownames(out_cp) <- c("NAIVE","RC","BART","LOESS","DR")
   
-  out_cp_2 <- t(apply(cp, 1, rowMeans, na.rm = TRUE))
-  colnames(out_cp) <- a.vals
-  rownames(out_cp) <- c("NAIVE","RC","BART","LOESS","DR")
-  
-  rslt <- list(scenario = scenario, est = out_est, bias = out_bias, mse = out_mse, cp_mean = out_cp_1, cp_med = out_cp_2)
+  rslt <- list(scenario = scenario, est = out_est, bias = out_bias, mse = out_mse, cp = out_cp)
   filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim_2/", paste(scenario, collapse = "_"),".RData")
   save(rslt, file = filename)
   

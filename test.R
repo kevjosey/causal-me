@@ -13,12 +13,13 @@ library(abind)
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
 source("~/Github/causal-me/erc.R")
+source("~/Github/causal-me/erc-alt.R")
 source("~/Github/causal-me/bart-erc.R")
 source("~/Github/causal-me/bayes-erc.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
-n.sim <- 50
+n.sim <- 100
 sig_gps <- 2
 sig_agg <- sqrt(2)
 sig_pred <- 1
@@ -36,7 +37,7 @@ family <- poisson()
 
 # mcmc arguments
 n.iter <- 2000
-n.adapt <- 1000
+n.adapt <- 2000
 thin <- 20
 h.a <- 0.5
 scale <- 1e6
@@ -118,14 +119,7 @@ out <- mclapply(1:n.sim, function(i, ...){
               if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$smooth_variance)} else {rep(NA, length(a.vals))},
               if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$dr_variance)} else {rep(NA, length(a.vals))})
   
-  # coverage probability
-  cp <- rbind(if (!inherits(naive_hat, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} else {rep(NA, length(a.vals))},
-              if (!inherits(rc_hat, "try-error")) {as.numeric((est[3,] - 1.96*se[2,]) < est[1,] & (est[3,] + 1.96*se[2,]) > est[1,])} else {rep(NA, length(a.vals))},
-              if (!inherits(bart_hat, "try-error")) {as.numeric(bart_hat$hpdi[1,] < est[1,] & bart_hat$hpdi[2,] > est[1,])} else {rep(NA, length(a.vals))},
-              if (!inherits(bart_hat, "try-error")) {as.numeric((est[5,] - 1.96*se[4,]) < est[1,] & (est[5,] + 1.96*se[4,]) > est[1,])} else {rep(NA, length(a.vals))},
-              if (!inherits(bayes_hat, "try-error")) {as.numeric((est[6,] - 1.96*se[5,]) < est[1,] & (est[6,] + 1.96*se[5,]) > est[1,])} else {rep(NA, length(a.vals))})
-  
-  return(list(est = est, se = se, cp = cp))
+  return(list(est = est, se = se))
   
 }, mc.cores = 25, mc.preschedule = TRUE)
 
@@ -134,19 +128,30 @@ stop - start
 
 est <- abind(lapply(out, function(lst, ...) lst$est), along = 3)
 se <- abind(lapply(out, function(lst, ...) lst$se), along = 3)
-cp <- abind(lapply(out, function(lst, ...) lst$cp), along = 3)
+mu.mat <- matrix(rep(rowMeans(est[1,,]), n.sim), nrow = length(a.vals), ncol = n.sim)
+
+# coverage probability
+cp <- list(as.matrix((est[2,,] - 1.96*se[1,,]) < mu.mat & (est[2,,] + 1.96*se[1,,]) > mu.mat),
+           as.matrix((est[3,,] - 1.96*se[2,,]) < mu.mat & (est[3,,] + 1.96*se[2,,]) > mu.mat),
+           as.matrix((est[4,,] - 1.96*se[3,,]) < mu.mat & (est[5,,] + 1.96*se[3,,]) > mu.mat),
+           as.matrix((est[5,,] - 1.96*se[4,,]) < mu.mat & (est[5,,] + 1.96*se[4,,]) > mu.mat),
+           as.matrix((est[6,,] - 1.96*se[5,,]) < mu.mat & (est[6,,] + 1.96*se[5,,]) > mu.mat))
 
 out_est <- t(apply(est, 1, rowMeans, na.rm = T))
 colnames(out_est) <- a.vals
 rownames(out_est) <- c("ERF","NAIVE","RC","BART","LOESS","DR")
 
-out_se <- t(apply(se, 1, rowMeans, na.rm = T))
-colnames(out_se) <- a.vals
-rownames(out_se) <- c("NAIVE","RC","BART","LOESS","DR")
+out_bias <- t(apply(est[2:6,,], 1, function(x) rowMeans(abs(x - mu.mat), na.rm = T)))
+colnames(out_bias) <- a.vals
+rownames(out_bias) <- c("NAIVE","RC","BART","LOESS","DR")
 
-out_cp <- t(apply(cp, 1, rowMeans, na.rm = T))
+out_mse <- t(apply(est[2:6,,], 1, function(x) rowMeans((x - mu.mat)^2, na.rm = T)))
+colnames(out_mse) <- a.vals
+rownames(out_mse) <- c("NAIVE","RC","BART","LOESS","DR")
+
+out_cp <- do.call(rbind, lapply(cp, rowMeans, na.rm = T))
 colnames(out_cp) <- a.vals
-rownames(out_cp) <- c("NAIVE","RC","BART","LOESS","DR")
+rownames(out_cp) <- c("NAIVE","RC","BART","LOESS", "DR")
 
 plot(a.vals, out_est[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
      main = "Exposure = b, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
