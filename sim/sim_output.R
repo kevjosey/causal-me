@@ -53,8 +53,7 @@ for (k in 1:length(filenames)){
   
   tbl[k,1:7] <- rslt$scenario
   tbl[k,8:11] <- round(colMeans(t(rslt$bias)/rslt$est[1,]), 3)
-  tbl[k,12:15] <- round(rowMeans(rslt$se), 3)
-  tbl[k,16:19] <- round(rowMeans(rslt$sd), 3)
+  tbl[k,12:15] <- round(rowMeans(rslt$mse), 3)
   tbl[k,20:23] <- round(rowMeans(rslt$cp), 3)
   
 }
