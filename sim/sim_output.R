@@ -51,10 +51,12 @@ for (k in 1:length(filenames)){
   
   load(file = filenames[[k]])
   
+  idx <- ceiling(length(a.vals)/2)
+  
   tbl[k,1:7] <- rslt$scenario
-  tbl[k,8:11] <- round(colMeans(t(rslt$bias)/rslt$est[1,]), 3)
-  tbl[k,12:15] <- round(rowMeans(rslt$mse), 3)
-  tbl[k,20:23] <- round(rowMeans(rslt$cp), 3)
+  tbl[k,8:11] <- paste(round(colMeans(t(rslt$bias)/rslt$est[1,]), 3), " (", round(rslt$bias[,idx]/rslt$est[1,idx], 3), ")", sep = "")
+  tbl[k,12:15] <- paste(round(rowMeans(sqrt(rslt$mse)), 3), " (", round(sqrt(rslt$mse[,idx]), 3), ")", sep = "")
+  tbl[k,20:23] <- paste(round(rowMeans(rslt$cp), 3), " (", round(rslt$cp[,idx], 3), ")", sep = "")
   
 }
 
