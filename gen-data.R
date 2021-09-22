@@ -74,7 +74,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   s <- rnorm(mult*n, a_s, sig_agg)
   
   if (pred_scen == "b"){
-    star <- rnorm(mult*n, s - 1 + abs(0.5*w1 + 0.5*w2), sig_pred)
+    star <- rnorm(mult*n, s - 1 + 0.5*abs(w1 + w2), sig_pred)
   } else {
     star <- rnorm(mult*n, s - 1 + 0.5*w1 + 0.5*w2, sig_pred)
   }

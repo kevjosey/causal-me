@@ -101,7 +101,7 @@ simulate <- function(scenario, n.sim, a.vals){
     
     # Alternate Bayes
     bayes_hat <- try(bayes_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
-                               s.id = s.id, id = id, w = w, x = x, family = family, h.gamma = h.gamma,
+                               s.id = s.id, id = id, w = w, x = x, family = family,
                                a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                                h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
@@ -131,7 +131,7 @@ simulate <- function(scenario, n.sim, a.vals){
   # coverage probability
   cp <- list(as.matrix((est[2,,] - 1.96*se[1,,]) < mu.mat & (est[2,,] + 1.96*se[1,,]) > mu.mat),
              as.matrix((est[3,,] - 1.96*se[2,,]) < mu.mat & (est[3,,] + 1.96*se[2,,]) > mu.mat),
-             as.matrix((est[4,,] - 1.96*se[3,,]) < mu.mat & (est[5,,] + 1.96*se[4,,]) > mu.mat),
+             as.matrix((est[4,,] - 1.96*se[3,,]) < mu.mat & (est[4,,] + 1.96*se[3,,]) > mu.mat),
              as.matrix((est[5,,] - 1.96*se[4,,]) < mu.mat & (est[5,,] + 1.96*se[4,,]) > mu.mat),
              as.matrix((est[6,,] - 1.96*se[5,,]) < mu.mat & (est[6,,] + 1.96*se[5,,]) > mu.mat))
   
@@ -151,7 +151,26 @@ simulate <- function(scenario, n.sim, a.vals){
   colnames(out_cp) <- a.vals
   rownames(out_cp) <- c("NAIVE","RC","BART","LOESS","DR")
   
-  rslt <- list(scenario = scenario, est = out_est, bias = out_bias, mse = out_mse, cp = out_cp)
+  lower <- rbind(rowMeans(est[2,,] - 1.96*se[1,,]),
+                 rowMeans(est[3,,] - 1.96*se[2,,]),
+                 rowMeans(est[4,,] - 1.96*se[3,,]),
+                 rowMeans(est[5,,] - 1.96*se[4,,]),
+                 rowMeans(est[6,,] - 1.96*se[5,,]))
+  
+  colnames(lower) <- a.vals
+  rownames(lower) <- c("NAIVE","RC","BART","LOESS","DR")
+  
+  upper <- rbind(rowMeans(est[2,,] + 1.96*se[1,,]),
+                 rowMeans(est[3,,] + 1.96*se[2,,]),
+                 rowMeans(est[4,,] + 1.96*se[3,,]),
+                 rowMeans(est[5,,] + 1.96*se[4,,]),
+                 rowMeans(est[6,,] + 1.96*se[5,,]))
+                 
+  colnames(upper) <- a.vals
+  rownames(upper) <- c("NAIVE","RC","BART","LOESS","DR")
+
+  
+  rslt <- list(scenario = scenario, est = out_est, bias = out_bias, mse = out_mse, cp = out_cp, lower = lower, upper = upper)
   filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim_2/", paste(scenario, collapse = "_"),".RData")
   save(rslt, file = filename)
   
@@ -162,11 +181,11 @@ set.seed(42)
 
 # simulation scenarios
 a.vals <- seq(6, 14, by = 0.04)
-n.sim <- 500
+n.sim <- 200
 
 n <- 800
 mult <- 5
-sig_agg <- 1
+sig_agg <- sqrt(2)
 sig_pred <- 1
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
