@@ -61,7 +61,7 @@ plotnames <- c("GPS: \"a\"; Outcome: \"a\"; EPE: \"b\"",
                "GPS: \"b\"; Outcome: \"b\"; EPE: \"a\"")
 idx <- c(2:7)
 
-pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_mis.pdf", width = 11, height = 9)
+pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_mis.pdf", width = 11, height = 11)
 par(mfrow = c(3,2))
 j <- 1
 
@@ -75,10 +75,14 @@ for (k in idx){
   grid(lty = 1)
   lines(a.vals, rslt$est[5,], type = "l", col = gg_color_hue(4)[3], lwd = 2, lty = 1)
   lines(a.vals, rslt$est[6,], type = "l", col = gg_color_hue(4)[4], lwd = 2, lty = 1)
+  lines(a.vals, rslt$upper[4,], type = "l", col = gg_color_hue(4)[3], lwd = 2, lty = 2)
+  lines(a.vals, rslt$upper[5,], type = "l", col = gg_color_hue(4)[4], lwd = 2, lty = 2)
+  lines(a.vals, rslt$lower[4,], type = "l", col = gg_color_hue(4)[3], lwd = 2, lty = 2)
+  lines(a.vals, rslt$lower[5,], type = "l", col = gg_color_hue(4)[4], lwd = 2, lty = 2)
   
   if (k == idx[length(idx)]){
     
-    legend(6, 0.1, legend=c("True ERC", "RC", "BART+LOESS", "95% CI"),
+    legend(6, 0.1, legend=c("True ERC", "GLM", "BART", "95% CI"),
            col = c("black", gg_color_hue(4)[3:4], "black"),
            lty = c(1,1,1,2), lwd=2, cex=0.8)
     
