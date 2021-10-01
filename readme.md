@@ -12,4 +12,4 @@
 
 [`auxiliary.R`](https://github.com/kevjosey/causal-me/tree/master/auxiliary.R) Additional functions used intermittently throughout the manuscript including a function to estimate the regression calibrated exposures and a function to compute the highest posterior density interval when the BART ERF is used without smoothing.
 
-[`/sim`](https://github.com/kevjosey/causal-me/tree/mastergen-data.R) Code for running the numerical studies is contained in this directory. Also included in this folder is `test.R` for unit testing and `gen-data.R` which includes functions to generate simulated data and the true exposure response function.
+[`/sim`](https://github.com/kevjosey/causal-me/tree/master/sim) Code for running the numerical studies is contained in this directory. Also included in this folder is `test.R` for unit testing and `gen-data.R` which includes functions to generate simulated data and the true exposure response function.

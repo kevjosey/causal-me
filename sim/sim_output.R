@@ -105,15 +105,15 @@ for (k in 1:length(filenames)){
   idx <- 126
   
   relvec <- rslt$est[1,]
-  relmat <- matrix(rep(relvec, times = 4), nrow = 4, byrow = TRUE)
+  relmat <- matrix(rep(relvec, times = 3), nrow = 3, byrow = TRUE)
   
   tbl[k,1:7] <- rslt$scenario
-  tbl[k,8:11] <- paste(round(colMeans(t(rslt$est[2:5,] - relmat)/relvec), 2), " (", round(c(rslt$est[2:5,idx] - relmat[,idx])/relvec[idx], 2), ")", sep = "")
-  tbl[k,12:15] <- paste(round(rowMeans(sqrt(rslt$mse[1:4,])), 3), " (", round(sqrt(rslt$mse[1:4,idx]), 3), ")", sep = "")
-  tbl[k,16:19] <- paste(round(rowMeans(rslt$cp[1:4,]), 2), " (", round(rslt$cp[1:4,idx], 2), ")", sep = "")
+  tbl[k,8:10] <- paste(round(colMeans(t(rslt$est[2:4,] - relmat)/relvec), 2), " (", round(c(rslt$est[2:4,idx] - relmat[,idx])/relvec[idx], 2), ")", sep = "")
+  tbl[k,11:13] <- paste(round(rowMeans(sqrt(rslt$mse[1:3,])), 3), " (", round(sqrt(rslt$mse[1:3,idx]), 3), ")", sep = "")
+  tbl[k,14:16] <- paste(round(rowMeans(rslt$cp[1:3,]), 2), " (", round(rslt$cp[1:3,idx], 2), ")", sep = "")
   
 }
 
-colnames(tbl)[8:19] <- outer(rownames(rslt$bias[1:4,]), c("Bias", "MSE", "CI"), FUN = "paste")[1:12]
+colnames(tbl)[8:16] <- outer(rownames(rslt$bias[1:3,]), c("Bias", "MSE", "CI"), FUN = "paste")[1:9]
 
 write.csv(tbl, file = "~/Dropbox/Projects/ERF-EPE/Output/table.csv")
