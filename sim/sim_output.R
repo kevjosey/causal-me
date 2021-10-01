@@ -1,7 +1,7 @@
 #### Measurement Error
 
 a.vals <- seq(6, 14, by = 0.04)
-filenames_1 <- list.files(path = "~/Dropbox/Projects/ERC-EPE/Output/sim_1", full.names = TRUE)
+filenames_1 <- list.files(path = "~/Dropbox/Projects/ERF-EPE/Output/sim_1", full.names = TRUE)
 plotnames <- c("No Measurement Error",
                "Prediction Error but No Aggregation Error",
                "Aggregation Error but No Prediction Error",
@@ -11,7 +11,7 @@ plotnames <- c("No Measurement Error",
 # idx <- c(19,20,25,26)
 idx <- c(28,29,34,35)
 
-pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_sim.pdf", width = 9, height = 9)
+pdf(file = "~/Dropbox/Projects/ERF-EPE/Output/plot_sim.pdf", width = 9, height = 9)
 par(mfrow = c(2,2))
 j <- 1
 
@@ -48,10 +48,8 @@ dev.off()
 
 ### Model Misspecification
 
-# Summary Plot
-
 a.vals <- seq(6, 14, by = 0.04)
-filenames_2 <- list.files(path = "~/Dropbox/Projects/ERC-EPE/Output/sim_2", full.names = TRUE)
+filenames_2 <- list.files(path = "~/Dropbox/Projects/ERF-EPE/Output/sim_2", full.names = TRUE)
 
 plotnames <- c("GPS: \"a\"; Outcome: \"a\"; EPE: \"b\"",
                "GPS: \"a\"; Outcome: \"b\"; EPE: \"a\"",
@@ -61,7 +59,7 @@ plotnames <- c("GPS: \"a\"; Outcome: \"a\"; EPE: \"b\"",
                "GPS: \"b\"; Outcome: \"b\"; EPE: \"a\"")
 idx <- c(2:7)
 
-pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_mis.pdf", width = 11, height = 11)
+pdf(file = "~/Dropbox/Projects/ERF-EPE/Output/plot_mis.pdf", width = 11, height = 11)
 par(mfrow = c(3,2))
 j <- 1
 
@@ -73,17 +71,17 @@ for (k in idx){
        xlab = "Exposure", ylab = "Rate of Event", main = plotnames[j],
        ylim = c(0,0.1))
   grid(lty = 1)
-  lines(a.vals, rslt$est[5,], type = "l", col = gg_color_hue(4)[3], lwd = 2, lty = 1)
   lines(a.vals, rslt$est[6,], type = "l", col = gg_color_hue(4)[4], lwd = 2, lty = 1)
-  lines(a.vals, rslt$upper[4,], type = "l", col = gg_color_hue(4)[3], lwd = 2, lty = 2)
+  lines(a.vals, rslt$est[5,], type = "l", col = gg_color_hue(4)[3], lwd = 2, lty = 1)
   lines(a.vals, rslt$upper[5,], type = "l", col = gg_color_hue(4)[4], lwd = 2, lty = 2)
-  lines(a.vals, rslt$lower[4,], type = "l", col = gg_color_hue(4)[3], lwd = 2, lty = 2)
+  lines(a.vals, rslt$upper[4,], type = "l", col = gg_color_hue(4)[3], lwd = 2, lty = 2)
   lines(a.vals, rslt$lower[5,], type = "l", col = gg_color_hue(4)[4], lwd = 2, lty = 2)
+  lines(a.vals, rslt$lower[4,], type = "l", col = gg_color_hue(4)[3], lwd = 2, lty = 2)
   
   if (k == idx[length(idx)]){
     
-    legend(6, 0.1, legend=c("True ERC", "GLM", "BART", "95% CI"),
-           col = c("black", gg_color_hue(4)[3:4], "black"),
+    legend(6, 0.1, legend=c("True ERF", "GLM", "BART", "95% CI"),
+           col = c("black", gg_color_hue(4)[4:3], "black"),
            lty = c(1,1,1,2), lwd=2, cex=0.8)
     
     
@@ -118,4 +116,4 @@ for (k in 1:length(filenames)){
 
 colnames(tbl)[8:19] <- outer(rownames(rslt$bias[1:4,]), c("Bias", "MSE", "CI"), FUN = "paste")[1:12]
 
-write.csv(tbl, file = "~/Dropbox/Projects/ERC-EPE/Output/table.csv")
+write.csv(tbl, file = "~/Dropbox/Projects/ERF-EPE/Output/table.csv")

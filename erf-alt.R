@@ -1,6 +1,6 @@
 #### Alternate implementations
 
-erc_alt <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
+erf_alt <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
                     a.vals = seq(min(a), max(a), length.out = 100),
                     n.iter = 10000, n.adapt = 1000, thin = 10, 
                     span = NULL, span.seq = seq(0.05, 1, by = 0.05), k = 5){	

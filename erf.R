@@ -1,5 +1,5 @@
-# wrapper function to fit an ERC with measurement error using LOESS regression on a nonparametric models
-erc <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
+# wrapper function to fit an ERF with measurement error using LOESS regression on a nonparametric models
+erf <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
                 a.vals = seq(min(a), max(a), length.out = 100),
                 n.iter = 10000, n.adapt = 1000, thin = 10, 
                 span = NULL, span.seq = seq(0.05, 1, by = 0.05), k = 5){	

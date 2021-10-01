@@ -12,10 +12,10 @@ library(abind)
 
 # Code for generating and fitting data
 source("~/Github/causal-me/gen-data.R")
-source("~/Github/causal-me/erc.R")
-source("~/Github/causal-me/erc-alt.R")
-source("~/Github/causal-me/bart-erc.R")
-source("~/Github/causal-me/bayes-erc.R")
+source("~/Github/causal-me/erf.R")
+source("~/Github/causal-me/erf-alt.R")
+source("~/Github/causal-me/bart-erf.R")
+source("~/Github/causal-me/bayes-erf.R")
 source("~/Github/causal-me/auxiliary.R")
 
 # simulation arguments
@@ -83,23 +83,23 @@ out <- mclapply(1:n.sim, function(i, ...){
   z_tilde <- aggregate(s_tilde, by = list(s.id), mean)[,2]
   
   # naive
-  naive_hat <- try(erc(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
+  naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
                        family = family, a.vals = a.vals, span = span,
                        n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # real
-  rc_hat <- try(erc(y = y, a = z_hat, x = x, offset = offset, weights = weights,
+  rc_hat <- try(erf(y = y, a = z_hat, x = x, offset = offset, weights = weights,
                     family = family, a.vals = a.vals, span = span,
                     n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # BART Approach
-  bart_hat <- try(bart_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
+  bart_hat <- try(bart_erf(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
                            s.id = s.id, id = id, w = w, x = x, family = family, 
                            a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                            h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # Bayes DR Approach
-  bayes_hat <- try(bayes_erc(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
+  bayes_hat <- try(bayes_erf(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
                              s.id = s.id, id = id, w = w, x = x, family = family,
                              a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                              h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)

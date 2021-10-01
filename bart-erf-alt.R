@@ -1,9 +1,11 @@
-bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
-                      offset = NULL, weights = NULL, family = gaussian(),
-                      a.vals = seq(min(a), max(a), length.out = 100),
-                      shape = 1e-3, rate = 1e-3, scale = 1e6,
-                      n.iter = 10000, n.adapt = 1000, thin = 10, 
-                      h.a = 0.5, span = 0.75) {
+# alternative, less accurate, but more computationally efficient implementation
+bart_erf_alt <- function(s, star, y, s.id, id, w = NULL, x = NULL,
+                         offset = NULL, weights = NULL, family = gaussian(),
+                         a.vals = seq(min(a), max(a), length.out = 100),
+                         n.iter = 10000, n.adapt = 1000, thin = 10, 
+                         shape = 1e-3, rate = 1e-3, scale = 1e6, h.a = 1, span = 0.75, 
+                         control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
+                                                 n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
@@ -44,8 +46,8 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   y <- y[shield]
   x <- x[shield,]
   id <- id[shield]
-  weights <- weights[shield]
   offset <- offset[shield]
+  weights <- weights[shield]
   
   if (is.null(w)) {
     ws <- cbind(rep(1, length(s.id)), star = star)
@@ -68,12 +70,10 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   s.hat <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
-  xa <- cbind(x, a - 10, (a - 10)^2, (a - 10)^3, (a - 10)^4, (a - 10)*x[,2]) # needs to be more general
   
   # data dimensions
   p <- ncol(x)
   q <- ncol(ws)
-  o <- ncol(xa)
   
   # initialize parameters
   beta <- matrix(NA, nrow = n.adapt + n.iter, ncol = p)
@@ -88,11 +88,13 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
   omega2[1] <- var(s.hat - a.s)
   
-  # outcome stuff
+  # initialize bart
   y_ <- family$linkinv(family$linkfun(y) - offset)
-  gamma <- matrix(NA, nrow = n.adapt + n.iter, ncol = o)
-  gamma[1,] <- coef(glm(y ~ 0 + xa, family = family, offset = offset))
-  h.gamma <- sqrt(diag(vcov(glm(y ~ 0 + xa, family = family, offset = offset))))
+  xa.train <- data.frame(y_ = y_, x[,-1], a = a)
+  sampler <- dbarts::dbarts(y_ ~ ., data = xa.train, control = control, weights = weights)
+  
+  # run first iteration of tree
+  samples <- sampler$run()
   
   # the good stuff
   a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
@@ -110,21 +112,31 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     s.hat <- rnorm(m, mu.s, sig.s)
     s.hat[!is.na(s)] <- s[!is.na(s)]
     
-    # sample A
+    # sample A and update outcome tree
     
+    test <- FALSE
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
-    a_ <- rnorm(n, a, h.a)
-    xa_ <- cbind(x, a_ - 10, (a_ - 10)^2, (a_ - 10)^3, (a_ - 10)^4, (a_ - 10)*x[,2]) # needs to be more general
     
-    log.eps <- dpois(y, family$linkinv(c(xa_%*%gamma[i - 1,]) + offset), log = TRUE) +
-      dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
-      dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
-      dpois(y, family$linkinv(c(xa%*%gamma[i - 1,]) + offset), log = TRUE) -
-      dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
-      dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
+    while (test == FALSE) {
+      
+      a_ <- rnorm(n, a, h.a)
+      xa.test <- data.frame(x = x[,-1], a = a_)
+      colnames(xa.test) <- colnames(xa.train)[-1]
+      xa.pred <- sampler$predict(xa.test)
+      
+      log.eps <- dnorm(y_, xa.pred, mean(samples$sigma)/sqrt(weights), log = TRUE) +
+        dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
+        dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
+        dnorm(y_, samples$train, mean(samples$sigma)/sqrt(weights), log = TRUE) -
+        dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
+        dnorm(z.hat, a, sqrt(omega2[i - 1]/stab), log = TRUE)
+      
+      temp <- ifelse(((log(runif(n)) <= log.eps) & !is.na(log.eps)), a_, a)
+      test <- sampler$setPredictor(x = temp, column = "a")
+      
+    }
     
-    test <- log(runif(n))
-    a <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_, a)
+    a <- temp
     a.s <- rep(a, stab)
     
     # Sample pred parameters
@@ -146,57 +158,31 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
     
-    # Sample outcome model while cutting feedback
+    # Sample outcome tree
+    samples <- sampler$run()
     
-    xa <- cbind(x, a - 10, (a - 10)^2, (a - 10)^3, (a - 10)^4, (a - 10)*x[,2]) # needs to be more general
-    gamma_ <- gamma0 <- gamma[i - 1,]
-    
-    for (j in 1:o) {
-      
-      gamma_[j] <- c(rnorm(1, gamma0[j], h.gamma[j]))
-      
-      log.eps <- sum(dpois(y, family$linkinv(c(xa %*% gamma_) + offset), log = TRUE)) -
-        sum(dpois(y, family$linkinv(c(xa %*% gamma0) + offset), log = TRUE)) +
-        dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma0[j], 0 , scale, log = TRUE)
-      
-      if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
-        gamma0[j] <- gamma_[j]
-      else
-        gamma_[j] <- gamma0[j]
-      
-    }
-    
-    gamma[i,] <- gamma_
-    
-    # update important things
+    # Save output
     if (i > n.adapt & (i - n.adapt)%%thin == 0) {
       
       j <- (i - n.adapt)/thin
       a.mat[j,] <- a 
       
-      xa.new.list <- lapply(a.vals, function(a.tmp, ...) {
-        
-        cbind(x, a.tmp - 10, (a.tmp - 10)^2, (a.tmp - 10)^3, (a.tmp - 10)^4, (a.tmp - 10)*x[,2]) # needs to be more general
-        
+      # outcome model
+      muhat <- rowMeans(samples$train)
+      
+      muhat.mat <- sapply(a.vals, function(a.tmp, ...){
+        xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
+        colnames(xa.tmp) <- colnames(xa.train)[-1]
+        c(sampler$predict(xa.tmp))
       })
       
-      xa.new <- rbind(xa, do.call(rbind, xa.new.list))
-      x.new <- xa.new[,1:ncol(x)]
-      a.new <- c(a, rep(a.vals, each = n))
-      colnames(x.new) <- colnames(x)
-      colnames(xa.new) <- colnames(xa)
-      
-      # outcome models
-      muhat.vals <- family$linkinv(c(xa.new %*% gamma[i,]))
-      muhat <- muhat.vals[1:n]
-      muhat.mat <- matrix(muhat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
       mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
       
-      # exposure models
-      pimod.vals <- c(x.new %*% beta[i,])
-      pihat.vals <- dnorm(a.new, pimod.vals, sqrt(sigma2[i]))
-      pihat <- pihat.vals[1:n]
-      pihat.mat <- matrix(pihat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
+      # exposure model
+      pimod.vals <- c(x %*% beta[i,])
+      pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
+      pihat.mat <- sapply(a.vals, function(a.tmp, ...)
+        dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
       phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
       phat[phat <= 0] <- .Machine$double.eps
       
@@ -205,12 +191,12 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       mhat.out[j,] <- colMeans(muhat.mat)
       
       # integrate
-      mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
       phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
-      int.mat <- (muhat.mat - mhat.mat)*phat.mat
+      mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
+      int.mat <- (muhat.mat - mhat.mat) * phat.mat
       
-      dr_out <- sapply(a.vals, dr_est_alt, psi = psi[j,], a = a, family = gaussian(), 
-                       span = span, int.mat = int.mat, se.fit = TRUE)
+      dr_out <- sapply(a.vals, dr_est_alt, psi = psi[j,], a = a, span = span, 
+                       family = gaussian(), se.fit = TRUE, int.mat = int.mat)
       
       est.mat[j,] <- dr_out[1,]
       var.mat[j,] <- dr_out[2,]
@@ -220,11 +206,9 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   }
   
   accept.a <- apply(a.mat, 2, function(x) mean(diff(x) != 0) )
-  accept.gamma <- apply(gamma[(n.adapt + 1):(n.iter + n.adapt),], 2, function(x) mean(diff(x) != 0) )
   
   # thinning
   keep <- seq(n.adapt + 1, n.iter + n.adapt, by = thin)
-  gamma <- gamma[keep,]
   beta <- beta[keep,]
   alpha <- alpha[keep,]
   sigma2 <- sigma2[keep]
@@ -232,18 +216,16 @@ bayes_erc <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   omega2 <- omega2[keep]
   
   a.mat <- a.mat[,order(shield)]
-  dr_estimate <- colMeans(est.mat)
-  dr_variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
-  g_estimate <- colMeans(mhat.out)
-  g_variance <- apply(mhat.out, 2, var)
+  smooth_estimate <- colMeans(est.mat)
+  smooth_variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
+  tree_estimate <- colMeans(mhat.out)
+  tree_variance <- apply(mhat.out, 2, var)
   hpdi <- apply(mhat.out, 2, hpd)
   rownames(hpdi) <- c("lower", "upper")
   
-  rslt <- list(dr_estimate = dr_estimate, dr_variance = dr_variance,
-               g_estimate = g_estimate, g_variance = g_variance, hpdi = hpdi,
-               accept.a = accept.a, accept.gamma = accept.gamma,
-               mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, gamma = gamma,
-                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
+  rslt <- list(smooth_estimate = smooth_estimate, smooth_variance = smooth_variance,
+               tree_estimate = tree_estimate, tree_variance = tree_variance, hpdi = hpdi,
+               accept.a = accept.a, mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
   return(rslt)
   

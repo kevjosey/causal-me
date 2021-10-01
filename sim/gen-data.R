@@ -1,23 +1,25 @@
 ## Inputs
 
 # n = number of clusters
-# m = number of grids m < n
-# l = number of individuals comprising clusters
+# mult = number of grids equals n*mult
 # sig_gps = sd of the true exposure
-# sig_agg = sd of the error prone exposure
+# sig_agg = sd of the aggregation error
+# sig_pred = sd of the prediction error
 # gps_scen = gps exposure misspecification
 # out_scen = outcome misspecification
+# out_scen = exposure model misspecification
 
 ## Output
 
-# s = error prone exposure (on a grid)
-# a = true exposure (on cluster)
-# a_y = true cluster exposure expanded to individuals
-# y = outcome (individual)
-# y.id = cluster assignment for y
+# s = true grid exposure
+# star = error prone exposure
+# a = true cluster exposure
+# y = cluster outcomes
+# id = cluster assignment for y
 # s.id = cluster assignment for s
-# id = id for a corresponding to y.id
-# x = covariate matrix
+# x = confounders
+# w = grid-level predictors
+# offset = offset
 
 gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gps = 1, sig_pred = sqrt(0.5),
                      gps_scen = c("a", "b"), out_scen = c("a", "b"), pred_scen = c("a", "b")) {
