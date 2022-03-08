@@ -1,10 +1,11 @@
-bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
-                     offset = NULL, weights = NULL, family = gaussian(),
-                     a.vals = seq(min(a), max(a), length.out = 100),
-                     n.iter = 10000, n.adapt = 1000, thin = 10, 
-                     shape = 1e-3, rate = 1e-3, scale = 1e6, h.a = 1, span = 0.75, 
-                     control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
-                                             n.samples = 1L, n.thin = thin, n.chains = 1L)) {
+# alternative, less accurate, but more computationally efficient implementation
+bart_spat_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
+                         offset = NULL, weights = NULL, family = gaussian(),
+                         a.vals = seq(min(a), max(a), length.out = 100),
+                         n.iter = 10000, n.adapt = 1000, thin = 10, 
+                         shape = 1e-3, rate = 1e-3, scale = 1e6, h.a = 1, span = 0.75, 
+                         control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
+                                                 n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
@@ -87,6 +88,36 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
   omega2[1] <- var(s.hat - a.s)
   
+  # initialize spatial stuff
+  res.temp <- Y - X %*% beta[1,]
+  res.sd <- sd(res.temp, na.rm = TRUE)/5
+  phi <- rnorm(n, mean = 0, sd = res.sd)
+  nu2 <- var(phi) / 10
+  rho <- runif(1)
+  accept <- c(0,0)
+  
+  # CAR quantities
+  V.quants <- common.Wcheckformat(V)
+  V <- V.quants$W
+  V.triplet <- V.quants$W.triplet
+  n.triplet <- V.quants$n.triplet
+  V.triplet.sum <- V.quants$W.triplet.sum
+  n.neighbours <- V.quants$n.neighbours 
+  V.begfin <- V.quants$W.begfin
+  
+  # determinant for rho
+  Vstar <- diag(apply(V, 1, sum)) - V
+  Vstar.eigen <- eigen(Wstar)
+  Vstar.val <- Vstar.eigen$values
+  detQ <- 0.5 * sum(log((rho * Vstar.val + (1 - rho))))    
+  
+  # check for islands
+  V.list<- mat2listw(W)
+  V.nb <- V.list$neighbours
+  V.islands <- n.comp.nb(V.nb)
+  islands <- V.islands$comp.id
+  n.islands <- max(V.islands$nc)
+  
   # initialize bart
   ybar <- family$linkinv(family$linkfun(y) - offset)
   xa.train <- data.frame(ybar = ybar, x[,-1], a = a)
@@ -95,7 +126,7 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   # run first iteration of tree
   samples <- sampler$run()
   
-  # the good stuff
+  # ERC stuff
   a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
   mhat.out <- est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
@@ -105,12 +136,14 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     # print(i)
     
     # sample S
+    
     sig.s <- sqrt((1/omega2[i - 1] + 1/tau2[i - 1])^(-1))
     mu.s <- (sig.s^2)*(a.s/omega2[i - 1] + c(ws %*% alpha[i - 1,])/tau2[i - 1])
     s.hat <- rnorm(m, mu.s, sig.s)
     s.hat[!is.na(s)] <- s[!is.na(s)]
     
     # sample A and update outcome tree
+    
     test <- FALSE
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     
@@ -139,7 +172,7 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     # Sample pred parameters
     
     alpha_var <- solve(t(ws.tmp) %*% ws.tmp + diag(tau2[i - 1]/scale, q, q))
-    alpha[i,] <- rmvnorm(1, alpha_var %*% c(t(ws.tmp) %*% s.tmp), tau2[i - 1]*alpha_var)
+    alpha[i,] <- rmvnorm(1, alpha_var %*% t(ws.tmp) %*% s.tmp, tau2[i - 1]*alpha_var)
     
     tau2[i] <- 1/rgamma(1, shape = shape + l/2, rate = rate +
                           sum(c(s.tmp - c(ws.tmp %*% alpha[i,]))^2)/2)
@@ -148,12 +181,49 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     
     omega2[i] <- 1/rgamma(1, shape = shape + m/2, rate = rate + sum((s.hat - a.s)^2)/2)
     
+    ## Sample Spatial Components
+    
+    
+    
+    # sample phi
+    off.phi <- (ybar - as.numeric(X %*% beta[i,]) - offset) / sigma2    
+    phi <- CARBayes::gaussiancarupdate(Wtriplet = W.triplet, Wbegfin = W.begfin, Wtripletsum = W.triplet.sum,
+                                       nsites = n, phi = phi, tau2 = nu2, rho = rho, nu2 = sigma2, offset = off.phi)
+    phi <- phi - mean(phi)
+    
+    # sample nu2
+    temp <- CARBayes:::quadform(W.triplet, W.triplet.sum, n.triplet, n, phi, phi, rho)
+    nu2 <- 1 / rgamma(1, shape + m/2, rate = rate + temp)
+    
+    # sample rho
+    rho_ <- truncnorm::rtruncnorm(n = 1, a = 0, b = 1, mean = rho, sd = proposal.sd.rho)  
+    temp_ <- CARBayes:::quadform(W.triplet, W.triplet.sum, n.triplet, K, phi, phi, rho_)
+    detQ_ <- 0.5 * sum(log((rho_ * Wstar.val + (1 - rho_))))              
+    logprob <- detQ - temp / 2
+    logprob_ <- detQ_ - temp_ / nu2
+    hastings <- log(truncnorm::dtruncnorm(x = rho, a = 0, b = 1, mean = rho_, sd = rhosd_)) -
+      log(truncnorm::dtruncnorm(x = rho_, a = 0, b = 1, mean = rho, sd = rhosd_)) 
+    prob <- exp(logprob_ - logprob + hastings)
+    
+    if(prob > runif(1)) {
+      rho <- rho_
+      detQ <- detQ_
+      accept[1] <- accept[1] + 1  
+    }
+    
+    accept[2] <- accept[2] + 1  
+    
+    if (ceiling(j/100)==floor(j/100) & j < burnin) {
+      rhosd_ <- CARBayescommon.accceptrates2(accept[1:2], proposal.sd.rho, 40, 50, 0.5)
+      accept <- c(0,0)
+    }
+    
     # Sample GPS parameters
     
     beta_var <- solve(t(x) %*% x + diag(sigma2[i - 1]/scale, p, p))
-    beta[i,] <- rmvnorm(1, beta_var %*% c(t(x) %*% a), sigma2[i - 1]*beta_var)
+    beta[i,] <- rmvnorm(1, beta_var %*% t(x) %*% (a - phi), sigma2[i - 1]*beta_var)
     
-    sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
+    sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - phi - c(x %*% beta[i,]))^2)/2)
     
     # Sample outcome tree
     samples <- sampler$run()
@@ -164,22 +234,35 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       j <- (i - n.adapt)/thin
       a.mat[j,] <- a 
       
+      # outcome model
       muhat <- rowMeans(samples$train)
       
-      muhat.mat <- sapply(a, function(a.tmp, ...) {
+      muhat.mat <- sapply(a.vals, function(a.tmp, ...){
         xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
         colnames(xa.tmp) <- colnames(xa.train)[-1]
         c(sampler$predict(xa.tmp))
       })
-
-      mhat <- colMeans(muhat.mat)
-      int.mat <- muhat.mat - matrix(rep(mhat, n), byrow = T, nrow = n)
+      
+      mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
+      
+      # exposure model
+      pimod.vals <- phi + c(x %*% beta[i,])
+      pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
+      pihat.mat <- sapply(a.vals, function(a.tmp, ...)
+        dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
+      phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
+      phat[phat <= 0] <- .Machine$double.eps
       
       # pseudo-outcome
-      psi[j,] <- c(ybar - muhat) + mhat # pseudo-outcome
-      mhat.out[j,] <- predict(smooth.spline(a, mhat), x = a.vals)$y
+      psi[j,] <- (ybar - muhat)*(phat/pihat) + mhat
+      mhat.out[j,] <- colMeans(muhat.mat)
       
-      dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, span = span, 
+      # integrate
+      phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
+      mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
+      int.mat <- (muhat.mat - mhat.mat) * phat.mat
+      
+      dr_out <- sapply(a.vals, dr_est_alt, psi = psi[j,], a = a, span = span, 
                        family = gaussian(), se.fit = TRUE, int.mat = int.mat)
       
       est.mat[j,] <- dr_out[1,]
@@ -198,8 +281,6 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   sigma2 <- sigma2[keep]
   tau2 <- tau2[keep]
   omega2 <- omega2[keep]
-  
-  # analyze output
   
   a.mat <- a.mat[,order(shield)]
   smooth_estimate <- colMeans(est.mat)
