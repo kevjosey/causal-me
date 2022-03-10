@@ -49,18 +49,15 @@ dev.off()
 ### Model Misspecification
 
 a.vals <- seq(6, 14, by = 0.04)
-filenames_2 <- list.files(path = "~/Dropbox/Projects/ERF-EPE/Output/sim_2", full.names = TRUE)
+filenames_2 <- list.files(path = "~/Dropbox/Projects/ERC-EPE/Output/sim_2", full.names = TRUE)
 
-plotnames <- c("GPS: \"a\"; Outcome: \"a\"; EPE: \"b\"",
-               "GPS: \"a\"; Outcome: \"b\"; EPE: \"a\"",
-               "GPS: \"a\"; Outcome: \"b\"; EPE: \"b\"",
-               "GPS: \"b\"; Outcome: \"a\"; EPE: \"a\"",
-               "GPS: \"b\"; Outcome: \"a\"; EPE: \"b\"",
-               "GPS: \"b\"; Outcome: \"b\"; EPE: \"a\"")
-idx <- c(2:7)
+plotnames <- c("GPS: \"a\"; Outcome: \"b\"",
+               "GPS: \"b\"; Outcome: \"a\"",
+               "GPS: \"b\"; Outcome: \"b\"")
+idx <- c(3,5,7)
 
-pdf(file = "~/Dropbox/Projects/ERF-EPE/Output/plot_mis.pdf", width = 11, height = 11)
-par(mfrow = c(3,2))
+pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_mis.pdf", width = 18, height = 6)
+par(mfrow = c(1,3))
 j <- 1
 
 for (k in idx){

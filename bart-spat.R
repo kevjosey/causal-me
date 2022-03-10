@@ -1,10 +1,10 @@
-# alternative, less accurate, but more computationally efficient implementation
-bart_spat_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
-                         offset = NULL, weights = NULL, family = gaussian(),
-                         a.vals = seq(min(a), max(a), length.out = 100),
-                         n.iter = 10000, n.adapt = 1000, thin = 10, 
-                         shape = 1e-3, rate = 1e-3, scale = 1e6, h.a = 1, span = 0.75, 
-                         control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
+# Only provides a non-dr option
+bart_spat <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, length(y)),
+                      dr = FALSE, offset = NULL, weights = NULL, family = gaussian(),
+                      a.vals = seq(min(a), max(a), length.out = 100),
+                      n.iter = 10000, n.adapt = 1000, thin = 10, 
+                      shape = 1e-3, rate = 1e-3, scale = 1e6, h.a = 1, span = 0.75, 
+                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
                                                  n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
   # remove any s.id not present in id
@@ -27,7 +27,7 @@ bart_spat_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     offset <- rep(0, times = length(y))
   
   s <- s[s.id %in% id]
-  star <- as.matrix(star)[s.id %in% id]
+  t <- as.matrix(t)[s.id %in% id]
   w <- w[s.id %in% id,]
   s.id <- s.id[s.id %in% id]
   
@@ -50,15 +50,15 @@ bart_spat_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   weights <- weights[shield]
   
   if (is.null(w)) {
-    ws <- cbind(rep(1, length(s.id)), star = star)
+    ws <- cbind(rep(1, length(s.id)), t = t)
   } else {
-    ws <- cbind(model.matrix(~ ., data.frame(w)), star = star)
+    ws <- cbind(model.matrix(~ ., data.frame(w)), t = t)
   }
   
   sword <- order(s.id)
   stab <- table(s.id)
   s <- s[sword]
-  star <- star[sword]
+  t <- t[sword]
   ws <- ws[sword,]
   s.id <- s.id[sword]
   
@@ -81,6 +81,8 @@ bart_spat_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   sigma2 <- rep(NA, n.adapt + n.iter)
   tau2 <- rep(NA, n.adapt + n.iter)
   omega2 <- rep(NA, n.adapt + n.iter)
+  nu2 <- rep(NA, n.adapt + n.iter)
+  rho <- rep(NA, n.adapt + n.iter)
   
   beta[1,] <- coef(lm(a ~ 0 + x))
   alpha[1,] <- coef(lm(s.tmp ~ 0 + ws.tmp))
@@ -89,15 +91,16 @@ bart_spat_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   omega2[1] <- var(s.hat - a.s)
   
   # initialize spatial stuff
-  res.temp <- Y - X %*% beta[1,]
+  res.temp <- y - x %*% beta[1,]
   res.sd <- sd(res.temp, na.rm = TRUE)/5
   phi <- rnorm(n, mean = 0, sd = res.sd)
-  nu2 <- var(phi) / 10
-  rho <- runif(1)
+  nu2[i] <- var(phi) / 10
+  rho[i] <- runif(1)
   accept <- c(0,0)
+  rho_sd <- 0.02
   
   # CAR quantities
-  V.quants <- common.Wcheckformat(V)
+  V.quants <- CARBayes:::common.Wcheckformat(V)
   V <- V.quants$W
   V.triplet <- V.quants$W.triplet
   n.triplet <- V.quants$n.triplet
@@ -105,18 +108,11 @@ bart_spat_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   n.neighbours <- V.quants$n.neighbours 
   V.begfin <- V.quants$W.begfin
   
-  # determinant for rho
+  # determinant of V for updating rho
   Vstar <- diag(apply(V, 1, sum)) - V
-  Vstar.eigen <- eigen(Wstar)
+  Vstar.eigen <- eigen(Vstar)
   Vstar.val <- Vstar.eigen$values
-  detQ <- 0.5 * sum(log((rho * Vstar.val + (1 - rho))))    
-  
-  # check for islands
-  V.list<- mat2listw(W)
-  V.nb <- V.list$neighbours
-  V.islands <- n.comp.nb(V.nb)
-  islands <- V.islands$comp.id
-  n.islands <- max(V.islands$nc)
+  detQ <- 0.5 * sum(log((rho[1] * Vstar.val + (1 - rho[1]))))
   
   # initialize bart
   ybar <- family$linkinv(family$linkfun(y) - offset)
@@ -136,14 +132,12 @@ bart_spat_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     # print(i)
     
     # sample S
-    
     sig.s <- sqrt((1/omega2[i - 1] + 1/tau2[i - 1])^(-1))
     mu.s <- (sig.s^2)*(a.s/omega2[i - 1] + c(ws %*% alpha[i - 1,])/tau2[i - 1])
     s.hat <- rnorm(m, mu.s, sig.s)
     s.hat[!is.na(s)] <- s[!is.na(s)]
     
     # sample A and update outcome tree
-    
     test <- FALSE
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     
@@ -169,66 +163,60 @@ bart_spat_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     a <- temp
     a.s <- rep(a, stab)
     
-    # Sample pred parameters
-    
+    # sample pred parameters
     alpha_var <- solve(t(ws.tmp) %*% ws.tmp + diag(tau2[i - 1]/scale, q, q))
     alpha[i,] <- rmvnorm(1, alpha_var %*% t(ws.tmp) %*% s.tmp, tau2[i - 1]*alpha_var)
-    
     tau2[i] <- 1/rgamma(1, shape = shape + l/2, rate = rate +
                           sum(c(s.tmp - c(ws.tmp %*% alpha[i,]))^2)/2)
     
-    # Sample agg parameters
-    
+    # sample agg parameters
     omega2[i] <- 1/rgamma(1, shape = shape + m/2, rate = rate + sum((s.hat - a.s)^2)/2)
     
-    ## Sample Spatial Components
-    
-    
+    # sample gps parameters
+    beta_var <- solve(t(x) %*% x + diag(sigma2[i - 1]/scale, p, p))
+    beta[i,] <- rmvnorm(1, beta_var %*% t(x) %*% (a - phi), sigma2[i - 1]*beta_var)
+    sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - phi - c(x %*% beta[i,]))^2)/2)
     
     # sample phi
-    off.phi <- (ybar - as.numeric(X %*% beta[i,]) - offset) / sigma2    
-    phi <- CARBayes::gaussiancarupdate(Wtriplet = W.triplet, Wbegfin = W.begfin, Wtripletsum = W.triplet.sum,
-                                       nsites = n, phi = phi, tau2 = nu2, rho = rho, nu2 = sigma2, offset = off.phi)
+    off.phi <- (ybar - as.numeric(x %*% beta[i,])) / sigma2[i]    
+    phi <- CARBayes:::gaussiancarupdate(Wtriplet = W.triplet, Wbegfin = W.begfin, 
+                                        Wtripletsum = W.triplet.sum, nsites = n,
+                                        phi = phi, tau2 = nu2[i], rho = rho[i], 
+                                        nu2 = sigma2[i], offset = off.phi)
     phi <- phi - mean(phi)
     
     # sample nu2
-    temp <- CARBayes:::quadform(W.triplet, W.triplet.sum, n.triplet, n, phi, phi, rho)
-    nu2 <- 1 / rgamma(1, shape + m/2, rate = rate + temp)
+    temp <- CARBayes:::quadform(W.triplet, W.triplet.sum, n.triplet, n, phi, phi, rho[i])
+    nu2[i] <- 1/rgamma(1, shape + n/2, rate = rate + temp)
     
     # sample rho
-    rho_ <- truncnorm::rtruncnorm(n = 1, a = 0, b = 1, mean = rho, sd = proposal.sd.rho)  
-    temp_ <- CARBayes:::quadform(W.triplet, W.triplet.sum, n.triplet, K, phi, phi, rho_)
+    rho_ <- truncnorm::rtruncnorm(n = 1, a = 0, b = 1, mean = rho[i], sd = rho_sd)  
+    temp_ <- CARBayes:::quadform(W.triplet, W.triplet.sum, n.triplet, n, phi, phi, rho_)
     detQ_ <- 0.5 * sum(log((rho_ * Wstar.val + (1 - rho_))))              
-    logprob <- detQ - temp / 2
-    logprob_ <- detQ_ - temp_ / nu2
-    hastings <- log(truncnorm::dtruncnorm(x = rho, a = 0, b = 1, mean = rho_, sd = rhosd_)) -
-      log(truncnorm::dtruncnorm(x = rho_, a = 0, b = 1, mean = rho, sd = rhosd_)) 
+    logprob <- detQ - temp / nu2[i]
+    logprob_ <- detQ_ - temp_ / nu2[i]
+    hastings <- log(truncnorm::dtruncnorm(x = rho[i - 1], a = 0, b = 1, mean = rho_, sd = rho_sd)) -
+      log(truncnorm::dtruncnorm(x = rho_, a = 0, b = 1, mean = rho[i - 1], sd = rho_sd)) 
     prob <- exp(logprob_ - logprob + hastings)
     
     if(prob > runif(1)) {
-      rho <- rho_
+      rho[i] <- rho_
       detQ <- detQ_
       accept[1] <- accept[1] + 1  
-    }
+    } else
+      rho[i] <- rho[i - 1]
     
     accept[2] <- accept[2] + 1  
     
     if (ceiling(j/100)==floor(j/100) & j < burnin) {
-      rhosd_ <- CARBayescommon.accceptrates2(accept[1:2], proposal.sd.rho, 40, 50, 0.5)
+      rho_sd <- CARBayes:::common.accceptrates2(accept[1:2], rho_sd, 40, 50, 0.5)
       accept <- c(0,0)
     }
     
-    # Sample GPS parameters
-    
-    beta_var <- solve(t(x) %*% x + diag(sigma2[i - 1]/scale, p, p))
-    beta[i,] <- rmvnorm(1, beta_var %*% t(x) %*% (a - phi), sigma2[i - 1]*beta_var)
-    
-    sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - phi - c(x %*% beta[i,]))^2)/2)
-    
-    # Sample outcome tree
+    # sample outcome tree
     samples <- sampler$run()
     
-    # Save output
+    # save output
     if (i > n.adapt & (i - n.adapt)%%thin == 0) {
       
       j <- (i - n.adapt)/thin
@@ -245,25 +233,22 @@ bart_spat_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
       
       mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
       
-      # exposure model
-      pimod.vals <- phi + c(x %*% beta[i,])
-      pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
-      pihat.mat <- sapply(a.vals, function(a.tmp, ...)
-        dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
-      phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat)), x = a)$y
-      phat[phat <= 0] <- .Machine$double.eps
-      
       # pseudo-outcome
-      psi[j,] <- (ybar - muhat)*(phat/pihat) + mhat
+      psi[j,] <- (ybar - muhat) + mhat
       mhat.out[j,] <- colMeans(muhat.mat)
       
-      # integrate
-      phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
+      # exposure model for integtion
+      a.std <- c(c(a, a.vals) - mean(a)) / sd(a)
+      dens <- density(a.std[1:n])
+      phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
+      
+      # integration matrix
+      phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
       mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
       int.mat <- (muhat.mat - mhat.mat) * phat.mat
       
-      dr_out <- sapply(a.vals, dr_est_alt, psi = psi[j,], a = a, span = span, 
-                       family = gaussian(), se.fit = TRUE, int.mat = int.mat)
+      out <- sapply(a.vals, loess_est, psi = psi[j,], a = a, span = span, 
+                    family = gaussian(), se.fit = TRUE, int.mat = int.mat)
       
       est.mat[j,] <- dr_out[1,]
       var.mat[j,] <- dr_out[2,]
@@ -292,7 +277,8 @@ bart_spat_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   
   rslt <- list(smooth_estimate = smooth_estimate, smooth_variance = smooth_variance,
                tree_estimate = tree_estimate, tree_variance = tree_variance, hpdi = hpdi,
-               accept.a = accept.a, mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
+               accept.a = accept.a, mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, 
+                                                sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
   return(rslt)
   

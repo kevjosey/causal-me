@@ -1,6 +1,6 @@
 
 # regression calibration function
-pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glm.interaction", "SL.ranger", "SL.earth")){
+pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glmnet", "SL.earth", "SL.ranger")){
   
   # set up evaluation points & matrices for predictions
   ws <- data.frame(w, star)

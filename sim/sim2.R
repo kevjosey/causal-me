@@ -96,14 +96,9 @@ simulate <- function(scenario, n.sim, a.vals){
     
     # BART Approach
     bart_hat <- try(bart_erf(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
-                             s.id = s.id, id = id, w = w, x = x, family = family,
+                             s.id = s.id, id = id, w = w, x = x, family = family, approx = TRUE,
                              a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                              h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
-
-    bart_hat_alt <- try(bart_erf_alt(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
-                                     s.id = s.id, id = id, w = w, x = x, family = family,
-                                     a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
-                                     h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # Alternate Bayes
     bayes_hat <- try(bayes_erf(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
@@ -116,14 +111,12 @@ simulate <- function(scenario, n.sim, a.vals){
                  if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(rc_hat, "try-error")) {rc_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(bart_hat, "try-error")) {bart_hat$smooth_estimate} else {rep(NA, length(a.vals))},
-                 if (!inherits(bart_hat_alt, "try-error")) {bart_hat_alt$smooth_estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(bayes_hat, "try-error")) {bayes_hat$dr_estimate} else {rep(NA, length(a.vals))})
     
     #standard error
     se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(rc_hat, "try-error")) {sqrt(rc_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$smooth_variance)} else {rep(NA, length(a.vals))},
-                if (!inherits(bart_hat_alt, "try-error")) {sqrt(bart_hat_alt$smooth_variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$dr_variance)} else {rep(NA, length(a.vals))})
     
     return(list(est = est, se = se))
@@ -195,7 +188,7 @@ sig_agg <- sqrt(2)
 sig_pred <- 1
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
-pred_scen <- c("a", "b")
+pred_scen <- "a"
 
 scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred, gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])

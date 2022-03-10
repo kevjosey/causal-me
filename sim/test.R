@@ -11,9 +11,8 @@ library(dbarts)
 library(abind)
 
 # Code for generating and fitting data
-source("~/Github/causal-me/gen-data.R")
+source("~/Github/causal-me/sim/gen-data.R")
 source("~/Github/causal-me/erf.R")
-source("~/Github/causal-me/erf-alt.R")
 source("~/Github/causal-me/bart-erf.R")
 source("~/Github/causal-me/bayes-erf.R")
 source("~/Github/causal-me/auxiliary.R")
@@ -24,11 +23,11 @@ sig_gps <- 2
 sig_agg <- sqrt(2)
 sig_pred <- 1
 gps_scen <- "a"
-out_scen <- "a"
+out_scen <- "b"
 pred_scen <- "a"
 span <- 0.1
 mult <- 5
-n <- 800
+n <- 400
 prob <- 0.1
 
 # model arguments
@@ -93,14 +92,14 @@ out <- mclapply(1:n.sim, function(i, ...){
                     n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # BART Approach
-  bart_hat <- try(bart_erf(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
-                           s.id = s.id, id = id, w = w, x = x, family = family, 
+  bart_hat <- try(bart_erf(s = s, t = s_tilde, y = y, offset = offset, weights = weights,
+                           s.id = s.id, id = id, w = w, x = x, family = family,
                            a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                            h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # Bayes DR Approach
-  bayes_hat <- try(bayes_erf(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
-                             s.id = s.id, id = id, w = w, x = x, family = family,
+  bayes_hat <- try(bayes_erf(s = s, t = s_tilde, y = y, offset = offset, weights = weights,
+                             s.id = s.id, id = id, w = w, x = x, family = family, df = 4,
                              a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                              h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   

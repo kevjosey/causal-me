@@ -1,6 +1,7 @@
-bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
+
+bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
                      offset = NULL, weights = NULL, family = gaussian(),
-                     a.vals = seq(min(a), max(a), length.out = 100),
+                     a.vals = seq(min(s), max(s), length.out = 100),
                      n.iter = 10000, n.adapt = 1000, thin = 10, 
                      shape = 1e-3, rate = 1e-3, scale = 1e6, h.a = 1, span = 0.75, 
                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
@@ -26,7 +27,7 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     offset <- rep(0, times = length(y))
   
   s <- s[s.id %in% id]
-  star <- as.matrix(star)[s.id %in% id]
+  t <- as.matrix(t)[s.id %in% id]
   w <- w[s.id %in% id,]
   s.id <- s.id[s.id %in% id]
   
@@ -49,15 +50,15 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   weights <- weights[shield]
   
   if (is.null(w)) {
-    ws <- cbind(rep(1, length(s.id)), star = star)
+    ws <- cbind(rep(1, length(s.id)), t = t)
   } else {
-    ws <- cbind(model.matrix(~ ., data.frame(w)), star = star)
+    ws <- cbind(model.matrix(~ ., data.frame(w)), t = t)
   }
   
   sword <- order(s.id)
   stab <- table(s.id)
   s <- s[sword]
-  star <- star[sword]
+  t <- t[sword]
   ws <- ws[sword,]
   s.id <- s.id[sword]
   
@@ -104,13 +105,13 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     
     # print(i)
     
-    # sample S
+    # Sample S
     sig.s <- sqrt((1/omega2[i - 1] + 1/tau2[i - 1])^(-1))
     mu.s <- (sig.s^2)*(a.s/omega2[i - 1] + c(ws %*% alpha[i - 1,])/tau2[i - 1])
     s.hat <- rnorm(m, mu.s, sig.s)
     s.hat[!is.na(s)] <- s[!is.na(s)]
     
-    # sample A and update outcome tree
+    # Sample A and update outcome tree
     test <- FALSE
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     
@@ -137,53 +138,58 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
     a.s <- rep(a, stab)
     
     # Sample pred parameters
-    
     alpha_var <- solve(t(ws.tmp) %*% ws.tmp + diag(tau2[i - 1]/scale, q, q))
     alpha[i,] <- rmvnorm(1, alpha_var %*% c(t(ws.tmp) %*% s.tmp), tau2[i - 1]*alpha_var)
-    
     tau2[i] <- 1/rgamma(1, shape = shape + l/2, rate = rate +
                           sum(c(s.tmp - c(ws.tmp %*% alpha[i,]))^2)/2)
     
     # Sample agg parameters
-    
     omega2[i] <- 1/rgamma(1, shape = shape + m/2, rate = rate + sum((s.hat - a.s)^2)/2)
     
-    # Sample GPS parameters
-    
+    # Sample gps parameters
     beta_var <- solve(t(x) %*% x + diag(sigma2[i - 1]/scale, p, p))
     beta[i,] <- rmvnorm(1, beta_var %*% c(t(x) %*% a), sigma2[i - 1]*beta_var)
-    
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
     
     # Sample outcome tree
     samples <- sampler$run()
     
-    # Save output
+    # save output
     if (i > n.adapt & (i - n.adapt)%%thin == 0) {
       
       j <- (i - n.adapt)/thin
       a.mat[j,] <- a 
       
+      # outcome model
       muhat <- rowMeans(samples$train)
-      
-      muhat.mat <- sapply(a, function(a.tmp, ...) {
+        
+      muhat.mat <- sapply(a.vals, function(a.tmp, ...){
         xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
         colnames(xa.tmp) <- colnames(xa.train)[-1]
         c(sampler$predict(xa.tmp))
       })
-
-      mhat <- colMeans(muhat.mat)
-      int.mat <- muhat.mat - matrix(rep(mhat, n), byrow = T, nrow = n)
+      
+      mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
       
       # pseudo-outcome
-      psi[j,] <- c(ybar - muhat) + mhat # pseudo-outcome
-      mhat.out[j,] <- predict(smooth.spline(a, mhat), x = a.vals)$y
+      psi[j,] <- (ybar - muhat) + mhat
+      mhat.out[j,] <- colMeans(muhat.mat)
       
-      dr_out <- sapply(a.vals, dr_est, psi = psi[j,], a = a, span = span, 
-                       family = gaussian(), se.fit = TRUE, int.mat = int.mat)
+      # exposure model for integtion
+      a.std <- c(c(a, a.vals) - mean(a)) / sd(a)
+      dens <- density(a.std[1:n])
+      phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
       
-      est.mat[j,] <- dr_out[1,]
-      var.mat[j,] <- dr_out[2,]
+      # integration matrix
+      phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
+      mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
+      int.mat <- (muhat.mat - mhat.mat) * phat.mat
+      
+      out <- sapply(a.vals, loess_est, psi = psi[j,], a = a, span = span, 
+                    family = gaussian(), se.fit = TRUE, int.mat = int.mat)
+      
+      est.mat[j,] <- out[1,]
+      var.mat[j,] <- out[2,]
       
     }
     
@@ -200,7 +206,6 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   omega2 <- omega2[keep]
   
   # analyze output
-  
   a.mat <- a.mat[,order(shield)]
   smooth_estimate <- colMeans(est.mat)
   smooth_variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
@@ -211,7 +216,8 @@ bart_erf <- function(s, star, y, s.id, id, w = NULL, x = NULL,
   
   rslt <- list(smooth_estimate = smooth_estimate, smooth_variance = smooth_variance,
                tree_estimate = tree_estimate, tree_variance = tree_variance, hpdi = hpdi,
-               accept.a = accept.a, mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
+               accept.a = accept.a, mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha,
+                                                sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
   return(rslt)
   
