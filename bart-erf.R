@@ -82,16 +82,21 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
   tau2 <- rep(NA, n.adapt + n.iter)
   omega2 <- rep(NA, n.adapt + n.iter)
   
-  beta[1,] <- coef(lm(a ~ 0 + x))
-  alpha[1,] <- coef(lm(s.tmp ~ 0 + ws.tmp))
-  sigma2[1] <- sigma(lm(a ~ 0 + x))^2
-  tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
+  fit.a <- lm(a ~ 0 + x)
+  fit.s <- lm(s.tmp ~ 0 + ws.tmp)
+  
+  beta[1,] <- coef(fit.a)
+  alpha[1,] <- coef(fit.s)
+  sigma2[1] <- sigma(fit.a)^2
+  tau2[1] <- sigma(fit.s)^2
   omega2[1] <- var(s.hat - a.s)
   
   # initialize bart
   ybar <- family$linkinv(family$linkfun(y) - offset)
   xa.train <- data.frame(ybar = ybar, x[,-1], a = a)
   sampler <- dbarts::dbarts(ybar ~ ., data = xa.train, control = control, weights = weights)
+  h.a <- rep(h.a, n)
+  accept.a <- rep(0, n)
   
   # run first iteration of tree
   samples <- sampler$run()
@@ -103,15 +108,15 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
-    # print(i)
+    print(i)
     
-    # Sample S
+    # sample S
     sig.s <- sqrt((1/omega2[i - 1] + 1/tau2[i - 1])^(-1))
     mu.s <- (sig.s^2)*(a.s/omega2[i - 1] + c(ws %*% alpha[i - 1,])/tau2[i - 1])
     s.hat <- rnorm(m, mu.s, sig.s)
     s.hat[!is.na(s)] <- s[!is.na(s)]
     
-    # Sample A and update outcome tree
+    # sample A and update outcome tree
     test <- FALSE
     z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
     
@@ -129,30 +134,40 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
         dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
         dnorm(z.hat, a, sqrt(omega2[i - 1]/stab), log = TRUE)
       
-      temp <- ifelse(((log(runif(n)) <= log.eps) & !is.na(log.eps)), a_, a)
+      exam <- (log(runif(n)) <= log.eps) & !is.na(log.eps)
+      temp <- ifelse(exam, a_, a)
       test <- sampler$setPredictor(x = temp, column = "a")
       
     }
     
+    accept.a <- accept.a + exam
     a <- temp
     a.s <- rep(a, stab)
     
-    # Sample pred parameters
+    # sample pred parameters
     alpha_var <- solve(t(ws.tmp) %*% ws.tmp + diag(tau2[i - 1]/scale, q, q))
     alpha[i,] <- rmvnorm(1, alpha_var %*% c(t(ws.tmp) %*% s.tmp), tau2[i - 1]*alpha_var)
     tau2[i] <- 1/rgamma(1, shape = shape + l/2, rate = rate +
                           sum(c(s.tmp - c(ws.tmp %*% alpha[i,]))^2)/2)
     
-    # Sample agg parameters
+    # sample agg parameters
     omega2[i] <- 1/rgamma(1, shape = shape + m/2, rate = rate + sum((s.hat - a.s)^2)/2)
     
-    # Sample gps parameters
+    # sample gps parameters
     beta_var <- solve(t(x) %*% x + diag(sigma2[i - 1]/scale, p, p))
     beta[i,] <- rmvnorm(1, beta_var %*% c(t(x) %*% a), sigma2[i - 1]*beta_var)
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
     
-    # Sample outcome tree
+    # sample outcome tree
     samples <- sampler$run()
+    
+    if(ceiling(i/100)==floor(i/100) & i < n.adapt) {
+      
+      h.a <- ifelse(accept.a > 20, h.a + 0.1 * h.a,
+                    ifelse(accept.a < 10, h.a - 0.1 * h.a, h.a))
+      accept.a <- rep(0, n)
+      
+    }
     
     # save output
     if (i > n.adapt & (i - n.adapt)%%thin == 0) {
@@ -171,10 +186,6 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
       
       mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
       
-      # pseudo-outcome
-      psi[j,] <- (ybar - muhat) + mhat
-      mhat.out[j,] <- colMeans(muhat.mat)
-      
       # exposure model for integtion
       a.std <- c(c(a, a.vals) - mean(a)) / sd(a)
       dens <- density(a.std[1:n])
@@ -185,8 +196,13 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
       mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
       int.mat <- (muhat.mat - mhat.mat) * phat.mat
       
-      out <- sapply(a.vals, loess_est, psi = psi[j,], a = a, span = span, 
-                    family = gaussian(), se.fit = TRUE, int.mat = int.mat)
+      # pseudo-outcome
+      psi[j,] <- c(ybar - muhat + mhat) # pseudo-outcome
+      mhat.out[j,] <- apply(muhat.mat, 2, weighted.mean, w = weights)
+      
+      out <- sapply(a.vals, loess_est, psi = psi[j,], a = a, span = span,
+                    family = gaussian(), weights = weights, int.mat = int.mat, 
+                    se.fit = TRUE)
       
       est.mat[j,] <- out[1,]
       var.mat[j,] <- out[2,]

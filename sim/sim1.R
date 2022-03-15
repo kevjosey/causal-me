@@ -162,10 +162,10 @@ n.sim <- 500
 n <- c(400, 800)
 mult <- c(5, 10)
 sig_agg <- c(0, 1, sqrt(2))
-sig_pred <- c(0, 1, sqrt(2))
+sig_pred <- c(1, sqrt(2))
 gps_scen <- "a"
 out_scen <- "a"
-pred_scen <- "a"
+pred_scen <- c("a", "b")
 
 scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred, gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])

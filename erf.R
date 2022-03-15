@@ -22,7 +22,7 @@ erf <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
   int.mat <- wrap$int.mat
   
   ybar <- family$linkinv(family$linkfun(y) - offset)
-  psi <- c((ybar - muhat) + mhat)
+  psi <- c(ybar - muhat + mhat)
   
   if(is.null(span)) {
 
@@ -40,7 +40,7 @@ erf <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
       for(j in 1:k) {
 
         preds <- sapply(j, a.sub, loess_est, psi = psi.sub[folds != j], a = a.sub[folds != j], 
-                        span = h, family = gaussian(), se.fit = FALSE)
+                        weights = weights[folds != j], span = h, family = gaussian(), se.fit = FALSE)
         cv.vec[j] <- mean((psi.sub[folds == j] - preds)^2, na.rm = TRUE)
 
       }
@@ -55,7 +55,8 @@ erf <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
   }
   
   out <- sapply(a.vals, loess_est, psi = psi, a = a, span = span, 
-                   family = gaussian(), se.fit = TRUE, int.mat = int.mat)
+                weights = weights, family = gaussian(), 
+                se.fit = TRUE, int.mat = int.mat)
   
   estimate <- out[1,]
   variance <- out[2,]
@@ -75,7 +76,7 @@ bart_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = ga
     weights <- rep(1, nrow(x))
   
   if (is.null(offset))
-    offset <- rep(1, nrow(x))
+    offset <- rep(0, nrow(x))
   
   # set up evaluation points & matrices for predictions
   n <- nrow(x)
@@ -100,7 +101,7 @@ bart_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = ga
   
   mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
   
-  # exposure model for integtion
+  # exposure model for integration
   a.std <- c(c(a, a.vals) - mean(a)) / sd(a)
   dens <- density(a.std[1:n])
   phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
@@ -117,19 +118,31 @@ bart_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = ga
 }
 
 # LOESS function
-loess_est <- function(newa, a, psi, span, family = gaussian(), se.fit = FALSE, int.mat = NULL) {
+loess_est <- function(newa, a, psi, span, weights = NULL, family = gaussian(), se.fit = FALSE, int.mat = NULL) {
 
+  if(is.null(weights))
+    weights <- rep(1, times = length(y))
+  
+  # subset index
   a.std <- a - newa
   k <- floor(min(span, 1)*length(a))
   idx <- order(abs(a.std))[1:k]
+  
+  # subset
   a.std <- a.std[idx]
   psi <- psi[idx]
+  weights <- weights[idx]
   max.a.std <- max(abs(a.std))
-  k.std <- c((1 - abs(a.std/max.a.std)^3)^3)
+  
+  # construct kernel weight
+  k.std <- weights*c((1 - abs(a.std/max.a.std)^3)^3)
   gh <- cbind(1, a.std)
+  
+  # optimize
   bh <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh, family = family)
   mu <- family$linkinv(c(bh$par[1]))
 
+  # standard error
   if (se.fit & !is.null(int.mat)) {
     
     kern.mat <- matrix(rep(c((1 - abs((a.vals - newa)/max.a.std)^3)^3), k), byrow = T, nrow = k)

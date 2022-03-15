@@ -78,23 +78,30 @@ bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
   o <- ncol(xa)
   
   # initialize parameters
+  gamma <- matrix(NA, nrow = n.adapt + n.iter, ncol = o)
   beta <- matrix(NA, nrow = n.adapt + n.iter, ncol = p)
   alpha <- matrix(NA, nrow = n.adapt + n.iter, ncol = q)
   sigma2 <- rep(NA, n.adapt + n.iter)
   tau2 <- rep(NA, n.adapt + n.iter)
   omega2 <- rep(NA, n.adapt + n.iter)
   
-  beta[1,] <- coef(lm(a ~ 0 + x))
-  alpha[1,] <- coef(lm(s.tmp ~ 0 + ws.tmp))
-  sigma2[1] <- sigma(lm(a ~ 0 + x))^2
-  tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
+  fit.a <- lm(a ~ 0 + x)
+  fit.s <- lm(s.tmp ~ 0 + ws.tmp)
+  fit.y <- glm(y ~ 0 + xa, family = family, offset = offset)
+  
+  gamma[1,] <- coef(fit.y)
+  beta[1,] <- coef(fit.a)
+  alpha[1,] <- coef(fit.s)
+  sigma2[1] <- sigma(fit.a)^2
+  tau2[1] <- sigma(fit.s)^2
   omega2[1] <- var(s.hat - a.s)
   
-  # outcome stuff
+  # auxilliary
   ybar <- family$linkinv(family$linkfun(y) - offset)
-  gamma <- matrix(NA, nrow = n.adapt + n.iter, ncol = o)
-  gamma[1,] <- coef(glm(y ~ 0 + xa, family = family, offset = offset))
-  h.gamma <- sqrt(diag(vcov(glm(y ~ 0 + xa, family = family, offset = offset))))
+  h.gamma <- 0.5*sqrt(diag(vcov(fit.y)))
+  h.a <- rep(h.a, n)
+  accept.a <- rep(0, n)
+  accept.gamma <- rep(0, o)
   
   # the good stuff
   a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
@@ -103,7 +110,7 @@ bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
-    # print(i)
+    print(i)
     
     # sample S
     sig.s <- sqrt((1/omega2[i - 1] + 1/tau2[i - 1])^(-1))
@@ -123,8 +130,9 @@ bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
       dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
       dnorm(a, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE)
     
-    test <- log(runif(n))
-    a <- ifelse(((test <= log.eps) & !is.na(log.eps)), a_, a)
+    test <- log(runif(n)) <= log.eps & !is.na(log.eps)
+    a <- ifelse(test, a_, a)
+    accept.a <- accept.a + test
     a.s <- rep(a, stab)
     
     # sample pred parameters
@@ -151,9 +159,12 @@ bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
       
       log.eps <- sum(dpois(y, family$linkinv(c(xa %*% gamma_) + offset), log = TRUE)) -
         sum(dpois(y, family$linkinv(c(xa %*% gamma0) + offset), log = TRUE)) +
-        dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma0[j], 0 , scale, log = TRUE)
+        dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma0[j], 0, scale, log = TRUE)
       
-      if ((log(runif(1)) <= log.eps) & !is.na(log.eps))
+      exam <- (log(runif(1)) <= log.eps) & !is.na(log.eps)
+      accept.gamma[j] <- accept.gamma[j] + exam
+      
+      if (exam)
         gamma0[j] <- gamma_[j]
       else
         gamma_[j] <- gamma0[j]
@@ -162,6 +173,19 @@ bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
     
     gamma[i,] <- gamma_
     
+    if(ceiling(i/100)==floor(i/100) & i < n.adapt) {
+    
+      h.gamma <- ifelse(accept.gamma > 40, h.gamma + 0.1 * h.gamma,
+                        ifelse(accept.gamma < 30, h.gamma - 0.1 * h.gamma, h.gamma))
+      
+      h.a <- ifelse(accept.a > 20, h.a + 0.1 * h.a,
+                    ifelse(accept.a < 10, h.a - 0.1 * h.a, h.a))
+      
+      accept.a <- rep(0, n)
+      accept.gamma <- rep(0, o)
+      
+    }
+    
     # update important things
     if (i > n.adapt & (i - n.adapt)%%thin == 0) {
       
@@ -169,41 +193,37 @@ bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
       a.mat[j,] <- a
       nsa.vals <- predict(nsa, newx = a.vals)
       
-      # stop gap need to figure out more general approach
-      xa.new.list <- lapply(a.vals, function(a.tmp, ...)
-        cbind(x, nsa.vals[rep(which(a.vals == a.tmp), nrow(x)),], a.tmp*x[,2]))
-
-      xa.new <- rbind(xa, do.call(rbind, xa.new.list))
-      a.new <- c(a, rep(a.vals, each = n))
-      colnames(xa.new) <- colnames(xa)
+      # outcome model
+      muhat <- family$linkinv(c(xa %*% gamma[i,]))
       
-      # outcome models
-      muhat.vals <- family$linkinv(c(xa.new %*% gamma[i,]))
-      muhat <- muhat.vals[1:n]
-      muhat.mat <- matrix(muhat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
-      mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat, na.rm = TRUE)), x = a)$y
+      muhat.mat <- sapply(a.vals, function(a.tmp, ...){
+        xa.tmp <- cbind(x, nsa.vals[rep(which(a.vals == a.tmp), nrow(x)),], a.tmp*x[,2])
+        family$linkinv(c(xa.tmp %*% gamma[i,]))
+      })
       
-      # exposure models
-      pimod.vals <- c(x %*% beta[i,])
-      a.std <- c(c(a, rep(a.vals, each = n)) - pimod.vals[rep(1:n, length(a.vals) + 1)]) / sqrt(sigma2[i])
+      mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
+      
+      # exposure model for integtion
+      a.std <- c(c(a, a.vals) - mean(a)) / sd(a)
       dens <- density(a.std[1:n])
-      pihat.vals <- approx(x = dens$x, y = dens$y, xout = a.std)$y / sqrt(sigma2[i])
-      pihat <- pihat.vals[1:n]
-      pihat.mat <- matrix(pihat.vals[-(1:n)], nrow = n, ncol = length(a.vals))
-      phat <- predict(smooth.spline(a.vals, colMeans(pihat.mat, na.rm = TRUE)), x = a)$y
-      phat[phat <= 0] <- .Machine$double.eps
-      
-      # pseudo-outcome
-      psi[j,] <- (ybar - muhat)*(phat/pihat) + mhat
-      mhat.out[j,] <- colMeans(muhat.mat)
+      phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std)$y / sd(a)
+      phat <- phat.vals[1:n]
+      pimod.vals <- c(x %*% beta[i,])
+      a.denom <- c(a - pimod.vals) / sqrt(sigma2[i])
+      dens.denom <- density(a.denom)
+      pihat <- approx(x = dens.denom$x, y = dens.denom$y, xout = a.denom)$y / sqrt(sigma2[i])
       
       # integration matrix
+      phat.mat <- matrix(rep(phat.vals[-(1:n)], n), byrow = T, nrow = n)
       mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
-      phat.mat <- matrix(rep(colMeans(pihat.mat), n), byrow = T, nrow = n)
-      int.mat <- (muhat.mat - mhat.mat)*phat.mat
+      int.mat <- (muhat.mat - mhat.mat) * phat.mat
+      
+      # pseudo-outcome
+      psi[j,] <- c(ybar - muhat)*(phat/pihat) + mhat
       
       dr_out <- sapply(a.vals, loess_est, psi = psi[j,], a = a, span = span,
-                       family = gaussian(), int.mat = int.mat, se.fit = TRUE)
+                       family = poisson(), weights = weights, int.mat = int.mat, 
+                       se.fit = TRUE)
       
       est.mat[j,] <- dr_out[1,]
       var.mat[j,] <- dr_out[2,]
@@ -227,13 +247,8 @@ bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
   a.mat <- a.mat[,order(shield)]
   dr_estimate <- colMeans(est.mat)
   dr_variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
-  g_estimate <- colMeans(mhat.out)
-  g_variance <- apply(mhat.out, 2, var)
-  hpdi <- apply(mhat.out, 2, hpd)
-  rownames(hpdi) <- c("lower", "upper")
   
-  rslt <- list(dr_estimate = dr_estimate, dr_variance = dr_variance,
-               g_estimate = g_estimate, g_variance = g_variance, hpdi = hpdi,
+  rslt <- list(dr_estimate = dr_estimate, dr_variance = dr_variance, 
                accept.a = accept.a, accept.gamma = accept.gamma,
                mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, gamma = gamma,
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2))

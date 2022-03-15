@@ -5,6 +5,7 @@ rm(list = ls())
 ## Preliminaries
 library(mvtnorm)
 library(SuperLearner)
+library(CARBayes)
 library(scales)
 library(parallel)
 library(dbarts)
@@ -23,7 +24,7 @@ sig_gps <- 2
 sig_agg <- sqrt(2)
 sig_pred <- 1
 gps_scen <- "a"
-out_scen <- "b"
+out_scen <- "a"
 pred_scen <- "a"
 span <- 0.1
 mult <- 5
@@ -38,9 +39,10 @@ family <- poisson()
 n.iter <- 2000
 n.adapt <- 2000
 thin <- 20
-h.a <- 0.5
+h.a <- 1
 scale <- 1e6
-shape <- rate <- 1e-3
+shape <- 1
+rate <- 1e-6
 
 start <- Sys.time()
 
@@ -99,7 +101,7 @@ out <- mclapply(1:n.sim, function(i, ...){
   
   # Bayes DR Approach
   bayes_hat <- try(bayes_erf(s = s, t = s_tilde, y = y, offset = offset, weights = weights,
-                             s.id = s.id, id = id, w = w, x = x, family = family, df = 4,
+                             s.id = s.id, id = id, w = w, x = x, family = family, df = 8,
                              a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                              h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   

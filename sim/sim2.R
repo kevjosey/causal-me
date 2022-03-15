@@ -96,13 +96,13 @@ simulate <- function(scenario, n.sim, a.vals){
     
     # BART Approach
     bart_hat <- try(bart_erf(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
-                             s.id = s.id, id = id, w = w, x = x, family = family, approx = TRUE,
+                             s.id = s.id, id = id, w = w, x = x, family = family,
                              a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                              h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # Alternate Bayes
     bayes_hat <- try(bayes_erf(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
-                               s.id = s.id, id = id, w = w, x = x, family = family,
+                               s.id = s.id, id = id, w = w, x = x, family = family, df = 6,
                                a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                                h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
@@ -188,7 +188,7 @@ sig_agg <- sqrt(2)
 sig_pred <- 1
 gps_scen <- c("a", "b")
 out_scen <- c("a", "b")
-pred_scen <- "a"
+pred_scen <- "b"
 
 scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred, gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
