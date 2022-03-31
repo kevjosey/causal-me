@@ -1,8 +1,8 @@
 # wrapper function to fit an ERF with measurement error using LOESS regression on a nonparametric models
 erf <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
                 a.vals = seq(min(a), max(a), length.out = 100),
-                n.iter = 10000, n.adapt = 1000, thin = 10,
-                span = NULL, span.seq = seq(0.05, 1, by = 0.05), k = 5){	
+                n.iter = 10000, n.adapt = 1000, thin = 10, span = NULL, 
+                span.seq = seq(0.05, 1, by = 0.05), k = 5) {	
   
   
   if(is.null(weights))
@@ -24,38 +24,11 @@ erf <- function(a, y, x, family = gaussian(), offset = NULL, weights = NULL,
   ybar <- family$linkinv(family$linkfun(y) - offset)
   psi <- c(ybar - muhat + mhat)
   
-  if(is.null(span)) {
-
-    idx <- sample(x = n, size = min(n, 1000), replace = FALSE)
-
-    a.sub <- a[idx]
-    psi.sub <- psi[idx]
-
-    folds <- sample(x = k, size = min(n, 1000), replace = TRUE)
-
-    cv.mat <- sapply(span.seq, function(h, ...) {
-
-      cv.vec <- rep(NA, k)
-
-      for(j in 1:k) {
-
-        preds <- sapply(j, a.sub, loess_est, psi = psi.sub[folds != j], a = a.sub[folds != j], 
-                        weights = weights[folds != j], span = h, family = gaussian(), se.fit = FALSE)
-        cv.vec[j] <- mean((psi.sub[folds == j] - preds)^2, na.rm = TRUE)
-
-      }
-
-      return(cv.vec)
-
-    })
-
-    cv.err <- colMeans(cv.mat)
-    span <- span.seq[which.min(cv.err)]
-
-  }
+  if(is.null(span))
+    span <- cv_span(a = a, psi = psi, family = family, weights = weights)
   
   out <- sapply(a.vals, loess_est, psi = psi, a = a, span = span, 
-                weights = weights, family = gaussian(), 
+                weights = weights, family = family, 
                 se.fit = TRUE, int.mat = int.mat)
   
   estimate <- out[1,]
@@ -90,7 +63,7 @@ bart_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = ga
                         ndpost = n.iter, nskip = n.adapt, keepevery = thin, verbose = FALSE)
   muhat <- mumod$yhat.train.mean
   
-  muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
+  muhat.mat <- sapply(a, function(a.tmp, ...) {
     
     # for simulations
     xa.tmp <- data.frame(x = x, a = a.tmp)
@@ -99,17 +72,11 @@ bart_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = ga
     
   })
   
-  mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
-  
-  # exposure model for integration
-  a.std <- c(c(a, a.vals) - mean(a)) / sd(a)
-  dens <- density(a.std[1:n])
-  phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
+  mhat <- colMeans(muhat.mat)
   
   # integration matrix
-  phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
-  mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
-  int.mat <- (muhat.mat - mhat.mat) * phat.mat
+  mhat.mat <- matrix(rep(mhat, n), byrow = T, nrow = n)
+  int.mat <- muhat.mat - mhat.mat
   
   out <- list(muhat = muhat, mhat = mhat, int.mat = int.mat)
   
@@ -118,10 +85,11 @@ bart_est <- function(a, y, x, a.vals, weights = NULL, offset = NULL, family = ga
 }
 
 # LOESS function
-loess_est <- function(newa, a, psi, span, weights = NULL, family = gaussian(), se.fit = FALSE, int.mat = NULL) {
+loess_est <- function(newa, a, psi, family = gaussian(), span, weights = NULL, 
+                      se.fit = FALSE, int.mat = NULL, a.vals = NULL, approx = FALSE) {
 
   if(is.null(weights))
-    weights <- rep(1, times = length(y))
+    weights <- rep(1, times = length(a))
   
   # subset index
   a.std <- a - newa
@@ -141,31 +109,83 @@ loess_est <- function(newa, a, psi, span, weights = NULL, family = gaussian(), s
   # optimize
   bh <- optim(par = c(0,0), fn = opt_fun, k.std = k.std, psi = psi, gh = gh, family = family)
   mu <- family$linkinv(c(bh$par[1]))
-
-  # standard error
+  
   if (se.fit & !is.null(int.mat)) {
     
-    kern.mat <- matrix(rep(c((1 - abs((a.vals - newa)/max.a.std)^3)^3), k), byrow = T, nrow = k)
-    kern.mat[matrix(rep(abs(a.vals - newa)/max.a.std, k), byrow = T, nrow = k) > 1] <- 0
-    g2 <- matrix(rep(c(a.vals - newa), k), byrow = T, nrow = k)
-    intfn1.mat <- kern.mat * int.mat[idx,]
-    intfn2.mat <- g2 * kern.mat * int.mat[idx,]
-    int1 <- apply(matrix(rep((a.vals[-1] - a.vals[-length(a.vals)]), k), byrow = T, nrow = k)*
-                    (intfn1.mat[,-1] + intfn1.mat[,-length(a.vals)])/2, 1, sum)
-    int2 <- apply(matrix(rep((a.vals[-1] - a.vals[-length(a.vals)]), k), byrow = T, nrow = k)*
-                    (intfn2.mat[,-1] + intfn2.mat[,-length(a.vals)])/2, 1, sum)
+    if (approx) {
     
-    Dh <- solve(t(gh) %*% diag(k.std) %*% gh)
-    V <- crossprod(cbind(k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int1,
-                         a.std * k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int2))
+      kern.mat <- matrix(rep(c((1 - abs((a.vals - newa)/max.a.std)^3)^3), k), byrow = T, nrow = k)
+      kern.mat[matrix(rep(abs(a.vals - newa)/max.a.std, k), byrow = T, nrow = k) > 1] <- 0
+      g.vals <- matrix(rep(c(a.vals - newa), k), byrow = T, nrow = k)
+      
+      intfn1.mat <- kern.mat * int.mat[idx,]
+      intfn2.mat <- g.vals * kern.mat * int.mat[idx,]
+      
+      int1 <- apply(matrix(rep((a.vals[-1] - a.vals[-length(a.vals)]), k), byrow = T, nrow = k)*
+                      (intfn1.mat[,-1] + intfn1.mat[,-length(a.vals)])/2, 1, sum)
+      int2 <- apply(matrix(rep((a.vals[-1] - a.vals[-length(a.vals)]), k), byrow = T, nrow = k)*
+                      (intfn2.mat[,-1] + intfn2.mat[,-length(a.vals)])/2, 1, sum)
+      
+      Dh <- solve(t(gh) %*% diag(k.std) %*% gh)
+      V <- crossprod(cbind(k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int1,
+                           a.std * k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int2))
+      
+      sig <- Dh%*%V%*%Dh
+      
+      return(c(mu = mu, sig = sig[1,1]))
     
-    sig <- Dh%*%V%*%Dh
-    
-    return(c(mu = mu, sig = sig[1,1]))
+    } else {
+        
+      intfn1.mat <- k.std*t(int.mat[idx,idx])
+      intfn2.mat <- a.std*k.std*t(int.mat[idx,idx])
+      int1 <- colMeans(intfn1.mat)
+      int2 <- colMeans(intfn2.mat)
+      
+      Dh <- solve(t(gh) %*% diag(k.std) %*% gh)
+      V <- crossprod(cbind(k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int1,
+                           a.std * k.std * c(psi - family$linkinv(c(gh%*%bh$par))) + int2))
+      
+      sig <- Dh%*%V%*%Dh
+      
+      return(c(mu = mu, sig = sig[1,1]))
+
+    }
     
   } else
     return(mu)
+  
+}
 
+# k-fold cross validation to select span
+cv_span <- function(a, psi, family = gaussian(), folds = 10, weights = NULL) {
+  
+  n <- length(a)
+  fdx <- sample(x = folds, size = min(n, 1000), replace = TRUE)
+  idx <- sample(x = n, size = min(n, 1000), replace = FALSE) # for big data
+  a.sub <- a[idx]
+  psi.sub <- psi[idx]
+  
+  cv.mat <- sapply(seq(0.05, 1, by = 0.05), function(h, ...) {
+    
+    cv.vec <- rep(NA, folds)
+    
+    for(k in 1:folds) {
+      
+      preds <- sapply(a.sub[fdx == k], loess_est, psi = psi.sub[fdx != k], a = a.sub[fdx != k], 
+                      weights = weights[fdx != k], span = h, family = family, se.fit = FALSE)
+      cv.vec[k] <- mean((psi.sub[fdx == k] - preds)^2, na.rm = TRUE)
+      
+    }
+    
+    return(cv.vec)
+    
+  })
+
+  cv.err <- colMeans(cv.mat)
+  span <- span.seq[which.min(cv.err)]
+ 
+  return(span)
+  
 }
 
 # optimization used in dr_est

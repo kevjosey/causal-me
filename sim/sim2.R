@@ -37,12 +37,12 @@ simulate <- function(scenario, n.sim, a.vals){
   n.iter <- 2000
   n.adapt <- 2000
   thin <- 20
-  h.a <- 0.5
   scale <- 1e6
-  shape <- rate <- 1e-3
+  shape <- 1e-3
+  rate <- 1e-3
   
   # dr arguments
-  span <- ifelse(n == 800, 0.125, 0.25)
+  bw <- ifelse(n == 800, 0.125, 0.25)
   family <- poisson()
   
   print(scenario)
@@ -86,24 +86,24 @@ simulate <- function(scenario, n.sim, a.vals){
     
     # naive
     naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
-                         family = family, a.vals = a.vals, span = span,
+                         family = family, a.vals = a.vals, bw = bw,
                          n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # real
     rc_hat <- try(erf(y = y, a = z_hat, x = x, offset = offset, weights = weights,
-                      family = family, a.vals = a.vals, span = span,
+                      family = family, a.vals = a.vals, bw = bw,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # BART Approach
     bart_hat <- try(bart_erf(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
                              s.id = s.id, id = id, w = w, x = x, family = family,
-                             a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
+                             a.vals = a.vals, bw = bw, scale = scale, shape = shape, rate = rate,
                              h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # Alternate Bayes
     bayes_hat <- try(bayes_erf(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
                                s.id = s.id, id = id, w = w, x = x, family = family, df = 6,
-                               a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
+                               a.vals = a.vals, bw = bw, scale = scale, shape = shape, rate = rate,
                                h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # estimates
@@ -170,7 +170,7 @@ simulate <- function(scenario, n.sim, a.vals){
 
   
   rslt <- list(scenario = scenario, est = out_est, bias = out_bias, mse = out_mse, cp = out_cp, lower = lower, upper = upper)
-  filename <- paste0("~/Dropbox/Projects/ERF-EPE/Output/sim_2/", paste(scenario, collapse = "_"),".RData")
+  filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim_2/", paste(scenario, collapse = "_"),".RData")
   save(rslt, file = filename)
   
 }

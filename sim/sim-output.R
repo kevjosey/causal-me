@@ -1,7 +1,7 @@
 #### Measurement Error
 
 a.vals <- seq(6, 14, by = 0.04)
-filenames_1 <- list.files(path = "~/Dropbox/Projects/ERF-EPE/Output/sim_1", full.names = TRUE)
+filenames_1 <- list.files(path = "~/Dropbox/Projects/ERC-EPE/Output/sim_1", full.names = TRUE)
 plotnames <- c("No Measurement Error",
                "Prediction Error but No Aggregation Error",
                "Aggregation Error but No Prediction Error",
@@ -9,9 +9,9 @@ plotnames <- c("No Measurement Error",
 # idx <- c(1,2,7,8)
 # idx <- c(10,11,16,17)
 # idx <- c(19,20,25,26)
-idx <- c(28,29,34,35)
+idx <- c(39,40,45,46)
 
-pdf(file = "~/Dropbox/Projects/ERF-EPE/Output/plot_sim.pdf", width = 9, height = 9)
+pdf(file = "~/Dropbox/Projects/ERC-EPE/Output/plot_sim.pdf", width = 9, height = 9)
 par(mfrow = c(2,2))
 j <- 1
 
@@ -28,14 +28,15 @@ for (k in idx){
        xlab = "Exposure", ylab = "Rate of Event", main = plotnames[j],
        ylim = c(0,0.1))
   grid(lty = 1)
-  lines(a.vals, rslt$est[2,], type = "l", col = gg_color_hue(3)[1], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[3,], type = "l", col = gg_color_hue(3)[2], lwd = 2, lty = 1)
-  lines(a.vals, rslt$est[5,], type = "l", col = gg_color_hue(3)[3], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[2,], type = "l", col = gg_color_hue(4)[1], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[3,], type = "l", col = gg_color_hue(4)[2], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[5,], type = "l", col = gg_color_hue(4)[3], lwd = 2, lty = 1)
+  lines(a.vals, rslt$est[4,], type = "l", col = gg_color_hue(4)[4], lwd = 2, lty = 1)
   
   if (k == idx[length(idx)]){
     
-    legend(6, 0.1, legend=c("True ERF", "No Correction", "Regression Calibration", "Multiple Imputation"),
-           col = c("black", gg_color_hue(3)), lwd=2, cex=0.8)
+    legend(6, 0.1, legend=c("True ERF", "No Correction", "Regression Calibration", "GLM Multiple Imputation", "BART Multiple Imputation"),
+           col = c("black", gg_color_hue(4)), lwd=2, cex=0.8)
     
     
   }

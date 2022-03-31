@@ -1,10 +1,9 @@
 # WARNING: Only implements DR Estimation which violates congeniality concepts
 bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
-                      offset = NULL, weights = NULL, family = gaussian(),
+                      family = gaussian(), offset = NULL, weights = NULL,
                       a.vals = seq(min(s), max(s), length.out = 100),
                       shape = 1e-3, rate = 1e-3, scale = 1e6,
-                      n.iter = 10000, n.adapt = 1000, thin = 10, 
-                      h.a = 0.5, span = 0.75) {
+                      n.iter = 10000, n.adapt = 1000, thin = 10, span = NULL) {
   
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
@@ -98,14 +97,14 @@ bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
   
   # auxilliary
   ybar <- family$linkinv(family$linkfun(y) - offset)
+  h.a <- rep(0.5*sd(a), n)
   h.gamma <- 0.5*sqrt(diag(vcov(fit.y)))
-  h.a <- rep(h.a, n)
   accept.a <- rep(0, n)
   accept.gamma <- rep(0, o)
   
   # the good stuff
-  a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
-  mhat.out <- est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
+  a.mat <- psi <- psi_dr <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
+  est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
@@ -161,7 +160,7 @@ bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
         sum(dpois(y, family$linkinv(c(xa %*% gamma0) + offset), log = TRUE)) +
         dnorm(gamma_[j], 0, scale, log = TRUE) - dnorm(gamma0[j], 0, scale, log = TRUE)
       
-      exam <- (log(runif(1)) <= log.eps) & !is.na(log.eps)
+      exam <- log(runif(1)) <= log.eps & !is.na(log.eps)
       accept.gamma[j] <- accept.gamma[j] + exam
       
       if (exam)
@@ -173,13 +172,13 @@ bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
     
     gamma[i,] <- gamma_
     
-    if(ceiling(i/100)==floor(i/100) & i < n.adapt) {
+    if(ceiling(i/100) == floor(i/100) & i < n.adapt) {
     
       h.gamma <- ifelse(accept.gamma > 40, h.gamma + 0.1 * h.gamma,
                         ifelse(accept.gamma < 30, h.gamma - 0.1 * h.gamma, h.gamma))
       
-      h.a <- ifelse(accept.a > 20, h.a + 0.1 * h.a,
-                    ifelse(accept.a < 10, h.a - 0.1 * h.a, h.a))
+      h.a <- ifelse(accept.a > 400/thin, h.a + 0.1 * h.a,
+                    ifelse(accept.a < 100/thin, h.a - 0.1 * h.a, h.a))
       
       accept.a <- rep(0, n)
       accept.gamma <- rep(0, o)
@@ -191,42 +190,45 @@ bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
       
       j <- (i - n.adapt)/thin
       a.mat[j,] <- a
-      nsa.vals <- predict(nsa, newx = a.vals)
+      nsa.vals <- predict(nsa, newx = a)
       
       # outcome model
       muhat <- family$linkinv(c(xa %*% gamma[i,]))
       
-      muhat.mat <- sapply(a.vals, function(a.tmp, ...){
-        xa.tmp <- cbind(x, nsa.vals[rep(which(a.vals == a.tmp), nrow(x)),], a.tmp*x[,2])
+      muhat.mat <- sapply(a, function(a.tmp, ...){
+        
+        xa.tmp <- cbind(x, nsa.vals[rep(which(a == a.tmp)[1], nrow(x)),], a.tmp*x[,2])
         family$linkinv(c(xa.tmp %*% gamma[i,]))
+        
       })
       
-      mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
+      mhat <- colMeans(muhat.mat)
       
-      # exposure model for integtion
-      a.std <- c(c(a, a.vals) - mean(a)) / sd(a)
-      dens <- density(a.std[1:n])
-      phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std)$y / sd(a)
-      phat <- phat.vals[1:n]
+      # exposure model for integration
+      a.num <- c(a - mean(a)) / sd(a)
+      dens.num <- density(a.num)
+      phat <- approx(x = dens.num$x, y = dens.num$y, xout = a.num)$y / sd(a)
       pimod.vals <- c(x %*% beta[i,])
       a.denom <- c(a - pimod.vals) / sqrt(sigma2[i])
       dens.denom <- density(a.denom)
       pihat <- approx(x = dens.denom$x, y = dens.denom$y, xout = a.denom)$y / sqrt(sigma2[i])
       
-      # integration matrix
-      phat.mat <- matrix(rep(phat.vals[-(1:n)], n), byrow = T, nrow = n)
-      mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
-      int.mat <- (muhat.mat - mhat.mat) * phat.mat
+      # integrate
+      mhat.mat <- matrix(rep(mhat, n), byrow = T, nrow = n)
+      int.mat <- (muhat.mat - mhat.mat)
       
       # pseudo-outcome
-      psi[j,] <- c(ybar - muhat)*(phat/pihat) + mhat
+      psi_dr[j,] <- c(ybar - muhat)*(phat/pihat) + mhat
+      psi[j,] <- c(ybar - muhat + mhat)
       
-      dr_out <- sapply(a.vals, loess_est, psi = psi[j,], a = a, span = span,
-                       family = poisson(), weights = weights, int.mat = int.mat, 
-                       se.fit = TRUE)
+      if (j == 1 & is.null(span))
+        span <- cv_span(a = a, psi = psi[j,], family = family, weights = weights)
       
-      est.mat[j,] <- dr_out[1,]
-      var.mat[j,] <- dr_out[2,]
+      out <- sapply(a.vals, loess_est, psi = psi[j,], a = a, span = span,
+                    family = family, int.mat = int.mat, se.fit = TRUE)
+      
+      est.mat[j,] <- out[1,]
+      var.mat[j,] <- out[2,]
       
     }
     
@@ -245,11 +247,11 @@ bayes_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, df = 4,
   omega2 <- omega2[keep]
   
   a.mat <- a.mat[,order(shield)]
-  dr_estimate <- colMeans(est.mat)
-  dr_variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
+  estimate <- colMeans(est.mat)
+  variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
   
-  rslt <- list(dr_estimate = dr_estimate, dr_variance = dr_variance, 
-               accept.a = accept.a, accept.gamma = accept.gamma,
+  rslt <- list(estimate = estimate, variance = variance, 
+               accept.a = accept.a, accept.gamma = accept.gamma, span = span,
                mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, gamma = gamma,
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   

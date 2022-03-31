@@ -13,6 +13,7 @@ library(dbarts)
 source("~/Github/causal-me/sim/gen-data.R")
 source("~/Github/causal-me/erf.R")
 source("~/Github/causal-me/bart-erf.R")
+source("~/Github/causal-me/bayes-erf.R")
 source("~/Github/causal-me/auxiliary.R")
 
 simulate <- function(scenario, n.sim, a.vals){
@@ -34,11 +35,9 @@ simulate <- function(scenario, n.sim, a.vals){
   n.iter <- 2000
   n.adapt <- 2000
   thin <- 20
-  h.a <- 0.5
   scale <- 1e6
-  shape <- rate <- 1e-3
-  
-  # dr arguments
+  shape <- 1e-3
+  rate <- 1e-3
   span <- ifelse(n == 800, 0.125, 0.25)
   family <- poisson()
   
@@ -81,40 +80,40 @@ simulate <- function(scenario, n.sim, a.vals){
     z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
     z_tilde <- aggregate(s_tilde, by = list(s.id), mean)[,2]
     
-    # naive
-    naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
-                         family = family, a.vals = a.vals, span = span,
-                         n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
-    
     # real
     rc_hat <- try(erf(y = y, a = z_hat, x = x, offset = offset, weights = weights,
                       family = family, a.vals = a.vals, span = span,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
+    # naive
+    naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
+                         family = family, a.vals = a.vals, span = span,
+                         n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
+    
     # BART Approach
     bart_hat <- try(bart_erf(s = s, t = s_tilde, y = y, offset = offset, weights = weights,
                              s.id = s.id, id = id, w = w, x = x, family = family,
-                             a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
-                             h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
+                             a.vals = a.vals, scale = scale, shape = shape, rate = rate,
+                             n.iter = n.iter, n.adapt = n.adapt, thin = thin, span = span), silent = TRUE)
+    
+    # Bayes DR Approach
+    bayes_hat <- try(bayes_erf(s = s, t = s_tilde, y = y, offset = offset, weights = weights,
+                               s.id = s.id, id = id, w = w, x = x, family = family, df = 8,
+                               a.vals = a.vals, scale = scale, shape = shape, rate = rate,
+                               n.iter = n.iter, n.adapt = n.adapt, thin = thin, span = span), silent = TRUE)
     
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
                  if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(rc_hat, "try-error")) {rc_hat$estimate} else {rep(NA, length(a.vals))},
-                 if (!inherits(bart_hat, "try-error")) {bart_hat$smooth_estimate} else {rep(NA, length(a.vals))},
-                 if (!inherits(bart_hat, "try-error")) {bart_hat$tree_estimate} else {rep(NA, length(a.vals))})
+                 if (!inherits(bart_hat, "try-error")) {bayes_hat$estimate} else {rep(NA, length(a.vals))},
+                 if (!inherits(bayes_hat, "try-error")) {bart_hat$estimate} else {rep(NA, length(a.vals))})
     
     #standard error
     se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(rc_hat, "try-error")) {sqrt(rc_hat$variance)} else {rep(NA, length(a.vals))},
-                if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$smooth_variance)} else {rep(NA, length(a.vals))},
-                if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$tree_variance)} else {rep(NA, length(a.vals))})
-    
-    # coverage probability
-    cp <- rbind(if (!inherits(naive_hat, "try-error")) {as.numeric((est[2,] - 1.96*se[1,]) < est[1,] & (est[2,] + 1.96*se[1,]) > est[1,])} else {rep(NA, length(a.vals))},
-                if (!inherits(rc_hat, "try-error")) {as.numeric((est[3,] - 1.96*se[2,]) < est[1,] & (est[3,] + 1.96*se[2,]) > est[1,])} else {rep(NA, length(a.vals))},
-                if (!inherits(bart_hat, "try-error")) {as.numeric((est[4,] - 1.96*se[3,]) < est[1,] & (est[4,] + 1.96*se[3,]) > est[1,])} else {rep(NA, length(a.vals))},
-                if (!inherits(bart_hat, "try-error")) {as.numeric(bart_hat$hpdi[1,] < est[1,] & bart_hat$hpdi[2,] > est[1,])} else {rep(NA, length(a.vals))})
+                if (!inherits(bart_hat, "try-error")) {sqrt(bayes_hat$variance)} else {rep(NA, length(a.vals))},
+                if (!inherits(bayes_hat, "try-error")) {sqrt(bart_hat$variance)} else {rep(NA, length(a.vals))})
     
     return(list(est = est, se = se))
     
@@ -132,22 +131,22 @@ simulate <- function(scenario, n.sim, a.vals){
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("ERF","NAIVE","RC","LOESS","BART")
+  rownames(out_est) <- c("ERF","NAIVE","RC","BART","GLM")
   
   out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - mu.mat), na.rm = T)))
   colnames(out_bias) <- a.vals
-  rownames(out_bias) <- c("NAIVE","RC","LOESS","BART")
+  rownames(out_bias) <- c("NAIVE","RC","BART","GLM")
   
   out_mse <- t(apply(est[2:5,,], 1, function(x) rowMeans((x - mu.mat)^2, na.rm = T)))
   colnames(out_mse) <- a.vals
-  rownames(out_mse) <- c("NAIVE","RC","LOESS","BART")
+  rownames(out_mse) <- c("NAIVE","RC","BART","GLM")
   
   out_cp <- do.call(rbind, lapply(cp, rowMeans, na.rm = T))
   colnames(out_cp) <- a.vals
-  rownames(out_cp) <- c("NAIVE","RC","LOESS","BART")
+  rownames(out_cp) <- c("NAIVE","RC","BART","GLM")
   
   rslt <- list(scenario = scenario, est = out_est, bias = out_bias, mse = out_mse, cp = out_cp)
-  filename <- paste0("~/Dropbox/Projects/ERF-EPE/Output/sim_1/", paste(scenario, collapse = "_"),".RData")
+  filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim_1/", paste(scenario, collapse = "_"),".RData")
   save(rslt, file = filename)
   
 }
