@@ -1,9 +1,9 @@
 
 bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
-                     family = family, offset = NULL, weights = NULL,
+                     family = gaussian(), offset = NULL, df = 4,
                      a.vals = seq(min(s), max(s), length.out = 100),
                      n.iter = 10000, n.adapt = 1000, thin = 10, 
-                     shape = 1e-3, rate = 1e-3, scale = 1e6, span = NULL, 
+                     shape = 1e-3, rate = 1e-3, scale = 1e6,
                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
                                              n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
@@ -20,11 +20,10 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
   if(length(check) > length(id))
     warning("deleting some exposures without an associated outcome.")
   
-  if(is.null(weights))
-    weights <- rep(1, times = length(y))
-  
   if(is.null(offset))
     offset <- rep(0, times = length(y))
+  
+  weights <- family$variance(family$linkinv(offset))
   
   s <- s[s.id %in% id]
   t <- as.matrix(t)[s.id %in% id]
@@ -103,7 +102,7 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
   
   # initialize output
   a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
-  mhat.out <- est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
+  est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
@@ -161,10 +160,11 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
     # sample outcome tree
     samples <- sampler$run()
     
+    # update random walk parameters
     if(ceiling(i/100) == floor(i/100) & i < n.adapt) {
       
-      h.a <- ifelse(accept.a > 400/thin, h.a + 0.1 * h.a,
-                    ifelse(accept.a < 100/thin, h.a - 0.1 * h.a, h.a))
+      h.a <- ifelse(accept.a > 30, h.a + 0.1 * h.a,
+                    ifelse(accept.a < 10, h.a - 0.1 * h.a, h.a))
       accept.a <- rep(0, n)
       
     }
@@ -178,34 +178,21 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
       # outcome model
       muhat <- rowMeans(samples$train)
       
-      muhat.mat <- sapply(a.vals, function(a.tmp, ...){
+      muhat.mat <- sapply(a, function(a.tmp, ...){
         xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
         colnames(xa.tmp) <- colnames(xa.train)[-1]
         c(sampler$predict(xa.tmp))
       })
       
-      mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
+      mhat <- colMeans(muhat.mat)
+      int.mat <- muhat.mat - matrix(rep(mhat, n), byrow = T, nrow = n)
       
       # pseudo-outcome
       psi[j,] <- (ybar - muhat + mhat)
-      mhat.out[j,] <- colMeans(muhat.mat)
+      psi[j,psi[j,] < 0] <- 0
       
-      # exposure model for integtion
-      a.std <- c(c(a, a.vals) - mean(a)) / sd(a)
-      dens <- density(a.std[1:n])
-      phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
-      
-      # integration matrix
-      phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
-      mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
-      int.mat <- (muhat.mat - mhat.mat) * phat.mat
-      
-      if (j == 1 & is.null(span))
-        span <- cv_span(a = a, psi = psi[j,], family = family, weights = weights)
-      
-      out <- sapply(a.vals, loess_est, psi = psi[j,], a = a, span = span, 
-                    family = gaussian(), se.fit = TRUE, int.mat = int.mat, 
-                    a.vals = a.vals, approx = TRUE)
+      out <- sapply(a.vals, loess_est, psi = psi[j,], a = a, span = 0.2, offset = offset, 
+                    family = family, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
       
       est.mat[j,] <- out[1,]
       var.mat[j,] <- out[2,]
@@ -225,17 +212,12 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
   omega2 <- omega2[keep]
   
   a.mat <- a.mat[,order(shield)]
-  smooth_estimate <- colMeans(est.mat)
-  smooth_variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
-  tree_estimate <- colMeans(mhat.out)
-  tree_variance <- apply(mhat.out, 2, var)
-  hpdi <- apply(mhat.out, 2, hpd)
-  rownames(hpdi) <- c("lower", "upper")
+  estimate <- colMeans(est.mat)
+  variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
   
-  rslt <- list(smooth_estimate = smooth_estimate, smooth_variance = smooth_variance,
-               tree_estimate = tree_estimate, tree_variance = tree_variance, hpdi = hpdi,
-               accept.a = accept.a, mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, 
-                                                sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
+  rslt <- list(estimate = estimate, variance = variance, accept.a = accept.a,
+               mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, 
+                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
   return(rslt)
   

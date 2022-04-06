@@ -4,6 +4,7 @@ rm(list = ls())
 
 ## Preliminaries
 library(mvtnorm)
+library(gam)
 library(SuperLearner)
 library(CARBayes)
 library(scales)
@@ -31,21 +32,21 @@ n <- 400
 prob <- 0.1
 
 # model arguments
-a.vals <- seq(6, 14, by = 0.04)
-family <- poisson()
+a.vals <- seq(6, 14, by = 0.08)
+family <- quasipoisson()
 
 # mcmc arguments
-n.iter <- 1000
-n.adapt <- 1000
-thin <- 10
-span <- 0.2
+n.iter <- 2000
+n.adapt <- 2000
+thin <- 20
+df <- 10
 scale <- 1e6
 shape <- 1e-3
 rate <- 1e-3
 
 start <- Sys.time()
 
-out <- mclapply(1, function(i, ...){
+out <- mclapply(1:n.sim, function(i, ...){
   
   dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
                   pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
@@ -53,7 +54,6 @@ out <- mclapply(1, function(i, ...){
   # zipcode index
   s.id <- dat$s.id
   id <- dat$id
-  weights <- dat$offset
   offset <- log(dat$offset)
 
   # data
@@ -61,7 +61,7 @@ out <- mclapply(1, function(i, ...){
   x <- dat$x
   a <- dat$a
   w <- dat$w
-  s_tilde <- star <- dat$star
+  s_tilde <- dat$star
   
   # validation subset
   s <- dat$s*rbinom(mult*n, 1, prob)
@@ -83,47 +83,43 @@ out <- mclapply(1, function(i, ...){
   z_tilde <- aggregate(s_tilde, by = list(s.id), mean)[,2]
   
   # real
-  rc_hat <- try(erf(y = y, a = z_hat, x = x, offset = offset, weights = weights,
-                    family = family, a.vals = a.vals, span = span,
+  rc_hat <- try(erf(y = y, a = z_hat, x = x, offset = offset,
+                    family = family, a.vals = a.vals, df = df,
                     n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # naive
-  naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
-                       family = family, a.vals = a.vals, span = span,
+  naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset,
+                       family = family, a.vals = a.vals, df = df,
                        n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # BART Approach
-  bart_hat <- try(bart_erf(s = s, t = s_tilde, y = y, offset = offset, weights = weights,
-                           s.id = s.id, id = id, w = w, x = x, family = family,
-                           a.vals = a.vals, scale = scale, shape = shape, rate = rate,
-                           n.iter = n.iter, n.adapt = n.adapt, thin = thin, span = span), silent = TRUE)
-
-  print(bart_hat)
+  bart_hat <- try(bart_erf(s = s, t = s_tilde, y = y, s.id = s.id, id = id, w = w, x = x, 
+                           offset = offset, family = family, a.vals = a.vals,
+                           scale = scale, shape = shape, rate = rate, df = df,
+                           n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
   # Bayes DR Approach
-  bayes_hat <- try(bayes_erf(s = s, t = s_tilde, y = y, offset = offset, weights = weights,
-                             s.id = s.id, id = id, w = w, x = x, family = family, df = 8,
-                             a.vals = a.vals, scale = scale, shape = shape, rate = rate,
-                             n.iter = n.iter, n.adapt = n.adapt, thin = thin, span = span), silent = TRUE)
+  bayes_hat <- try(bayes_erf(s = s, t = s_tilde, y = y, s.id = s.id, id = id, w = w, x = x, 
+                             offset = offset, family = family, a.vals = a.vals, 
+                             scale = scale, shape = shape, rate = rate, df = df,
+                             n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # estimates
   est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
                if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
                if (!inherits(rc_hat, "try-error")) {rc_hat$estimate} else {rep(NA, length(a.vals))},
-               if (!inherits(bart_hat, "try-error")) {bart_hat$smooth_estimate} else {rep(NA, length(a.vals))},
-               if (!inherits(bart_hat, "try-error")) {bart_hat$tree_estimate} else {rep(NA, length(a.vals))},
+               if (!inherits(bart_hat, "try-error")) {bart_hat$estimate} else {rep(NA, length(a.vals))},
                if (!inherits(bayes_hat, "try-error")) {bayes_hat$estimate} else {rep(NA, length(a.vals))})
   
   #standard error
   se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
               if (!inherits(rc_hat, "try-error")) {sqrt(rc_hat$variance)} else {rep(NA, length(a.vals))},
-              if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$smooth_variance)} else {rep(NA, length(a.vals))},
-              if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$tree_variance)} else {rep(NA, length(a.vals))},
+              if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$variance)} else {rep(NA, length(a.vals))},
               if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$variance)} else {rep(NA, length(a.vals))})
   
   return(list(est = est, se = se))
   
-}, mc.cores = 1, mc.preschedule = TRUE)
+}, mc.cores = 25, mc.preschedule = TRUE)
 
 stop <- Sys.time()
 stop - start
@@ -140,26 +136,26 @@ cp <- list(as.matrix((est[2,,] - 1.96*se[1,,]) < mu.mat & (est[2,,] + 1.96*se[1,
 
 out_est <- t(apply(est, 1, rowMeans, na.rm = T))
 colnames(out_est) <- a.vals
-rownames(out_est) <- c("ERF","NAIVE","RC","BART","DR")
+rownames(out_est) <- c("ERF","NAIVE","RC","BART","GLM")
 
 out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - mu.mat), na.rm = T)))
 colnames(out_bias) <- a.vals
-rownames(out_bias) <- c("NAIVE","RC","BART","DR")
+rownames(out_bias) <- c("NAIVE","RC","BART","GLM")
 
 out_mse <- t(apply(est[2:5,,], 1, function(x) rowMeans((x - mu.mat)^2, na.rm = T)))
 colnames(out_mse) <- a.vals
-rownames(out_mse) <- c("NAIVE","RC","BART","DR")
+rownames(out_mse) <- c("NAIVE","RC","BART","GLM")
 
 out_cp <- do.call(rbind, lapply(cp, rowMeans, na.rm = T))
 colnames(out_cp) <- a.vals
-rownames(out_cp) <- c("NAIVE","RC","BART","DR")
+rownames(out_cp) <- c("NAIVE","RC","BART","GLM")
 
-plot(a.vals, out_est[1,], type = "l", col = hue_pal()(6)[1], lwd = 2,
+plot(a.vals, out_est[1,], type = "l", col = hue_pal()(5)[1], lwd = 2,
      main = "Exposure = b, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
      ylim = c(0,0.1))
-lines(a.vals, out_est[2,], type = "l", col = hue_pal()(6)[2], lwd = 2, lty = 1)
-lines(a.vals, out_est[3,], type = "l", col = hue_pal()(6)[3], lwd = 2, lty = 1)
-lines(a.vals, out_est[4,], type = "l", col = hue_pal()(6)[5], lwd = 2, lty = 1)
-lines(a.vals, out_est[5,], type = "l", col = hue_pal()(6)[6], lwd = 2, lty = 1)
-legend(5, 0.1, legend=c("True ERF","NAIVE","RC","LOESS","DR"),
+lines(a.vals, out_est[2,], type = "l", col = hue_pal()(5)[2], lwd = 2, lty = 1)
+lines(a.vals, out_est[3,], type = "l", col = hue_pal()(5)[3], lwd = 2, lty = 1)
+lines(a.vals, out_est[4,], type = "l", col = hue_pal()(5)[4], lwd = 2, lty = 1)
+lines(a.vals, out_est[5,], type = "l", col = hue_pal()(5)[5], lwd = 2, lty = 1)
+legend(6, 0.1, legend=c("True ERF","NAIVE","RC","BART","GLM"),
        col=hue_pal()(5),lty = c(1,1,1,1,1), lwd=2, cex=0.8)

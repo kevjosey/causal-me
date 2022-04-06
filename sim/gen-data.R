@@ -48,7 +48,6 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   u4 <- as.numeric(scale((x[,2] + x[,4] + 20)^2))
   
   u <- cbind(u1, u2, u3, u4)
-  # u <- u%*%solve(chol(cov(u)))
   w2 <- rep(NA, mult*n)
   
   if (gps_scen == "b") {

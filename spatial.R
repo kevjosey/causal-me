@@ -3,7 +3,8 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
                          family = gaussian(), offset = NULL, weights = NULL,
                          a.vals = seq(min(a), max(a), length.out = 100),
                          n.iter = 10000, n.adapt = 1000, thin = 10, 
-                         shape = 1e-3, rate = 1e-3, scale = 1e6, span = 0.75, 
+                         shape = 1e-3, rate = 1e-3, scale = 1e6, 
+                         span = NULL, span.seq = seq(0.1, 2, by = 0.1), folds = 5,
                          control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
                                                  n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
@@ -255,11 +256,11 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
       int.mat <- (muhat.mat - mhat.mat) * phat.mat
       
       if (j == 1 & is.null(span))
-        span <- cv_span(a = a, psi = psi[j,], family = family, weights = weights)
+        span <- cv_span(a = a, psi = psi[j,], family = family, folds = folds, span.seq = span.seq)
       
-      out <- sapply(a.vals, loess_est, psi = psi[j,], a = a, span = span, 
+      out <- sapply(a.vals, kern_est, psi = psi[j,], a = a, span = span, 
                     family = gaussian(), se.fit = TRUE, int.mat = int.mat, 
-                    a.vals = a.vals, approx = TRUE)
+                    a.vals = a.vals)
       
       est.mat[j,] <- out[1,]
       var.mat[j,] <- out[2,]
