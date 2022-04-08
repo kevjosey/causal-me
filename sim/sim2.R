@@ -138,11 +138,11 @@ simulate <- function(scenario, n.sim, a.vals){
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = T))
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("ERF","NAIVE","RC","BART","LOESS","DR")
+  rownames(out_est) <- c("ERF","NAIVE","RC","BART","GLM","DR")
   
   out_bias <- t(apply(est[2:6,,], 1, function(x) rowMeans(abs(x - mu.mat), na.rm = T)))
   colnames(out_bias) <- a.vals
-  rownames(out_bias) <- c("NAIVE","RC","BART","LOESS","DR")
+  rownames(out_bias) <- c("NAIVE","RC","BART","GLM","DR")
   
   out_mse <- t(apply(est[2:6,,], 1, function(x) rowMeans((x - mu.mat)^2, na.rm = T)))
   colnames(out_mse) <- a.vals
