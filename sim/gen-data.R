@@ -33,7 +33,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   # x <- x%*%solve(chol(cov(x)))
   
   id <- 1:n
-  offset <- floor(runif(n, 10, 1000))
+  offset <- log(floor(runif(n, 10, 1000)))
   
   if (mult == 10) {
     s.id <- rep(id, rep(c(2,4,6,8,12,14,16,18), each = n/8))
@@ -81,14 +81,14 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   }
   
   if (out_scen == "b") {
-    mu_out <- -4 - 0.5*u[,1] - 0.25*u[,2] + 0.25*u[,3] + 0.5*u[,4] +
+    mu_out <- -3.5 - 0.5*u[,1] - 0.25*u[,2] + 0.25*u[,3] + 0.5*u[,4] +
       0.25*(a - 10) - 0.75*cos(pi*(a - 6)/4) - 0.25*(a - 10)*u[,1]
   } else { # y_scen == "b"
-    mu_out <- -4 - 0.5*x[,1] - 0.25*x[,2] + 0.25*x[,3] + 0.5*x[,4] +
+    mu_out <- -3.5 - 0.5*x[,1] - 0.25*x[,2] + 0.25*x[,3] + 0.5*x[,4] +
       0.25*(a - 10) - 0.75*cos(pi*(a - 6)/4) - 0.25*(a - 10)*x[,1]
   }
   
-  y <- rpois(n, exp(mu_out + log(offset)))
+  y <- rpois(n, exp(mu_out + offset))
   
   # create simulation dataset
   sim <- list(a = a, s = s, star = star, y = y, x = x, w = w, 
@@ -114,9 +114,9 @@ predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
     a.vec <- rep(a.vals[i],nrow(x))
 
     if (out_scen == "b") {
-      mu_out <- exp(-4 + u %*% c(-0.5,-0.25,0.25,0.5) + 0.25*(a.vec - 10) - 0.75*cos(pi*(a.vec - 6)/4) - 0.25*(a.vec - 10)*u[,1])
+      mu_out <- exp(-3.5 + u %*% c(-0.5,-0.25,0.25,0.5) + 0.25*(a.vec - 10) - 0.75*cos(pi*(a.vec - 6)/4) - 0.25*(a.vec - 10)*u[,1])
     } else { # out_scen == "a"
-      mu_out <- exp(-4 + x %*% c(-0.5,-0.25,0.25,0.5) + 0.25*(a.vec - 10) - 0.75*cos(pi*(a.vec - 6)/4) - 0.25*(a.vec - 10)*x[,1])
+      mu_out <- exp(-3.5 + x %*% c(-0.5,-0.25,0.25,0.5) + 0.25*(a.vec - 10) - 0.75*cos(pi*(a.vec - 6)/4) - 0.25*(a.vec - 10)*x[,1])
     }
 
     out[i] <- mean(mu_out)

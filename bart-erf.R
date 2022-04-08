@@ -1,9 +1,9 @@
 
-bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
-                     family = gaussian(), offset = NULL, df = 4,
+bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, offset = NULL,
                      a.vals = seq(min(s), max(s), length.out = 100),
                      n.iter = 10000, n.adapt = 1000, thin = 10, 
                      shape = 1e-3, rate = 1e-3, scale = 1e6,
+                     span = NULL, span.seq = seq(0.1, 2, by = 0.1), folds = 5,
                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
                                              n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
@@ -23,7 +23,7 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
   if(is.null(offset))
     offset <- rep(0, times = length(y))
   
-  weights <- family$variance(family$linkinv(offset))
+  weights <- exp(offset)
   
   s <- s[s.id %in% id]
   t <- as.matrix(t)[s.id %in% id]
@@ -93,7 +93,7 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
   omega2[1] <- var(s.hat - a.s)
   
   # initialize bart
-  ybar <- family$linkinv(family$linkfun(y) - offset)
+  ybar <- exp(log(y) - offset)
   xa.train <- data.frame(ybar = ybar, x[,-1], a = a)
   sampler <- dbarts::dbarts(ybar ~ ., data = xa.train, control = control, weights = weights)
   
@@ -101,13 +101,11 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
   samples <- sampler$run()
   
   # initialize output
-  a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
+  a.mat <- psi.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
   est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
-    
-    print(i)
     
     # sample S
     sig.s <- sqrt((1/omega2[i - 1] + 1/tau2[i - 1])^(-1))
@@ -128,7 +126,7 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
       
       log.eps <- dnorm(ybar, xa.pred, mean(samples$sigma)/sqrt(weights), log = TRUE) +
         dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
-        dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
+        dnorm(z.hat, a_, sqrt(omega2[i - 1]/stab), log = TRUE) -
         dnorm(ybar, samples$train, mean(samples$sigma)/sqrt(weights), log = TRUE) -
         dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
         dnorm(z.hat, a, sqrt(omega2[i - 1]/stab), log = TRUE)
@@ -163,7 +161,7 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
     # update random walk parameters
     if(ceiling(i/100) == floor(i/100) & i < n.adapt) {
       
-      h.a <- ifelse(accept.a > 30, h.a + 0.1 * h.a,
+      h.a <- ifelse(accept.a > 20, h.a + 0.1 * h.a,
                     ifelse(accept.a < 10, h.a - 0.1 * h.a, h.a))
       accept.a <- rep(0, n)
       
@@ -179,23 +177,44 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
       muhat <- rowMeans(samples$train)
       
       muhat.mat <- sapply(a, function(a.tmp, ...){
+        
         xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
         colnames(xa.tmp) <- colnames(xa.train)[-1]
         c(sampler$predict(xa.tmp))
+        
       })
-      
-      mhat <- colMeans(muhat.mat)
-      int.mat <- muhat.mat - matrix(rep(mhat, n), byrow = T, nrow = n)
-      
+
+      mhat <- apply(muhat.mat, 2, weighted.mean, w = weights)
+
       # pseudo-outcome
-      psi[j,] <- (ybar - muhat + mhat)
-      psi[j,psi[j,] < 0] <- 0
+      psi.mat[j,] <- psi <- (ybar - muhat + mhat)
       
-      out <- sapply(a.vals, loess_est, psi = psi[j,], a = a, span = 0.2, offset = offset, 
-                    family = family, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
-      
+      # integration matrix
+      int.mat <- muhat.mat - matrix(rep(mhat, n), byrow = T, nrow = n)
+
+      # select span if NULL
+      if (j == 1 & is.null(span))
+        span <- cv_span(a = a, psi = psi, folds = folds, span.seq = span.seq)
+
+      # asymptotics
+      out <- sapply(a.vals, loess_est, psi = psi, a = a, weights = weights, 
+                    span = span, se.fit = TRUE, int.mat = int.mat)
+
       est.mat[j,] <- out[1,]
       var.mat[j,] <- out[2,]
+      
+      # bootstrap
+      # boot.idx <- cbind(1:n, replicate(200, sample(x = n, size = n, replace = TRUE)))
+      # 
+      # out <- apply(boot.idx, 2, function(idx, ...) {
+      # 
+      #   sapply(a.vals, loess_est, psi = psi[idx], a = a[idx], 
+      #          weights = weights[idx], span = span, se.fit = FALSE)
+      # 
+      # })
+      # 
+      # est.mat[j,] <- out[,1]
+      # var.mat[j,] <- apply(out[,2:ncol(out)], 1, var)
       
     }
     
@@ -212,11 +231,12 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL,
   omega2 <- omega2[keep]
   
   a.mat <- a.mat[,order(shield)]
+  psi.mat <- psi.mat[,order(shield)]
   estimate <- colMeans(est.mat)
   variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
   
   rslt <- list(estimate = estimate, variance = variance, accept.a = accept.a,
-               mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, 
+               mcmc = list(a.mat = a.mat, psi.mat = psi.mat, beta = beta, alpha = alpha, 
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
   return(rslt)

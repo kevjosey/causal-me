@@ -42,7 +42,7 @@ simulate <- function(scenario, n.sim, a.vals){
   rate <- 1e-3
   
   # dr arguments
-  bw <- ifelse(n == 800, 0.125, 0.25)
+  span <- ifelse(n == 800, 0.125, 0.25)
   family <- poisson()
   
   print(scenario)
@@ -55,7 +55,7 @@ simulate <- function(scenario, n.sim, a.vals){
     # zipcode index
     s.id <- dat$s.id
     id <- dat$id
-    offset <- log(dat$offset)
+    offset <- dat$offset
     weights <- dat$weights
     
     # data
@@ -63,7 +63,7 @@ simulate <- function(scenario, n.sim, a.vals){
     x <- dat$x
     a <- dat$a
     w <- dat$w
-    s_tilde <- dat$star
+    t <- dat$star
     
     # validation subset
     s <- dat$s*rbinom(mult*n, 1, prob)
@@ -75,49 +75,51 @@ simulate <- function(scenario, n.sim, a.vals){
       y <- dat$y[(id %in% keep)]
       x <- dat$x[(id %in% keep),]
       a <- dat$a[(id %in% keep)]
-      offset <- log(dat$offset[(id %in% keep)])
+      offset <- dat$offset[(id %in% keep)]
       id <- dat$id[(id %in% keep)]
     }
     
     # exposure predictions
-    s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = "SL.glm")
+    s_hat <- pred(s = s, star = t, w = w, sl.lib = "SL.glm")
     z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
-    z_tilde <- aggregate(s_tilde, by = list(s.id), mean)[,2]
+    z_tilde <- aggregate(t, by = list(s.id), mean)[,2]
     
     # naive
     naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset, weights = weights, 
-                         family = family, a.vals = a.vals, bw = bw,
+                         family = family, a.vals = a.vals, span = span,
                          n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # real
     rc_hat <- try(erf(y = y, a = z_hat, x = x, offset = offset, weights = weights,
-                      family = family, a.vals = a.vals, bw = bw,
+                      family = family, a.vals = a.vals, span = span,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # BART Approach
-    bart_hat <- try(bart_erf(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
+    bart_hat <- try(bart_erf(s = s, star = t, y = y, offset = offset, weights = weights,
                              s.id = s.id, id = id, w = w, x = x, family = family,
-                             a.vals = a.vals, bw = bw, scale = scale, shape = shape, rate = rate,
+                             a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                              h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # Alternate Bayes
-    bayes_hat <- try(bayes_erf(s = s, star = s_tilde, y = y, offset = offset, weights = weights,
-                               s.id = s.id, id = id, w = w, x = x, family = family, df = 6,
-                               a.vals = a.vals, bw = bw, scale = scale, shape = shape, rate = rate,
+    bayes_hat <- try(bayes_erf(s = s, star = t, y = y, offset = offset, weights = weights,
+                               s.id = s.id, id = id, w = w, x = x, family = family, dr = TRUE,
+                               a.vals = a.vals, span = span, scale = scale, shape = shape, rate = rate,
                                h.a = h.a, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
                  if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(rc_hat, "try-error")) {rc_hat$estimate} else {rep(NA, length(a.vals))},
-                 if (!inherits(bart_hat, "try-error")) {bart_hat$smooth_estimate} else {rep(NA, length(a.vals))},
-                 if (!inherits(bayes_hat, "try-error")) {bayes_hat$dr_estimate} else {rep(NA, length(a.vals))})
+                 if (!inherits(bart_hat, "try-error")) {bart_hat$estimate} else {rep(NA, length(a.vals))},
+                 if (!inherits(bayes_hat, "try-error")) {bayes_hat$estimate} else {rep(NA, length(a.vals))},
+                 if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$variance_dr)} else {rep(NA, length(a.vals))}))
     
     #standard error
     se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(rc_hat, "try-error")) {sqrt(rc_hat$variance)} else {rep(NA, length(a.vals))},
-                if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$smooth_variance)} else {rep(NA, length(a.vals))},
-                if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$dr_variance)} else {rep(NA, length(a.vals))})
+                if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$variance)} else {rep(NA, length(a.vals))},
+                if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$variance)} else {rep(NA, length(a.vals))},
+                if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$estimate_dr)} else {rep(NA, length(a.vals))})
     
     return(list(est = est, se = se))
     

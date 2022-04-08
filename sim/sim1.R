@@ -51,15 +51,14 @@ simulate <- function(scenario, n.sim, a.vals){
     # zipcode index
     s.id <- dat$s.id
     id <- dat$id
-    offset <- log(dat$offset)
-    weights <- dat$weights
     
     # data
     y <- dat$y
     x <- dat$x
     a <- dat$a
     w <- dat$w
-    s_tilde <- dat$star
+    t <- dat$star
+    offset <- dat$offset
     
     # validation subset
     s <- dat$s*rbinom(mult*n, 1, prob)
@@ -71,40 +70,34 @@ simulate <- function(scenario, n.sim, a.vals){
       y <- dat$y[(id %in% keep)]
       x <- dat$x[(id %in% keep),]
       a <- dat$a[(id %in% keep)]
-      offset <- log(dat$offset[(id %in% keep)])
+      offset <- dat$offset[(id %in% keep)]
       id <- dat$id[(id %in% keep)]
     }
     
     # exposure predictions
-    s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = "SL.glm")
+    s_hat <- pred(s = s, star = t, w = w, sl.lib = "SL.glm")
     z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
-    z_tilde <- aggregate(s_tilde, by = list(s.id), mean)[,2]
+    z_tilde <- aggregate(t, by = list(s.id), mean)[,2]
     
     # real
-    rc_hat <- try(erf(y = y, a = z_hat, x = x, offset = offset,
-                      family = family, a.vals = a.vals, span = span,
-                      n.iter = n.iter, n.adapt = n.adapt, thin = thin), 
-                  silent = TRUE)
+    rc_hat <- try(erf(y = y, a = z_hat, x = x, offset = offset, a.vals = a.vals, span = span,
+                      n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # naive
-    naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset,
-                         family = family, a.vals = a.vals, span = span,
-                         n.iter = n.iter, n.adapt = n.adapt, thin = thin), 
-                     silent = TRUE)
+    naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset, a.vals = a.vals, span = span,
+                         n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # BART Approach
-    bart_hat <- try(bart_erf(s = s, t = s_tilde, y = y, s.id = s.id, id = id, w = w, x = x, 
-                             offset = offset, family = family, a.vals = a.vals, 
-                             scale = scale, shape = shape, rate = rate, span = span,
-                             n.iter = n.iter, n.adapt = n.adapt, thin = thin), 
-                    silent = TRUE)
+    bart_hat <- try(bart_erf(s = s, t = t, y = y, s.id = s.id, id = id, w = w, x = x, 
+                             offset = offset, a.vals = a.vals, span = span,
+                             scale = scale, shape = shape, rate = rate, 
+                             n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # Bayes DR Approach
-    bayes_hat <- try(bayes_erf(s = s, t = s_tilde, y = y, s.id = s.id, id = id, w = w, x = x, 
-                               offset = offset, family = family, df = 5, a.vals = a.vals, 
-                               scale = scale, shape = shape, rate = rate, span = span,
-                               n.iter = n.iter, n.adapt = n.adapt, thin = thin), 
-                     silent = TRUE)
+    bayes_hat <- try(bayes_erf(s = s, t = t, y = y, s.id = s.id, id = id, w = w, x = x, 
+                               offset = offset, a.vals = a.vals, span = span,
+                               scale = scale, shape = shape, rate = rate, 
+                               n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
@@ -168,7 +161,7 @@ sig_agg <- c(0, 1, sqrt(2))
 sig_pred <- c(1, sqrt(2))
 gps_scen <- "a"
 out_scen <- "a"
-pred_scen <- c("a", "b")
+pred_scen <- "a"
 
 scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred,
                         gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, 

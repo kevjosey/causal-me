@@ -32,13 +32,13 @@ n <- 400
 prob <- 0.1
 
 # model arguments
-a.vals <- seq(6, 14, by = 0.08)
-family <- quasipoisson()
+a.vals <- seq(6, 14, by = 0.04)
 
 # mcmc arguments
 n.iter <- 2000
 n.adapt <- 2000
 thin <- 20
+span <- 0.125
 df <- 10
 scale <- 1e6
 shape <- 1e-3
@@ -46,7 +46,7 @@ rate <- 1e-3
 
 start <- Sys.time()
 
-out <- mclapply(1:n.sim, function(i, ...){
+out <- mclapply(1:n.sim, function(i, ...) {
   
   dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
                   pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
@@ -54,14 +54,14 @@ out <- mclapply(1:n.sim, function(i, ...){
   # zipcode index
   s.id <- dat$s.id
   id <- dat$id
-  offset <- log(dat$offset)
+  offset <- dat$offset
 
   # data
   y <- dat$y
   x <- dat$x
   a <- dat$a
   w <- dat$w
-  s_tilde <- dat$star
+  t <- dat$star
   
   # validation subset
   s <- dat$s*rbinom(mult*n, 1, prob)
@@ -73,35 +73,33 @@ out <- mclapply(1:n.sim, function(i, ...){
     y <- dat$y[(id %in% keep)]
     x <- dat$x[(id %in% keep),]
     a <- dat$a[(id %in% keep)]
-    offset <- log(dat$offset[(id %in% keep)])
+    offset <- dat$offset[(id %in% keep)]
     id <- dat$id[(id %in% keep)]
   }
   
   # exposure predictions
-  s_hat <- pred(s = s, star = s_tilde, w = w, sl.lib = "SL.glm")
+  s_hat <- pred(s = s, star = t, w = w, sl.lib = "SL.glm")
   z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
-  z_tilde <- aggregate(s_tilde, by = list(s.id), mean)[,2]
+  z_tilde <- aggregate(t, by = list(s.id), mean)[,2]
   
   # real
-  rc_hat <- try(erf(y = y, a = z_hat, x = x, offset = offset,
-                    family = family, a.vals = a.vals, df = df,
+  rc_hat <- try(erf(y = y, a = z_hat, x = x, offset = offset, a.vals = a.vals, span = span,
                     n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # naive
-  naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset,
-                       family = family, a.vals = a.vals, df = df,
+  naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset, a.vals = a.vals, span = span,
                        n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # BART Approach
-  bart_hat <- try(bart_erf(s = s, t = s_tilde, y = y, s.id = s.id, id = id, w = w, x = x, 
-                           offset = offset, family = family, a.vals = a.vals,
-                           scale = scale, shape = shape, rate = rate, df = df,
+  bart_hat <- try(bart_erf(s = s, t = t, y = y, s.id = s.id, id = id, w = w, x = x, 
+                           offset = offset, a.vals = a.vals, span = span,
+                           scale = scale, shape = shape, rate = rate, 
                            n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
   # Bayes DR Approach
-  bayes_hat <- try(bayes_erf(s = s, t = s_tilde, y = y, s.id = s.id, id = id, w = w, x = x, 
-                             offset = offset, family = family, a.vals = a.vals, 
-                             scale = scale, shape = shape, rate = rate, df = df,
+  bayes_hat <- try(bayes_erf(s = s, t = t, y = y, s.id = s.id, id = id, w = w, x = x, 
+                             offset = offset, a.vals = a.vals, span = span,
+                             scale = scale, shape = shape, rate = rate, 
                              n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # estimates
@@ -152,10 +150,11 @@ rownames(out_cp) <- c("NAIVE","RC","BART","GLM")
 
 plot(a.vals, out_est[1,], type = "l", col = hue_pal()(5)[1], lwd = 2,
      main = "Exposure = b, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
-     ylim = c(0,0.1))
+     ylim = c(0,0.2))
 lines(a.vals, out_est[2,], type = "l", col = hue_pal()(5)[2], lwd = 2, lty = 1)
 lines(a.vals, out_est[3,], type = "l", col = hue_pal()(5)[3], lwd = 2, lty = 1)
 lines(a.vals, out_est[4,], type = "l", col = hue_pal()(5)[4], lwd = 2, lty = 1)
 lines(a.vals, out_est[5,], type = "l", col = hue_pal()(5)[5], lwd = 2, lty = 1)
-legend(6, 0.1, legend=c("True ERF","NAIVE","RC","BART","GLM"),
+legend(6, 0.2, legend=c("True ERF","NAIVE","RC","BART","GLM"),
        col=hue_pal()(5),lty = c(1,1,1,1,1), lwd=2, cex=0.8)
+
