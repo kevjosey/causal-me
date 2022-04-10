@@ -32,14 +32,13 @@ n <- 400
 prob <- 0.1
 
 # model arguments
-a.vals <- seq(6, 14, by = 0.04)
+a.vals <- seq(6, 14, by = 0.08)
 
 # mcmc arguments
 n.iter <- 2000
 n.adapt <- 2000
 thin <- 20
-span <- 0.125
-df <- 10
+bw <- 0.2
 scale <- 1e6
 shape <- 1e-3
 rate <- 1e-3
@@ -61,7 +60,7 @@ out <- mclapply(1:n.sim, function(i, ...) {
   x <- dat$x
   a <- dat$a
   w <- dat$w
-  t <- dat$star
+  s.tilde <- dat$s.tilde
   
   # validation subset
   s <- dat$s*rbinom(mult*n, 1, prob)
@@ -78,27 +77,27 @@ out <- mclapply(1:n.sim, function(i, ...) {
   }
   
   # exposure predictions
-  s_hat <- pred(s = s, star = t, w = w, sl.lib = "SL.glm")
-  z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
-  z_tilde <- aggregate(t, by = list(s.id), mean)[,2]
+  s.hat <- pred(s = s, s.tilde = s.tilde, w = w, sl.lib = "SL.glm")
+  z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
+  z.tilde <- aggregate(s.tilde, by = list(s.id), mean)[,2]
   
   # real
-  rc_hat <- try(erf(y = y, a = z_hat, x = x, offset = offset, a.vals = a.vals, span = span,
+  rc_hat <- try(erf(y = y, a = z.hat, x = x, offset = offset, a.vals = a.vals, bw = bw,
                     n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # naive
-  naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset, a.vals = a.vals, span = span,
+  naive_hat <- try(erf(y = y, a = z.tilde, x = x, offset = offset, a.vals = a.vals, bw = bw,
                        n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # BART Approach
-  bart_hat <- try(bart_erf(s = s, t = t, y = y, s.id = s.id, id = id, w = w, x = x, 
-                           offset = offset, a.vals = a.vals, span = span,
+  bart_hat <- try(bart_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id, 
+                           w = w, x = x, offset = offset, a.vals = a.vals, bw = bw,
                            scale = scale, shape = shape, rate = rate, 
                            n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
-    
+  
   # Bayes DR Approach
-  bayes_hat <- try(bayes_erf(s = s, t = t, y = y, s.id = s.id, id = id, w = w, x = x, 
-                             offset = offset, a.vals = a.vals, span = span,
+  bayes_hat <- try(bayes_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id,
+                             w = w, x = x, offset = offset, a.vals = a.vals, bw = bw,
                              scale = scale, shape = shape, rate = rate, 
                              n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
@@ -150,11 +149,11 @@ rownames(out_cp) <- c("NAIVE","RC","BART","GLM")
 
 plot(a.vals, out_est[1,], type = "l", col = hue_pal()(5)[1], lwd = 2,
      main = "Exposure = b, Outcome = a", xlab = "Exposure", ylab = "Rate of Event", 
-     ylim = c(0,0.2))
+     ylim = c(0,0.15))
 lines(a.vals, out_est[2,], type = "l", col = hue_pal()(5)[2], lwd = 2, lty = 1)
 lines(a.vals, out_est[3,], type = "l", col = hue_pal()(5)[3], lwd = 2, lty = 1)
 lines(a.vals, out_est[4,], type = "l", col = hue_pal()(5)[4], lwd = 2, lty = 1)
 lines(a.vals, out_est[5,], type = "l", col = hue_pal()(5)[5], lwd = 2, lty = 1)
-legend(6, 0.2, legend=c("True ERF","NAIVE","RC","BART","GLM"),
+legend(6, 0.15, legend=c("True ERF","NAIVE","RC","BART","GLM"),
        col=hue_pal()(5),lty = c(1,1,1,1,1), lwd=2, cex=0.8)
 

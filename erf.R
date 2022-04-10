@@ -2,7 +2,7 @@
 erf <- function(a, y, x, offset = NULL,
                 a.vals = seq(min(a), max(a), length.out = 100),
                 n.iter = 10000, n.adapt = 1000, thin = 10,
-                span = NULL, span.seq = seq(0.1, 2, by = 0.1), folds = 5) {	
+                bw = NULL, bw.seq = seq(0.1, 2, by = 0.1), folds = 5) {	
   
   if(is.null(offset))
     offset <- rep(0, times = length(y))
@@ -14,16 +14,18 @@ erf <- function(a, y, x, offset = NULL,
   wrap <- bart_est(y = ybar, a = a, x = x, a.vals = a.vals, weights = weights,
                    n.iter = n.iter, n.adapt = n.adapt, thin = thin)
   
+  # wrap <- glm_est(y = ybar, a = a, x = x, a.vals = a.vals, weights = weights)
+  
   psi <- wrap$psi
   int.mat <- wrap$int.mat
   
-  # select span if null
-  if (is.null(span))
-    span <- cv_span(a = a, psi = psi, folds = folds, span.seq = span.seq)
+  # select bw if null
+  if (is.null(bw))
+    bw <- cv_bw(a = a, psi = psi, folds = folds, bw.seq = bw.seq)
 
   # asymptotics
-  out <- sapply(a.vals, loess_est, psi = psi, a = a, weights = weights,
-                span = span, se.fit = TRUE, int.mat = int.mat)
+  out <- sapply(a.vals, kern_est, psi = psi, a = a, weights = weights,
+                bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
   
   estimate <- out[1,]
   variance <- out[2,]
@@ -33,8 +35,8 @@ erf <- function(a, y, x, offset = NULL,
   # 
   # out <- apply(boot.idx, 2, function(idx, ...) {
   #   
-  #   sapply(a.vals, loess_est, psi = psi[idx], a = a[idx], 
-  #          weights = weights[idx], span = span, se.fit = FALSE)
+  #   sapply(a.vals, kern_est, psi = psi[idx], a = a[idx], 
+  #          weights = weights[idx], bw = bw, se.fit = FALSE)
   #   
   # })
   # 
@@ -53,7 +55,7 @@ bart_est <- function(a, y, x, a.vals, weights = NULL,
                      n.iter = 1000, n.adapt = 1000, thin = 10) {
   
   if (is.null(weights))
-    weights <- rep(0, nrow(x))
+    weights <- rep(1, nrow(x))
   
   # set up evaluation points & matrices for predictions
   n <- nrow(x)
@@ -66,7 +68,7 @@ bart_est <- function(a, y, x, a.vals, weights = NULL,
                         ndpost = n.iter, nskip = n.adapt, keepevery = thin, verbose = FALSE)
   muhat <- mumod$yhat.train.mean
   
-  muhat.mat <- sapply(a, function(a.tmp, ...) {
+  muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
     
     xa.tmp <- data.frame(x = x, a = a.tmp)
     colnames(xa.tmp) <- colnames(xa)
@@ -74,13 +76,61 @@ bart_est <- function(a, y, x, a.vals, weights = NULL,
     
   })
   
-  mhat <- apply(muhat.mat, 2, weighted.mean, w = weights)
+  mhat.vals <- apply(muhat.mat, 2, weighted.mean, w = weights)
+  mhat <- predict(smooth.spline(x = a.vals, y = mhat.vals), x = a)$y
+  mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
   
   # pseudo outcome
   psi <- c(y - muhat + mhat)
   
   # integration matrix
-  int.mat <- muhat.mat - matrix(rep(mhat, n), byrow = T, nrow = n)
+  a.std <- (c(a, a.vals) - mean(a))/sd(a)
+  dens <- density(a.std[1:n])
+  phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
+  phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)  
+  int.mat <- (muhat.mat - mhat.mat)*phat.mat
+  
+  out <- list(psi = psi, int.mat = int.mat)
+  
+  return(out)
+  
+}
+
+# estimate glm outcome model
+glm_est <- function(a, y, x, a.vals, weights = NULL, ...) {
+  
+  if (is.null(weights))
+    weights <- rep(1, nrow(x))
+  
+  # set up evaluation points & matrices for predictions
+  n <- nrow(x)
+  x <- data.frame(x)
+  xa <- cbind(as.matrix(x), a - 10, cos(pi*(a - 6)/4), (a - 10)*x[,1])
+  
+  # outcome model
+  mumod <- glm(y ~ xa, weights = weights, family = quasipoisson())
+  muhat <- mumod$fitted.values
+  
+  muhat.mat <- sapply(a.vals, function(a.tmp, ...) {
+    
+    xa.tmp <- cbind(1, as.matrix(x), a.tmp - 10, cos(pi*(a.tmp - 6)/4), (a.tmp - 10)*x[,1])
+    return(c(exp(xa.tmp %*% mumod$coefficients)))
+    
+  })
+  
+  mhat.vals <- apply(muhat.mat, 2, weighted.mean, w = weights)
+  mhat <- predict(smooth.spline(x = a.vals, y = mhat.vals), x = a)$y
+  mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
+  
+  # pseudo outcome
+  psi <- c(y - muhat + mhat)
+  
+  # integration matrix
+  a.std <- (c(a, a.vals) - mean(a))/sd(a)
+  dens <- density(a.std[1:n])
+  phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
+  phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)  
+  int.mat <- (muhat.mat - mhat.mat)*phat.mat
   
   out <- list(psi = psi, int.mat = int.mat)
   
@@ -89,24 +139,14 @@ bart_est <- function(a, y, x, a.vals, weights = NULL,
 }
 
 # LOESS function
-loess_est <- function(a.new, a, psi, span, weights = NULL, se.fit = FALSE, int.mat = NULL) {
+kern_est <- function(a.new, a, psi, bw, weights = NULL, se.fit = FALSE, int.mat = NULL, a.vals = NULL) {
   
   if(is.null(weights))
     weights <- rep(1, times = length(a))
   
-  # standardize
-  a.std <- a - a.new
-  k <- floor(min(span, 1)*length(a))
-  idx <- order(abs(a.std))[1:k]
-  
-  # subset
-  a.std <- a.std[idx]
-  psi <- psi[idx]
-  weights <- weights[idx]
-  
-  # construct kernel
-  max.a.std <- max(abs(a.std))
-  k.std <- c((1 - abs(a.std/max.a.std)^3)^3)
+  ## Gaussian Kernel
+  a.std <- (a - a.new) / bw
+  k.std <- dnorm(a.std) / bw
   g.std <- cbind(1, a.std)
   
   b <- lm(psi ~ -1 + g.std, weights = k.std*weights)$coefficients
@@ -116,8 +156,16 @@ loess_est <- function(a.new, a, psi, span, weights = NULL, se.fit = FALSE, int.m
     
     eta <- c(g.std %*% b)
     
-    int1 <- colMeans(k.std * t(int.mat[idx,idx]))
-    int2 <- colMeans(a.std * k.std * t(int.mat[idx,idx]))
+    kern.mat <- matrix(rep(dnorm((a.vals - a.new) / bw) / bw, n), byrow = T, nrow = n)
+    g.vals <- matrix(rep(c(a.vals - a.new) / bw, n), byrow = T, nrow = n)
+    
+    intfn1.mat <- kern.mat * int.mat
+    intfn2.mat <- g.vals * kern.mat * int.mat
+    
+    int1 <- rowSums(matrix(rep((a.vals[-1] - a.vals[-length(a.vals)]), n), byrow = T, nrow = n)*
+                    (intfn1.mat[,-1] + intfn1.mat[,-length(a.vals)])/2)
+    int2 <- rowSums(matrix(rep((a.vals[-1] - a.vals[-length(a.vals)]), n), byrow = T, nrow = n)*
+                    (intfn2.mat[,-1] + intfn2.mat[,-length(a.vals)])/2)
     
     U <- solve(t(g.std) %*% diag(weights*k.std) %*% g.std) 
     V <- cbind(weights * (k.std * (psi - eta) + int1),
@@ -131,8 +179,8 @@ loess_est <- function(a.new, a, psi, span, weights = NULL, se.fit = FALSE, int.m
   
 }
 
-# k-fold cross validation to select span
-cv_span <- function(a, psi, weights = NULL, folds = 5, span.seq = seq(0.05, 1, by = 0.05)) {
+# k-fold cross validation to select bw
+cv_bw <- function(a, psi, weights = NULL, folds = 5, bw.seq = seq(0.05, 1, by = 0.05)) {
   
   if(is.null(weights))
     weights <- rep(1, times = length(a))
@@ -143,14 +191,14 @@ cv_span <- function(a, psi, weights = NULL, folds = 5, span.seq = seq(0.05, 1, b
   a.sub <- a[idx]
   psi.sub <- psi[idx]
   
-  cv.mat <- sapply(span.seq, function(h, ...) {
+  cv.mat <- sapply(bw.seq, function(h, ...) {
     
     cv.vec <- rep(NA, folds)
     
     for(k in 1:folds) {
       
-      preds <- sapply(a.sub[fdx == k], loess_est, psi = psi.sub[fdx != k], a = a.sub[fdx != k], 
-                      weights = weights[fdx != k], span = h, se.fit = FALSE)
+      preds <- sapply(a.sub[fdx == k], kern_est, psi = psi.sub[fdx != k], a = a.sub[fdx != k], 
+                      weights = weights[fdx != k], bw = h, se.fit = FALSE)
       cv.vec[k] <- mean((psi.sub[fdx == k] - preds)^2, na.rm = TRUE)
       
     }
@@ -160,9 +208,9 @@ cv_span <- function(a, psi, weights = NULL, folds = 5, span.seq = seq(0.05, 1, b
   })
   
   cv.err <- colMeans(cv.mat)
-  span <- span.seq[which.min(cv.err)]
+  bw <- bw.seq[which.min(cv.err)]
   
-  return(span)
+  return(bw)
   
 }
 

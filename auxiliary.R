@@ -1,19 +1,19 @@
 
 # regression calibration function
-pred <- function(s, star, w, sl.lib = c("SL.mean", "SL.glm", "SL.glmnet", "SL.earth", "SL.ranger")){
+pred <- function(s, s.tilde, w, sl.lib = c("SL.mean", "SL.glm", "SL.glmnet", "SL.earth", "SL.ranger")){
   
   # set up evaluation points & matrices for predictions
-  ws <- data.frame(w, star)
-  ws.tmp <- data.frame(ws[!is.na(s),])
-  s.tmp <- s[!is.na(s)]
-  colnames(ws.tmp) <- colnames(ws) <- c(colnames(w), "expos")
+  ws <- data.frame(w, s.tilde)
+  ws.obs <- data.frame(ws[!is.na(s),])
+  s.obs <- s[!is.na(s)]
+  colnames(ws.obs) <- colnames(ws) <- c(colnames(w), "expos")
   
   # estimate nuisance outcome model with SuperLearner
-  mumod <- SuperLearner(Y = s.tmp, X = ws.tmp, SL.library = sl.lib)
-  stilde <- c(predict(mumod, newdata = ws)$pred)
-  stilde[!is.na(s)] <- s[!is.na(s)]
+  mumod <- SuperLearner(Y = s.obs, X = ws.obs, SL.library = sl.lib)
+  s.hat<- c(predict(mumod, newdata = ws)$pred)
+  s.hat[!is.na(s)] <- s[!is.na(s)]
   
-  return(stilde)
+  return(s.hat)
   
 }
 

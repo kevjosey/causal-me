@@ -12,7 +12,7 @@
 ## Output
 
 # s = true grid exposure
-# star = error prone exposure
+# s.tilde = error prone exposure
 # a = true cluster exposure
 # y = cluster outcomes
 # id = cluster assignment for y
@@ -75,9 +75,9 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   s <- rnorm(mult*n, a_s, sig_agg)
   
   if (pred_scen == "b"){
-    star <- rnorm(mult*n, s - 1 + 0.5*w1 + 0.5*w2, sig_pred)
+    s.tilde <- rnorm(mult*n, s - 1 + 0.5*w1 + 0.5*w2, sig_pred)
   } else {
-    star <- rnorm(mult*n, s, sig_pred)
+    s.tilde <- rnorm(mult*n, s, sig_pred)
   }
   
   if (out_scen == "b") {
@@ -91,7 +91,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   y <- rpois(n, exp(mu_out + offset))
   
   # create simulation dataset
-  sim <- list(a = a, s = s, star = star, y = y, x = x, w = w, 
+  sim <- list(a = a, s = s, s.tilde = s.tilde, y = y, x = x, w = w, 
               id = id, s.id = s.id, offset = offset)
   return(sim)
   

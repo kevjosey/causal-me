@@ -1,22 +1,22 @@
-### Test DR estimator
+### Simulation 1: Measurement Error
 
 rm(list = ls())
-
-## Preliminaries
-library(mvtnorm)
-library(SuperLearner)
 library(parallel)
-library(abind)
-library(dbarts)
 
-# Code for generating and fitting data
-source("~/Github/causal-me/sim/gen-data.R")
-source("~/Github/causal-me/erf.R")
-source("~/Github/causal-me/bart-erf.R")
-source("~/Github/causal-me/bayes-erf.R")
-source("~/Github/causal-me/auxiliary.R")
-
-simulate <- function(scenario, n.sim, a.vals){
+simulate1 <- function(scenario, n.sim, a.vals){
+  
+  ## Preliminaries
+  library(mvtnorm)
+  library(abind)
+  library(SuperLearner)
+  library(dbarts)
+  
+  # Code for generating and fitting data
+  source("~/Github/causal-me/sim/gen-data.R")
+  source("~/Github/causal-me/erf.R")
+  source("~/Github/causal-me/bart-erf.R")
+  source("~/Github/causal-me/bayes-erf.R")
+  source("~/Github/causal-me/auxiliary.R")
   
   # simulation arguments
   sig_gps <- 2
@@ -38,12 +38,12 @@ simulate <- function(scenario, n.sim, a.vals){
   scale <- 1e6
   shape <- 1e-3
   rate <- 1e-3
-  span <- ifelse(n == 800, 0.125, 0.25)
+  bw <- ifelse(n == 800, 0.2, 0.4)
   family <- poisson()
   
   print(scenario)
   
-  out <- mclapply(1:n.sim, function(i,...){
+  out <- lapply(1:n.sim, function(i,...){
     
     dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
                     pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
@@ -57,7 +57,7 @@ simulate <- function(scenario, n.sim, a.vals){
     x <- dat$x
     a <- dat$a
     w <- dat$w
-    t <- dat$star
+    s.tilde <- dat$s.tilde
     offset <- dat$offset
     
     # validation subset
@@ -75,27 +75,27 @@ simulate <- function(scenario, n.sim, a.vals){
     }
     
     # exposure predictions
-    s_hat <- pred(s = s, star = t, w = w, sl.lib = "SL.glm")
-    z_hat <- aggregate(s_hat, by = list(s.id), mean)[,2]
-    z_tilde <- aggregate(t, by = list(s.id), mean)[,2]
+    s.hat <- pred(s = s, s.tilde = s.tilde, w = w, sl.lib = "SL.glm")
+    z.hat <- aggregate(s.hat, by = list(s.id), mean)[,2]
+    z.tilde <- aggregate(s.tilde, by = list(s.id), mean)[,2]
     
     # real
-    rc_hat <- try(erf(y = y, a = z_hat, x = x, offset = offset, a.vals = a.vals, span = span,
+    rc_hat <- try(erf(y = y, a = z.hat, x = x, offset = offset, a.vals = a.vals, bw = bw,
                       n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # naive
-    naive_hat <- try(erf(y = y, a = z_tilde, x = x, offset = offset, a.vals = a.vals, span = span,
+    naive_hat <- try(erf(y = y, a = z.tilde, x = x, offset = offset, a.vals = a.vals, bw = bw,
                          n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # BART Approach
-    bart_hat <- try(bart_erf(s = s, t = t, y = y, s.id = s.id, id = id, w = w, x = x, 
-                             offset = offset, a.vals = a.vals, span = span,
+    bart_hat <- try(bart_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id, 
+                             w = w, x = x, offset = offset, a.vals = a.vals, bw = bw,
                              scale = scale, shape = shape, rate = rate, 
                              n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # Bayes DR Approach
-    bayes_hat <- try(bayes_erf(s = s, t = t, y = y, s.id = s.id, id = id, w = w, x = x, 
-                               offset = offset, a.vals = a.vals, span = span,
+    bayes_hat <- try(bayes_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id,
+                               w = w, x = x, offset = offset, a.vals = a.vals, bw = bw,
                                scale = scale, shape = shape, rate = rate, 
                                n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
@@ -103,22 +103,22 @@ simulate <- function(scenario, n.sim, a.vals){
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
                  if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(rc_hat, "try-error")) {rc_hat$estimate} else {rep(NA, length(a.vals))},
-                 if (!inherits(bart_hat, "try-error")) {bayes_hat$estimate} else {rep(NA, length(a.vals))},
-                 if (!inherits(bayes_hat, "try-error")) {bart_hat$estimate} else {rep(NA, length(a.vals))})
+                 if (!inherits(bart_hat, "try-error")) {bart_hat$estimate} else {rep(NA, length(a.vals))},
+                 if (!inherits(bayes_hat, "try-error")) {bayes_hat$estimate} else {rep(NA, length(a.vals))})
     
     #standard error
     se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(rc_hat, "try-error")) {sqrt(rc_hat$variance)} else {rep(NA, length(a.vals))},
-                if (!inherits(bart_hat, "try-error")) {sqrt(bayes_hat$variance)} else {rep(NA, length(a.vals))},
-                if (!inherits(bayes_hat, "try-error")) {sqrt(bart_hat$variance)} else {rep(NA, length(a.vals))})
+                if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$variance)} else {rep(NA, length(a.vals))},
+                if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$variance)} else {rep(NA, length(a.vals))})
     
     return(list(est = est, se = se))
     
-  }, mc.cores = 30, mc.preschedule = TRUE)
+  })
   
   est <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$est} else {matrix(NA, ncol = length(a.vals), nrow = 5)}), along = 3)
   se <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$se} else {matrix(NA, ncol = length(a.vals), nrow = 4)}), along = 3)
-  mu.mat <- matrix(rep(rowMeans(est[1,,]), n.sim), nrow = length(a.vals), ncol = n.sim)
+  mu.mat <- matrix(rep(rowMeans(est[1,,], na.rm = TRUE), n.sim), nrow = length(a.vals), ncol = n.sim)
   
   # coverage probability
   cp <- list(as.matrix((est[2,,] - 1.96*se[1,,]) < mu.mat & (est[2,,] + 1.96*se[1,,]) > mu.mat),
@@ -126,19 +126,19 @@ simulate <- function(scenario, n.sim, a.vals){
              as.matrix((est[4,,] - 1.96*se[3,,]) < mu.mat & (est[4,,] + 1.96*se[3,,]) > mu.mat),
              as.matrix((est[5,,] - 1.96*se[4,,]) < mu.mat & (est[5,,] + 1.96*se[4,,]) > mu.mat))
   
-  out_est <- t(apply(est, 1, rowMeans, na.rm = T))
+  out_est <- t(apply(est, 1, rowMeans, na.rm = TRUE))
   colnames(out_est) <- a.vals
   rownames(out_est) <- c("ERF","NAIVE","RC","BART","GLM")
   
-  out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - mu.mat), na.rm = T)))
+  out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - mu.mat), na.rm = TRUE)))
   colnames(out_bias) <- a.vals
   rownames(out_bias) <- c("NAIVE","RC","BART","GLM")
   
-  out_mse <- t(apply(est[2:5,,], 1, function(x) rowMeans((x - mu.mat)^2, na.rm = T)))
+  out_mse <- t(apply(est[2:5,,], 1, function(x) rowMeans((x - mu.mat)^2, na.rm = TRUE)))
   colnames(out_mse) <- a.vals
   rownames(out_mse) <- c("NAIVE","RC","BART","GLM")
   
-  out_cp <- do.call(rbind, lapply(cp, rowMeans, na.rm = T))
+  out_cp <- do.call(rbind, lapply(cp, rowMeans, na.rm = TRUE))
   colnames(out_cp) <- a.vals
   rownames(out_cp) <- c("NAIVE","RC","BART","GLM")
   
@@ -148,11 +148,15 @@ simulate <- function(scenario, n.sim, a.vals){
   
 }
 
+## Preliminaries
+
+library(parallel)
+
 # for replication
 set.seed(42)
 
 # simulation scenarios
-a.vals <- seq(6, 14, by = 0.04)
+a.vals <- seq(6, 14, by = 0.08)
 n.sim <- 500
 
 n <- c(400, 800)
@@ -167,4 +171,4 @@ scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pr
                         gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, 
                         stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
-est <- lapply(scenarios, simulate, n.sim = n.sim, a.vals = a.vals)
+est <- mclapply(scenarios, simulate1, n.sim = n.sim, a.vals = a.vals, mc.cores = 24, mc.preschedule = TRUE)

@@ -1,9 +1,9 @@
 
-bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, offset = NULL,
+bart_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
                      a.vals = seq(min(s), max(s), length.out = 100),
                      n.iter = 10000, n.adapt = 1000, thin = 10, 
                      shape = 1e-3, rate = 1e-3, scale = 1e6,
-                     span = NULL, span.seq = seq(0.1, 2, by = 0.1), folds = 5,
+                     bw = NULL, bw.seq = seq(0.1, 2, by = 0.1), folds = 5,
                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
                                              n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
@@ -26,7 +26,7 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, offset = NULL,
   weights <- exp(offset)
   
   s <- s[s.id %in% id]
-  t <- as.matrix(t)[s.id %in% id]
+  s.tilde <- s.tilde[s.id %in% id]
   w <- w[s.id %in% id,]
   s.id <- s.id[s.id %in% id]
   
@@ -49,24 +49,24 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, offset = NULL,
   weights <- weights[shield]
   
   if (is.null(w)) {
-    ws <- cbind(rep(1, length(s.id)), t = t)
+    ws <- cbind(rep(1, length(s.id)), s.tilde = s.tilde)
   } else {
-    ws <- cbind(model.matrix(~ ., data.frame(w)), t = t)
+    ws <- cbind(model.matrix(~ ., data.frame(w)), s.tilde = s.tilde)
   }
   
   sword <- order(s.id)
   stab <- table(s.id)
   s <- s[sword]
-  t <- t[sword]
+  s.tilde <- s.tilde[sword]
   ws <- ws[sword,]
   s.id <- s.id[sword]
   
   # when s is observed
-  ws.tmp <- ws[!is.na(s),]
-  s.tmp <- s[!is.na(s)]
+  ws.obs <- ws[!is.na(s),]
+  s.obs <- s[!is.na(s)]
   
   # initialize exposures
-  s.hat <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
+  s.hat <- predict(lm(s.obs ~ 0 + ., data = data.frame(ws.obs)), newdata = data.frame(ws))
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
   h.a <- rep(0.5*sd(a), n)
@@ -84,7 +84,7 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, offset = NULL,
   omega2 <- rep(NA, n.adapt + n.iter)
   
   fit.a <- lm(a ~ 0 + x)
-  fit.s <- lm(s.tmp ~ 0 + ws.tmp)
+  fit.s <- lm(s.obs ~ 0 + ws.obs)
   
   beta[1,] <- coef(fit.a)
   alpha[1,] <- coef(fit.s)
@@ -142,17 +142,17 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, offset = NULL,
     a.s <- rep(a, stab)
     
     # sample pred parameters
-    alpha_var <- solve(t(ws.tmp) %*% ws.tmp + diag(tau2[i - 1]/scale, q, q))
-    alpha[i,] <- rmvnorm(1, alpha_var %*% c(t(ws.tmp) %*% s.tmp), tau2[i - 1]*alpha_var)
+    alpha.var <- solve(t(ws.obs) %*% ws.obs + diag(tau2[i - 1]/scale, q, q))
+    alpha[i,] <- rmvnorm(1, alpha.var %*% c(t(ws.obs) %*% s.obs), tau2[i - 1]*alpha.var)
     tau2[i] <- 1/rgamma(1, shape = shape + l/2, rate = rate +
-                          sum(c(s.tmp - c(ws.tmp %*% alpha[i,]))^2)/2)
+                          sum(c(s.obs - c(ws.obs %*% alpha[i,]))^2)/2)
     
     # sample agg parameters
     omega2[i] <- 1/rgamma(1, shape = shape + m/2, rate = rate + sum((s.hat - a.s)^2)/2)
     
     # sample gps parameters
-    beta_var <- solve(t(x) %*% x + diag(sigma2[i - 1]/scale, p, p))
-    beta[i,] <- rmvnorm(1, beta_var %*% c(t(x) %*% a), sigma2[i - 1]*beta_var)
+    beta.var <- solve(t(x) %*% x + diag(sigma2[i - 1]/scale, p, p))
+    beta[i,] <- rmvnorm(1, beta.var %*% c(t(x) %*% a), sigma2[i - 1]*beta.var)
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - c(x %*% beta[i,]))^2)/2)
     
     # sample outcome tree
@@ -176,7 +176,7 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, offset = NULL,
       # outcome model
       muhat <- rowMeans(samples$train)
       
-      muhat.mat <- sapply(a, function(a.tmp, ...){
+      muhat.mat <- sapply(a.vals, function(a.tmp, ...){
         
         xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
         colnames(xa.tmp) <- colnames(xa.train)[-1]
@@ -184,21 +184,27 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, offset = NULL,
         
       })
 
-      mhat <- apply(muhat.mat, 2, weighted.mean, w = weights)
-
-      # pseudo-outcome
-      psi.mat[j,] <- psi <- (ybar - muhat + mhat)
+      mhat.vals <- apply(muhat.mat, 2, weighted.mean, w = weights)
+      mhat <- predict(smooth.spline(x = a.vals, y = mhat.vals), x = a)$y
+      mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
+      
+      # pseudo outcome
+      psi.mat[j,] <- psi <- c(ybar - muhat + mhat)
       
       # integration matrix
-      int.mat <- muhat.mat - matrix(rep(mhat, n), byrow = T, nrow = n)
+      a.std <- (c(a, a.vals) - mean(a))/sd(a)
+      dens <- density(a.std[1:n])
+      phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
+      phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)  
+      int.mat <- (muhat.mat - mhat.mat)*phat.mat
 
-      # select span if NULL
-      if (j == 1 & is.null(span))
-        span <- cv_span(a = a, psi = psi, folds = folds, span.seq = span.seq)
+      # select bw if NULL
+      if (j == 1 & is.null(bw))
+        bw <- cv_bw(a = a, psi = psi, folds = folds, bw.seq = bw.seq)
 
       # asymptotics
-      out <- sapply(a.vals, loess_est, psi = psi, a = a, weights = weights, 
-                    span = span, se.fit = TRUE, int.mat = int.mat)
+      out <- sapply(a.vals, kern_est, psi = psi, a = a, weights = weights, 
+                    bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
 
       est.mat[j,] <- out[1,]
       var.mat[j,] <- out[2,]
@@ -208,8 +214,8 @@ bart_erf <- function(s, t, y, s.id, id, w = NULL, x = NULL, offset = NULL,
       # 
       # out <- apply(boot.idx, 2, function(idx, ...) {
       # 
-      #   sapply(a.vals, loess_est, psi = psi[idx], a = a[idx], 
-      #          weights = weights[idx], span = span, se.fit = FALSE)
+      #   sapply(a.vals, kern_est, psi = psi[idx], a = a[idx], 
+      #          weights = weights[idx], bw = bw, se.fit = FALSE)
       # 
       # })
       # 

@@ -71,7 +71,7 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
   s.hat <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
-  h.a <- 0.5*sd(a)
+  h.a <- rep(0.5*sd(a), n)
   accept.a <- rep(0, n)
   
   # data dimensions
@@ -125,7 +125,7 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
   samples <- sampler$run()
   
   # ERC stuff
-  a.mat <- psi <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
+  a.mat <- psi.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
   mhat.out <- est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
   # gibbs sampler for predictors
@@ -182,7 +182,7 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
     sigma2[i] <- 1/rgamma(1, shape = shape + n/2, rate = rate + sum(c(a - phi - c(x %*% beta[i,]))^2)/2)
     
     # sample phi
-    off.phi <- (ybar - as.numeric(x %*% beta[i,])) / sigma2[i]    
+    off.phi <- (a - as.numeric(x %*% beta[i,])) / sigma2[i]    
     phi <- CARBayes:::gaussiancarupdate(Wtriplet = V3, Wbegfin = V.idx, 
                                         Wtripletsum = V3.sum, nsites = n,
                                         phi = phi, tau2 = nu2[i], rho = rho[i], 
@@ -207,7 +207,7 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
     if ((log(runif(1)) <= log.eps) & !is.na(log.eps)) {
       rho[i] <- rho_
       detQ <- detQ_
-      accept.rho[1] <- accept.rho[1] + 1  
+      accept.rho <- accept.rho + 1  
     } else
       rho[i] <- rho[i - 1]
 
@@ -216,8 +216,10 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
     
     if (ceiling(i/100) == floor(i/100) & j < n.adapt) {
       
-      h.rho <- CARBayes:::common.accceptrates2(accept.rho, h.rho, 30, 40, 0.5)
+      h.rho <- ifelse(accept.rho > 40, h.rho + 0.1 * h.rho,
+                      ifelse(accept.a < 30, h.rho - 0.1 * h.rho, h.rho))
       accept.rho <- c(0,0)
+      
       h.a <- ifelse(accept.a > 20, h.a + 0.1 * h.a,
                     ifelse(accept.a < 10, h.a - 0.1 * h.a, h.a))
       accept.a <- rep(0, n)
@@ -234,33 +236,38 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
       muhat <- rowMeans(samples$train)
       
       muhat.mat <- sapply(a.vals, function(a.tmp, ...){
+        
         xa.tmp <- data.frame(x[,-1], a = rep(a.tmp, n))
         colnames(xa.tmp) <- colnames(xa.train)[-1]
         c(sampler$predict(xa.tmp))
+        
       })
       
-      mhat <- predict(smooth.spline(a.vals, colMeans(muhat.mat)), x = a)$y
+      mhat.vals <- apply(muhat.mat, 2, weighted.mean, w = weights)
+      mhat <- predict(smooth.spline(x = a.vals, y = mhat.vals), x = a)$y
+      mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
       
       # pseudo-outcome
-      psi[j,] <- (ybar - muhat + mhat)
-      mhat.out[j,] <- colMeans(muhat.mat)
+      psi.mat[j,] <- psi <- (ybar - muhat + mhat)
       
       # exposure model for integtion
       a.std <- c(c(a, a.vals) - mean(a)) / sd(a)
       dens <- density(a.std[1:n])
       phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
+      phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
       
       # integration matrix
-      phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
+
       mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
       int.mat <- (muhat.mat - mhat.mat) * phat.mat
       
-      if (j == 1 & is.null(span))
-        span <- cv_span(a = a, psi = psi[j,], family = family, folds = folds, span.seq = span.seq)
+      # select bw if NULL
+      if (j == 1 & is.null(bw))
+        bw <- cv_bw(a = a, psi = psi, folds = folds, bw.seq = bw.seq)
       
-      out <- sapply(a.vals, kern_est, psi = psi[j,], a = a, span = span, 
-                    family = gaussian(), se.fit = TRUE, int.mat = int.mat, 
-                    a.vals = a.vals)
+      # asymptotics
+      out <- sapply(a.vals, kern_est, psi = psi, a = a, weights = weights, 
+                    bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
       
       est.mat[j,] <- out[1,]
       var.mat[j,] <- out[2,]
@@ -280,17 +287,15 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
   omega2 <- omega2[keep]
   
   a.mat <- a.mat[,order(shield)]
-  smooth_estimate <- colMeans(est.mat)
-  smooth_variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
-  tree_estimate <- colMeans(mhat.out)
-  tree_variance <- apply(mhat.out, 2, var)
-  hpdi <- apply(mhat.out, 2, hpd)
+  psi.mat <- psi.mat[,order(shield)]
+  estimate <- colMeans(est.mat)
+  variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
+
   rownames(hpdi) <- c("lower", "upper")
   
-  rslt <- list(smooth_estimate = smooth_estimate, smooth_variance = smooth_variance,
-               tree_estimate = tree_estimate, tree_variance = tree_variance, hpdi = hpdi,
-               accept.a = accept.a, mcmc = list(a.mat = a.mat, beta = beta, alpha = alpha, 
-                                                sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
+  rslt <- list(estimate = estimate, variance = variance, accept.a = accept.a, 
+               mcmc = list(a.mat = a.mat, psi.mat = psi.mat, beta = beta, alpha = alpha, 
+                           sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
   
   return(rslt)
   
