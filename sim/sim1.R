@@ -1,22 +1,45 @@
 ### Simulation 1: Measurement Error
 
-rm(list = ls())
-library(parallel)
+## Preliminaries
 
-simulate1 <- function(scenario, n.sim, a.vals){
+rm(list = ls())
+
+library(parallel)
+library(mvtnorm)
+library(abind)
+library(SuperLearner)
+library(dbarts)
+
+# Code for generating and fitting data
+source("~/Github/causal-me/sim/gen-data.R")
+source("~/Github/causal-me/erf.R")
+source("~/Github/causal-me/bart-erf.R")
+source("~/Github/causal-me/bayes-erf.R")
+source("~/Github/causal-me/auxiliary.R")
+
+# for replication
+set.seed(42)
+
+# simulation scenarios
+a.vals <- seq(6, 14, by = 0.08)
+n.sim <- 500
+
+n <- c(400, 800)
+mult <- c(5, 10)
+sig_agg <- c(1, sqrt(2))
+sig_pred <- c(1, sqrt(2))
+gps_scen <- "a"
+out_scen <- "a"
+pred_scen <- "b"
+
+scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred,
+                        gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, 
+                        stringsAsFactors = FALSE)
+scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
+
+for (i in 1:length(scenarios)) {
   
-  ## Preliminaries
-  library(mvtnorm)
-  library(abind)
-  library(SuperLearner)
-  library(dbarts)
-  
-  # Code for generating and fitting data
-  source("~/Github/causal-me/sim/gen-data.R")
-  source("~/Github/causal-me/erf.R")
-  source("~/Github/causal-me/bart-erf.R")
-  source("~/Github/causal-me/bayes-erf.R")
-  source("~/Github/causal-me/auxiliary.R")
+  scenario <- scenarios[[i]]
   
   # simulation arguments
   sig_gps <- 2
@@ -43,7 +66,7 @@ simulate1 <- function(scenario, n.sim, a.vals){
   
   print(scenario)
   
-  out <- lapply(1:n.sim, function(i,...){
+  out <- mclapply(1:n.sim, function(i,...){
     
     dat <- gen_data(n = n, mult = mult, sig_gps = sig_gps, sig_agg = sig_agg, sig_pred = sig_pred,
                     pred_scen = pred_scen, out_scen = out_scen, gps_scen = gps_scen)
@@ -80,12 +103,10 @@ simulate1 <- function(scenario, n.sim, a.vals){
     z.tilde <- aggregate(s.tilde, by = list(s.id), mean)[,2]
     
     # real
-    rc_hat <- try(erf(y = y, a = z.hat, x = x, offset = offset, a.vals = a.vals, bw = bw,
-                      n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
+    rc_hat <- try(erf(y = y, a = z.hat, x = x, offset = offset, a.vals = a.vals, bw = bw), silent = TRUE)
     
     # naive
-    naive_hat <- try(erf(y = y, a = z.tilde, x = x, offset = offset, a.vals = a.vals, bw = bw,
-                         n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
+    naive_hat <- try(erf(y = y, a = z.tilde, x = x, offset = offset, a.vals = a.vals, bw = bw), silent = TRUE)
     
     # BART Approach
     bart_hat <- try(bart_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id, 
@@ -114,7 +135,7 @@ simulate1 <- function(scenario, n.sim, a.vals){
     
     return(list(est = est, se = se))
     
-  })
+  }, mc.cores = 30)
   
   est <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$est} else {matrix(NA, ncol = length(a.vals), nrow = 5)}), along = 3)
   se <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$se} else {matrix(NA, ncol = length(a.vals), nrow = 4)}), along = 3)
@@ -147,28 +168,3 @@ simulate1 <- function(scenario, n.sim, a.vals){
   save(rslt, file = filename)
   
 }
-
-## Preliminaries
-
-library(parallel)
-
-# for replication
-set.seed(42)
-
-# simulation scenarios
-a.vals <- seq(6, 14, by = 0.08)
-n.sim <- 500
-
-n <- c(400, 800)
-mult <- c(5, 10)
-sig_agg <- c(0, 1, sqrt(2))
-sig_pred <- c(1, sqrt(2))
-gps_scen <- "a"
-out_scen <- "a"
-pred_scen <- "a"
-
-scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred,
-                        gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, 
-                        stringsAsFactors = FALSE)
-scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
-est <- mclapply(scenarios, simulate1, n.sim = n.sim, a.vals = a.vals, mc.cores = 24, mc.preschedule = TRUE)
