@@ -230,19 +230,6 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
       est.mat[j,] <- out[1,]
       var.mat[j,] <- out[2,]
       
-      # bootstrap
-      # boot.idx <- cbind(1:n, replicate(200, sample(x = n, size = n, replace = TRUE)))
-      # 
-      # out <- apply(boot.idx, 2, function(idx, ...) {
-      #   
-      #   sapply(a.vals, kern_est, psi = psi[idx], a = a[idx], 
-      #          weights = weights[idx], bw = bw, se.fit = FALSE)
-      #   
-      # })
-      # 
-      # est.mat[j,] <- out[,1]
-      # var.mat[j,] <- apply(out[,2:ncol(out)], 1, var)
-      
       # double-robust model
       if (dr) {
         
@@ -266,14 +253,6 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
         # asymptotics
         out.dr <- sapply(a.vals, kern_est, psi = psi.dr, a = a, weights = weights, 
                       bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
-        
-        # bootstrap
-        # out.dr <- sapply(1:ncol(boot.idx), function(k, ...) {
-        #   
-        #     sapply(a.vals, kern_est, psi = psi.dr[idx], a = a[idx],
-        #            weights = weights[idx], bw = bw, se.fit = FALSE)
-        #   
-        # })
         
         est.dr[j,] <- out.dr[1,]
         var.dr[j,] <- out.dr[2,]

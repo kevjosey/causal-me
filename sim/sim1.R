@@ -103,10 +103,12 @@ for (i in 1:length(scenarios)) {
     z.tilde <- aggregate(s.tilde, by = list(s.id), mean)[,2]
     
     # real
-    rc_hat <- try(erf(y = y, a = z.hat, x = x, offset = offset, a.vals = a.vals, bw = bw), silent = TRUE)
+    rc_hat <- try(erf(y = y, a = z.hat, x = x, offset = offset, a.vals = a.vals, 
+                      n.iter = n.iter, n.adapt = n.adapt, thin = thin, bw = bw), silent = TRUE)
     
     # naive
-    naive_hat <- try(erf(y = y, a = z.tilde, x = x, offset = offset, a.vals = a.vals, bw = bw), silent = TRUE)
+    naive_hat <- try(erf(y = y, a = z.tilde, x = x, offset = offset, a.vals = a.vals, 
+                         n.iter = n.iter, n.adapt = n.adapt, thin = thin, bw = bw), silent = TRUE)
     
     # BART Approach
     bart_hat <- try(bart_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id, 
@@ -114,24 +116,16 @@ for (i in 1:length(scenarios)) {
                              scale = scale, shape = shape, rate = rate, 
                              n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
-    # Bayes DR Approach
-    bayes_hat <- try(bayes_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id,
-                               w = w, x = x, offset = offset, a.vals = a.vals, bw = bw,
-                               scale = scale, shape = shape, rate = rate, 
-                               n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
-    
     # estimates
     est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
                  if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(rc_hat, "try-error")) {rc_hat$estimate} else {rep(NA, length(a.vals))},
-                 if (!inherits(bart_hat, "try-error")) {bart_hat$estimate} else {rep(NA, length(a.vals))},
-                 if (!inherits(bayes_hat, "try-error")) {bayes_hat$estimate} else {rep(NA, length(a.vals))})
+                 if (!inherits(bart_hat, "try-error")) {bart_hat$estimate} else {rep(NA, length(a.vals))})
     
     #standard error
     se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(rc_hat, "try-error")) {sqrt(rc_hat$variance)} else {rep(NA, length(a.vals))},
-                if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$variance)} else {rep(NA, length(a.vals))},
-                if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$variance)} else {rep(NA, length(a.vals))})
+                if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$variance)} else {rep(NA, length(a.vals))})
     
     return(list(est = est, se = se))
     
@@ -144,24 +138,23 @@ for (i in 1:length(scenarios)) {
   # coverage probability
   cp <- list(as.matrix((est[2,,] - 1.96*se[1,,]) < mu.mat & (est[2,,] + 1.96*se[1,,]) > mu.mat),
              as.matrix((est[3,,] - 1.96*se[2,,]) < mu.mat & (est[3,,] + 1.96*se[2,,]) > mu.mat),
-             as.matrix((est[4,,] - 1.96*se[3,,]) < mu.mat & (est[4,,] + 1.96*se[3,,]) > mu.mat),
-             as.matrix((est[5,,] - 1.96*se[4,,]) < mu.mat & (est[5,,] + 1.96*se[4,,]) > mu.mat))
+             as.matrix((est[4,,] - 1.96*se[3,,]) < mu.mat & (est[4,,] + 1.96*se[3,,]) > mu.mat))
   
   out_est <- t(apply(est, 1, rowMeans, na.rm = TRUE))
   colnames(out_est) <- a.vals
-  rownames(out_est) <- c("ERF","NAIVE","RC","BART","GLM")
+  rownames(out_est) <- c("ERF","NAIVE","RC","BART")
   
-  out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - mu.mat), na.rm = TRUE)))
+  out_bias <- t(apply(est[2:4,,], 1, function(x) rowMeans(abs(x - mu.mat), na.rm = TRUE)))
   colnames(out_bias) <- a.vals
-  rownames(out_bias) <- c("NAIVE","RC","BART","GLM")
+  rownames(out_bias) <- c("NAIVE","RC","BART")
   
-  out_mse <- t(apply(est[2:5,,], 1, function(x) rowMeans((x - mu.mat)^2, na.rm = TRUE)))
+  out_mse <- t(apply(est[2:4,,], 1, function(x) rowMeans((x - mu.mat)^2, na.rm = TRUE)))
   colnames(out_mse) <- a.vals
-  rownames(out_mse) <- c("NAIVE","RC","BART","GLM")
+  rownames(out_mse) <- c("NAIVE","RC","BART")
   
   out_cp <- do.call(rbind, lapply(cp, rowMeans, na.rm = TRUE))
   colnames(out_cp) <- a.vals
-  rownames(out_cp) <- c("NAIVE","RC","BART","GLM")
+  rownames(out_cp) <- c("NAIVE","RC","BART")
   
   rslt <- list(scenario = scenario, est = out_est, bias = out_bias, mse = out_mse, cp = out_cp)
   filename <- paste0("~/Dropbox/Projects/ERC-EPE/Output/sim_1/", paste(scenario, collapse = "_"),".RData")

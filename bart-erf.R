@@ -82,6 +82,8 @@ bart_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
   sigma2 <- rep(NA, n.adapt + n.iter)
   tau2 <- rep(NA, n.adapt + n.iter)
   omega2 <- rep(NA, n.adapt + n.iter)
+  nu2 <- rep(NA, n.adapt + n.iter)
+  rho <- rep(NA, n.adapt + n.iter)
   
   fit.a <- lm(a ~ 0 + x)
   fit.s <- lm(s.obs ~ 0 + ws.obs)
@@ -208,19 +210,6 @@ bart_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
 
       est.mat[j,] <- out[1,]
       var.mat[j,] <- out[2,]
-      
-      # bootstrap
-      # boot.idx <- cbind(1:n, replicate(200, sample(x = n, size = n, replace = TRUE)))
-      # 
-      # out <- apply(boot.idx, 2, function(idx, ...) {
-      # 
-      #   sapply(a.vals, kern_est, psi = psi[idx], a = a[idx], 
-      #          weights = weights[idx], bw = bw, se.fit = FALSE)
-      # 
-      # })
-      # 
-      # est.mat[j,] <- out[,1]
-      # var.mat[j,] <- apply(out[,2:ncol(out)], 1, var)
       
     }
     

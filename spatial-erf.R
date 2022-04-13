@@ -1,6 +1,6 @@
 
-bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, length(y)),
-                         family = gaussian(), offset = NULL, weights = NULL,
+bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
+                         V = diag(1, length(y)), family = gaussian(), offset = NULL,
                          a.vals = seq(min(a), max(a), length.out = 100),
                          n.iter = 10000, n.adapt = 1000, thin = 10, 
                          shape = 1e-3, rate = 1e-3, scale = 1e6, 
@@ -21,15 +21,14 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
   if(length(check) > length(id))
     warning("deleting some exposures without an associated outcome.")
   
-  if(is.null(weights))
-    weights <- rep(1, times = length(y))
-  
   if(is.null(offset))
     offset <- rep(0, times = length(y))
   
+  weights <- exp(offset)
+  
   s <- s[s.id %in% id]
-  t <- as.matrix(t)[s.id %in% id]
   w <- w[s.id %in% id,]
+  s.tilde <- s.tilde[s.id %in% id]
   s.id <- s.id[s.id %in% id]
   
   # create variables
@@ -49,26 +48,27 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
   id <- id[shield]
   offset <- offset[shield]
   weights <- weights[shield]
+  V <- V[shield, shield]
   
   if (is.null(w)) {
-    ws <- cbind(rep(1, length(s.id)), t = t)
+    ws <- cbind(rep(1, length(s.id)), s.tilde = s.tilde)
   } else {
-    ws <- cbind(model.matrix(~ ., data.frame(w)), t = t)
+    ws <- cbind(model.matrix(~ ., data.frame(w)), s.tilde = s.tilde)
   }
   
   sword <- order(s.id)
   stab <- table(s.id)
   s <- s[sword]
-  t <- t[sword]
+  s.tilde <- s.tilde[sword]
   ws <- ws[sword,]
   s.id <- s.id[sword]
   
   # when s is observed
-  ws.tmp <- ws[!is.na(s),]
-  s.tmp <- s[!is.na(s)]
+  ws.obs <- ws[!is.na(s),]
+  s.obs <- s[!is.na(s)]
   
   # initialize exposures
-  s.hat <- predict(lm(s.tmp ~ 0 + ., data = data.frame(ws.tmp)), newdata = data.frame(ws))
+  s.hat <- predict(lm(s.obs ~ 0 + ., data = data.frame(ws.obs)), newdata = data.frame(ws))
   a <- aggregate(s.hat, by = list(s.id), mean)[,2]
   a.s <- rep(a, stab)
   h.a <- rep(0.5*sd(a), n)
@@ -87,10 +87,13 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
   nu2 <- rep(NA, n.adapt + n.iter)
   rho <- rep(NA, n.adapt + n.iter)
   
-  beta[1,] <- coef(lm(a ~ 0 + x))
-  alpha[1,] <- coef(lm(s.tmp ~ 0 + ws.tmp))
-  sigma2[1] <- sigma(lm(a ~ 0 + x))^2
-  tau2[1] <- sigma(lm(s.tmp ~ 0 + ws.tmp))^2
+  fit.a <- lm(a ~ 0 + x)
+  fit.s <- lm(s.obs ~ 0 + ws.obs)
+  
+  beta[1,] <- coef(fit.a)
+  alpha[1,] <- coef(fit.s)
+  sigma2[1] <- sigma(fit.a)^2
+  tau2[1] <- sigma(fit.s)^2
   omega2[1] <- var(s.hat - a.s)
   
   # initialize spatial stuff
@@ -117,16 +120,16 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
   detQ <- 0.5 * sum(log((rho[1] * Vstar.val + (1 - rho[1]))))
   
   # initialize bart
-  ybar <- family$linkinv(family$linkfun(y) - offset)
+  ybar <- exp(log(y) - offset)
   xa.train <- data.frame(ybar = ybar, x[,-1], a = a)
   sampler <- dbarts::dbarts(ybar ~ ., data = xa.train, control = control, weights = weights)
   
   # run first iteration of tree
   samples <- sampler$run()
   
-  # ERC stuff
+  # initialize output
   a.mat <- psi.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
-  mhat.out <- est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
+  est.mat <- var.mat <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
   
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
@@ -151,10 +154,10 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
       xa.pred <- sampler$predict(xa.test)
       
       log.eps <- dnorm(ybar, xa.pred, mean(samples$sigma)/sqrt(weights), log = TRUE) +
-        dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
+        dnorm(a_, phi + c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
         dnorm(a_, z.hat, sqrt(omega2[i - 1]/stab), log = TRUE) -
         dnorm(ybar, samples$train, mean(samples$sigma)/sqrt(weights), log = TRUE) -
-        dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
+        dnorm(a, phi + c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
         dnorm(z.hat, a, sqrt(omega2[i - 1]/stab), log = TRUE)
       
       exam <- (log(runif(n)) <= log.eps) & !is.na(log.eps)
@@ -255,10 +258,6 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
       dens <- density(a.std[1:n])
       phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
       phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
-      
-      # integration matrix
-
-      mhat.mat <- matrix(rep(colMeans(muhat.mat), n), byrow = T, nrow = n)
       int.mat <- (muhat.mat - mhat.mat) * phat.mat
       
       # select bw if NULL
@@ -291,8 +290,6 @@ bart_spatial <- function(s, t, y, s.id, id, w = NULL, x = NULL, V = diag(1, leng
   estimate <- colMeans(est.mat)
   variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
 
-  rownames(hpdi) <- c("lower", "upper")
-  
   rslt <- list(estimate = estimate, variance = variance, accept.a = accept.a, 
                mcmc = list(a.mat = a.mat, psi.mat = psi.mat, beta = beta, alpha = alpha, 
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2))
