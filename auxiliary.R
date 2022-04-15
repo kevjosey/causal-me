@@ -29,3 +29,37 @@ hpd <- function(x, alpha = 0.05){
   c(x[k], x[n - m + k])
   
 }
+
+# Check the V matrix
+check <- function(V) {
+  
+  #### Check V is a matrix of the correct dimension
+  if(!is.matrix(V)) stop("V is not a matrix.", call.=FALSE)
+  n <- nrow(V)
+  if(ncol(V)!= n) stop("V is not a square matrix.", call.=FALSE)    
+  
+  #### Check validity of inputed V matrix
+  if(sum(is.na(V))>0) stop("V has missing 'NA' values.", call.=FALSE)
+  if(!is.numeric(V)) stop("V has non-numeric values.", call.=FALSE)
+  if(min(V)<0) stop("V has negative elements.", call.=FALSE)
+  if(sum(V!=t(V))>0) stop("V is not symmetric.", call.=FALSE)
+  if(min(apply(V, 1, sum))==0) stop("V has some areas with no neighbours (one of the row sums equals zero).", call.=FALSE)    
+  
+  #### Create the triplet form
+  ids <- which(V > 0, arr.ind = T)
+  V.triplet <- cbind(ids, V[ids])
+  V.triplet <- V.triplet[ ,c(2,1,3)]
+  
+  n.triplet <- nrow(V.triplet) 
+  V.triplet.sum <- tapply(V.triplet[ ,3], V.triplet[ ,1], sum)
+  n.neighbours <- tapply(V.triplet[ ,3], V.triplet[ ,1], length)
+  
+  #### Create the start and finish points for V updating
+  V.begfin <- cbind(c(1, cumsum(n.neighbours[-n])+1), cumsum(n.neighbours))
+  
+  #### Return the critical quantities
+  results <- list(V = V, V.triplet = V.triplet, n.triplet = n.triplet, 
+                  V.triplet.sum = V.triplet.sum, n.neighbours = n.neighbours, 
+                  V.begfin = V.begfin, n = n)
+  return(results)   
+}

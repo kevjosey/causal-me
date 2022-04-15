@@ -1,10 +1,9 @@
 
 bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
-                         V = diag(1, length(y)), family = gaussian(), offset = NULL,
-                         a.vals = seq(min(a), max(a), length.out = 100),
+                         V = diag(1, length(y)), a.vals = seq(min(a), max(a), length.out = 100),
                          n.iter = 10000, n.adapt = 1000, thin = 10, 
                          shape = 1e-3, rate = 1e-3, scale = 1e6, 
-                         span = NULL, span.seq = seq(0.1, 2, by = 0.1), folds = 5,
+                         bw = NULL, bw.seq = seq(0.1, 2, by = 0.1), folds = 5,
                          control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
                                                  n.samples = 1L, n.thin = thin, n.chains = 1L)) {
   
@@ -97,16 +96,16 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
   omega2[1] <- var(s.hat - a.s)
   
   # initialize spatial stuff
-  res.temp <- y - x %*% beta[1,]
+  res.temp <- a - x %*% beta[1,]
   res.sd <- sd(res.temp, na.rm = TRUE)/5
   phi <- rnorm(n, mean = 0, sd = res.sd)
-  nu2[i] <- var(phi) / 10
-  rho[i] <- runif(1)
-  accept.rho <- c(0,0)
+  nu2[1] <- var(phi) / 10
+  rho[1] <- runif(1)
+  accept.rho <- 0
   h.rho <- 0.02
   
   # CAR quantities
-  V.quants <- CARBayes:::common.Wcheckformat(V)
+  V.quants <- check(V)
   V <- V.quants$W
   V3 <- V.quants$W.triplet
   n3 <- V.quants$n.triplet
@@ -114,8 +113,8 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
   V.idx <- V.quants$W.begfin
   
   # determinant of V for updating rho
-  Vstar <- diag(apply(V, 1, sum)) - V
-  Vstar.eigen <- eigen(Vstar)
+  Vstar <- diag(rowSums(V)) - V
+  Vstar.eigen <- eigen(Vstar, symmetric = TRUE)
   Vstar.val <- Vstar.eigen$values
   detQ <- 0.5 * sum(log((rho[1] * Vstar.val + (1 - rho[1]))))
   
@@ -134,7 +133,7 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
-    # print(i)
+    print(i)
     
     # sample S
     sig.s <- sqrt((1/omega2[i - 1] + 1/tau2[i - 1])^(-1))
@@ -171,10 +170,10 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
     a.s <- rep(a, stab)
     
     # sample pred parameters
-    alpha_var <- solve(t(ws.tmp) %*% ws.tmp + diag(tau2[i - 1]/scale, q, q))
-    alpha[i,] <- rmvnorm(1, alpha_var %*% t(ws.tmp) %*% s.tmp, tau2[i - 1]*alpha_var)
+    alpha_var <- solve(t(ws.obs) %*% ws.obs + diag(tau2[i - 1]/scale, q, q))
+    alpha[i,] <- rmvnorm(1, alpha_var %*% t(ws.obs) %*% s.obs, tau2[i - 1]*alpha_var)
     tau2[i] <- 1/rgamma(1, shape = shape + l/2, rate = rate +
-                          sum(c(s.tmp - c(ws.tmp %*% alpha[i,]))^2)/2)
+                          sum(c(s.obs - c(ws.obs %*% alpha[i,]))^2)/2)
     
     # sample agg parameters
     omega2[i] <- 1/rgamma(1, shape = shape + m/2, rate = rate + sum((s.hat - a.s)^2)/2)
@@ -188,16 +187,16 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
     off.phi <- (a - as.numeric(x %*% beta[i,])) / sigma2[i]    
     phi <- CARBayes:::gaussiancarupdate(Wtriplet = V3, Wbegfin = V.idx, 
                                         Wtripletsum = V3.sum, nsites = n,
-                                        phi = phi, tau2 = nu2[i], rho = rho[i], 
+                                        phi = phi, tau2 = nu2[i - 1], rho = rho[i - 1], 
                                         nu2 = sigma2[i], offset = off.phi)
     phi <- phi - mean(phi)
     
     # sample nu2
-    temp <- CARBayes:::quadform(V3, V3.sum, n3, n, phi, phi, rho[i])
+    temp <- CARBayes:::quadform(V3, V3.sum, n3, n, phi, phi, rho[i - 1])
     nu2[i] <- 1/rgamma(1, shape + n/2, rate = rate + temp)
     
     # sample rho
-    rho_ <- truncnorm::rtruncnorm(n = 1, a = 0, b = 1, mean = rho[i], sd = h.rho)  
+    rho_ <- truncnorm::rtruncnorm(n = 1, a = 0, b = 1, mean = rho[i-1], sd = h.rho)  
     temp_ <- CARBayes:::quadform(V3, V3.sum, n3, n, phi, phi, rho_)
     detQ_ <- 0.5 * sum(log((rho_ * Vstar.val + (1 - rho_))))              
     logprob <- detQ - temp / nu2[i]
@@ -205,7 +204,6 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
     hastings <- log(truncnorm::dtruncnorm(x = rho[i - 1], a = 0, b = 1, mean = rho_, sd = h.rho)) -
       log(truncnorm::dtruncnorm(x = rho_, a = 0, b = 1, mean = rho[i - 1], sd = h.rho)) 
     log.eps <- logprob_ - logprob + hastings
-    accept.rho[2] <- accept.rho[2] + 1  
     
     if ((log(runif(1)) <= log.eps) & !is.na(log.eps)) {
       rho[i] <- rho_
@@ -213,14 +211,14 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
       accept.rho <- accept.rho + 1  
     } else
       rho[i] <- rho[i - 1]
-
+    
     # sample outcome tree
     samples <- sampler$run()
     
-    if (ceiling(i/100) == floor(i/100) & j < n.adapt) {
+    if (ceiling(i/100) == floor(i/100) & i < n.adapt) {
       
       h.rho <- ifelse(accept.rho > 40, h.rho + 0.1 * h.rho,
-                      ifelse(accept.a < 30, h.rho - 0.1 * h.rho, h.rho))
+                      ifelse(accept.rho < 30, h.rho - 0.1 * h.rho, h.rho))
       accept.rho <- c(0,0)
       
       h.a <- ifelse(accept.a > 20, h.a + 0.1 * h.a,
@@ -289,7 +287,7 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
   psi.mat <- psi.mat[,order(shield)]
   estimate <- colMeans(est.mat)
   variance <- colMeans(var.mat) + (1 + 1/nrow(a.mat))*apply(est.mat, 2, var)
-
+  
   rslt <- list(estimate = estimate, variance = variance, accept.a = accept.a, 
                mcmc = list(a.mat = a.mat, psi.mat = psi.mat, beta = beta, alpha = alpha, 
                            sigma2 = sigma2, tau2 = tau2, omega2 = omega2))

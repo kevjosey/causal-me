@@ -1,4 +1,4 @@
-# WARNING: Only implements DR Estimation which violates congeniality concepts
+
 bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
                       dr = FALSE, a.vals = seq(min(s), max(s), length.out = 100),
                       shape = 1e-3, rate = 1e-3, scale = 1e6,

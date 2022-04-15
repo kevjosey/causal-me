@@ -12,7 +12,7 @@ erf <- function(a, y, x, offset = NULL, bart = FALSE,
   n <- length(a)
   
   wrap <- bart_est(y = ybar, a = a, x = x, a.vals = a.vals, weights = weights,
-                   n.iter = 10000, n.adapt = 1000, thin = 10)
+                   n.iter = n.iter, n.adapt = n.adapt, thin = thin)
   
   psi <- wrap$psi
   int.mat <- wrap$int.mat
@@ -139,8 +139,27 @@ glm_est <- function(a, y, x, a.vals, weights = NULL, ...) {
 # LOESS function
 kern_est <- function(a.new, a, psi, bw, weights = NULL, se.fit = FALSE, int.mat = NULL, a.vals = NULL) {
   
+  n <- length(a)
+  
   if(is.null(weights))
     weights <- rep(1, times = length(a))
+  
+  ## LOESS Kernel
+  
+  # # subset index
+  # a.std <- a - a.new
+  # k <- floor(min(bw, 1)*length(a))
+  # idx <- order(abs(a.std))[1:k]
+  # 
+  # # subset
+  # a.std <- a.std[idx]
+  # psi <- psi[idx]
+  # weights <- weights[idx]
+  # max.a.std <- max(abs(a.std))
+  # 
+  # # construct kernel weight
+  # k.std <- c((1 - abs(a.std/max.a.std)^3)^3)
+  # g.std <- cbind(1, a.std)
   
   ## Gaussian Kernel
   a.std <- (a - a.new) / bw
@@ -154,12 +173,24 @@ kern_est <- function(a.new, a, psi, bw, weights = NULL, se.fit = FALSE, int.mat 
     
     eta <- c(g.std %*% b)
     
+    ## LOESS
+    # kern.mat <- matrix(rep(c((1 - abs((a.vals - a.new)/max.a.std)^3)^3), k), byrow = T, nrow = k)
+    # kern.mat[matrix(rep(abs(a.vals - a.new)/max.a.std, k), byrow = T, nrow = k) > 1] <- 0
+    # g.vals <- matrix(rep(c(a.vals - a.new), k), byrow = T, nrow = k)
+    # intfn1.mat <- kern.mat * int.mat[idx,]
+    # intfn2.mat <- g.vals * kern.mat * int.mat[idx,]
+    # 
+    # int1 <- apply(matrix(rep((a.vals[-1] - a.vals[-length(a.vals)]), k), byrow = T, nrow = k)*
+    #                 (intfn1.mat[,-1] + intfn1.mat[,-length(a.vals)])/2, 1, sum)
+    # int2 <- apply(matrix(rep((a.vals[-1] - a.vals[-length(a.vals)]), k), byrow = T, nrow = k)*
+    #                 (intfn2.mat[,-1] + intfn2.mat[,-length(a.vals)])/2, 1, sum)
+    
+    ## Gaussian
     kern.mat <- matrix(rep(dnorm((a.vals - a.new) / bw) / bw, n), byrow = T, nrow = n)
     g.vals <- matrix(rep(c(a.vals - a.new) / bw, n), byrow = T, nrow = n)
-    
     intfn1.mat <- kern.mat * int.mat
     intfn2.mat <- g.vals * kern.mat * int.mat
-    
+
     int1 <- rowSums(matrix(rep((a.vals[-1] - a.vals[-length(a.vals)]), n), byrow = T, nrow = n)*
                     (intfn1.mat[,-1] + intfn1.mat[,-length(a.vals)])/2)
     int2 <- rowSums(matrix(rep((a.vals[-1] - a.vals[-length(a.vals)]), n), byrow = T, nrow = n)*
