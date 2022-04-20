@@ -32,7 +32,7 @@ n <- 400
 prob <- 0.1
 
 # model arguments
-a.vals <- seq(6, 14, by = 0.08)
+a.vals <- seq(6, 14, by = 0.02)
 
 # mcmc arguments
 n.iter <- 2000

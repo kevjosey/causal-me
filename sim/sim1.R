@@ -21,23 +21,23 @@ source("~/Github/causal-me/auxiliary.R")
 set.seed(42)
 
 # simulation scenarios
-a.vals <- seq(6, 14, by = 0.08)
-n.sim <- 500
+a.vals <- seq(6, 14, by = 0.04)
+n.sim <- 200
 
 n <- c(400, 800)
 mult <- c(5, 10)
-sig_agg <- c(1, sqrt(2))
-sig_pred <- c(1, sqrt(2))
+sig_agg <- c(0, sqrt(2))
+sig_pred <- c(0, 1)
 gps_scen <- "a"
 out_scen <- "a"
-pred_scen <- "b"
+pred_scen <- "a"
 
 scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pred,
                         gps_scen = gps_scen, out_scen = out_scen, pred_scen = pred_scen, 
                         stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 
-for (i in 1:length(scenarios)) {
+for (i in 2:length(scenarios)) {
   
   scenario <- scenarios[[i]]
   
@@ -133,15 +133,15 @@ for (i in 1:length(scenarios)) {
     se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(rc_hat, "try-error")) {sqrt(rc_hat$variance)} else {rep(NA, length(a.vals))},
                 if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$variance)} else {rep(NA, length(a.vals))},
-                if (!inherits(bayes_hat, "try-error")) {bayes_hat$variance} else {rep(NA, length(a.vals))})
+                if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$variance)} else {rep(NA, length(a.vals))})
     
     return(list(est = est, se = se))
     
   }, mc.cores = 30)
   
-  est <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$est} else {matrix(NA, ncol = length(a.vals), nrow = 5)}), along = 3)
-  se <- abind(lapply(out, function(lst, ...) if (!inherits(lst, "try-error")) {lst$se} else {matrix(NA, ncol = length(a.vals), nrow = 4)}), along = 3)
-  mu.mat <- matrix(rep(rowMeans(est[1,,], na.rm = TRUE), n.sim), nrow = length(a.vals), ncol = n.sim)
+  est <- abind(lapply(out, function(lst, ...) lst$est), along = 3)
+  se <- abind(lapply(out, function(lst, ...) lst$se), along = 3)
+  mu.mat <- matrix(rep(rowMeans(est[1,,]), n.sim), nrow = length(a.vals), ncol = n.sim)
   
   # coverage probability
   cp <- list(as.matrix((est[2,,] - 1.96*se[1,,]) < mu.mat & (est[2,,] + 1.96*se[1,,]) > mu.mat),

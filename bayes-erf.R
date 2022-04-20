@@ -106,7 +106,6 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
   
   if (dr) {
     
-    psi.dr <- matrix(NA, nrow = floor(n.iter/thin), ncol = n)
     est.dr <- var.dr <- matrix(NA, nrow = floor(n.iter/thin), ncol = length(a.vals))
     
   }
@@ -237,22 +236,17 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
         pimod.vals <- c(x %*% beta[i,])
         
         # kernel density estimation
-        a.std <- (a - pimod.vals)/sqrt(sigma2[i])
-        dens <- density(a.std)
-        pihat <- approx(x = dens$x, y = dens$y, xout = a.std)$y / sqrt(sigma2[i])
+        pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
         
         phat <- sapply(a, function(a.tmp){
-          
-          a.tmp.std <- (a.tmp - pimod.vals)/sqrt(sigma2[i])
-          mean(approx(x = dens$x, y = dens$y, xout = a.tmp.std)$y / sqrt(sigma2[i]))
-          
+          mean(dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
         })
         
         psi.dr <- c(ybar - muhat)*(phat/pihat) + mhat
         
         # asymptotics
         out.dr <- sapply(a.vals, kern_est, psi = psi.dr, a = a, weights = weights, 
-                      bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
+                         bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
         
         est.dr[j,] <- out.dr[1,]
         var.dr[j,] <- out.dr[2,]

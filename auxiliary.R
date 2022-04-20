@@ -31,7 +31,7 @@ hpd <- function(x, alpha = 0.05){
 }
 
 # Check the V matrix
-check <- function(V) {
+quants <- function(V) {
   
   #### Check V is a matrix of the correct dimension
   if(!is.matrix(V)) stop("V is not a matrix.", call.=FALSE)

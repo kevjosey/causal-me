@@ -219,7 +219,7 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
       
       h.rho <- ifelse(accept.rho > 40, h.rho + 0.1 * h.rho,
                       ifelse(accept.rho < 30, h.rho - 0.1 * h.rho, h.rho))
-      accept.rho <- c(0,0)
+      accept.rho <- 0
       
       h.a <- ifelse(accept.a > 20, h.a + 0.1 * h.a,
                     ifelse(accept.a < 10, h.a - 0.1 * h.a, h.a))
@@ -263,11 +263,11 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
         bw <- cv_bw(a = a, psi = psi, folds = folds, bw.seq = bw.seq)
       
       # asymptotics
-      out <- sapply(a.vals, kern_est, psi = psi, a = a, weights = weights, 
+      out <- mclapply(a.vals, kern_est, psi = psi, a = a, weights = weights, 
                     bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
       
-      est.mat[j,] <- out[1,]
-      var.mat[j,] <- out[2,]
+      est.mat[j,] <- do.call(rbind, out)[1,]
+      var.mat[j,] <- do.call(rbind, out)[2,]
       
     }
     

@@ -171,6 +171,7 @@ kern_est <- function(a.new, a, psi, bw, weights = NULL, se.fit = FALSE, int.mat 
   
   if (se.fit & !is.null(int.mat)) {
     
+  
     eta <- c(g.std %*% b)
     
     ## LOESS
@@ -196,7 +197,7 @@ kern_est <- function(a.new, a, psi, bw, weights = NULL, se.fit = FALSE, int.mat 
     int2 <- rowSums(matrix(rep((a.vals[-1] - a.vals[-length(a.vals)]), n), byrow = T, nrow = n)*
                     (intfn2.mat[,-1] + intfn2.mat[,-length(a.vals)])/2)
     
-    U <- solve(t(g.std) %*% diag(weights*k.std) %*% g.std) 
+    U <- solve(crossprod(g.std, weights*k.std*g.std))
     V <- cbind(weights * (k.std * (psi - eta) + int1),
                weights * (a.std * k.std * (psi - eta) + int2))
     sig <- U %*% crossprod(V) %*% U
