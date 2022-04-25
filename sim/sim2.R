@@ -21,7 +21,7 @@ source("~/Github/causal-me/auxiliary.R")
 set.seed(42)
 
 # simulation scenarios
-a.vals <- seq(6, 14, by = 0.04)
+a.vals <- seq(6, 14, by = 0.08)
 n.sim <- 500
 
 n <- 800
@@ -57,7 +57,7 @@ for (i in 1:length(scenarios)) {
   # gibbs sampler stuff
   n.iter <- 2000
   n.adapt <- 2000
-  thin <- 20
+  thin <- 40
   scale <- 1e6
   shape <- 1e-3
   rate <- 1e-3
@@ -129,7 +129,7 @@ for (i in 1:length(scenarios)) {
                  if (!inherits(rc_hat, "try-error")) {rc_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(bart_hat, "try-error")) {bart_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(bayes_hat, "try-error")) {bayes_hat$estimate} else {rep(NA, length(a.vals))},
-                 if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$estimate.dr)} else {rep(NA, length(a.vals))})
+                 if (!inherits(bayes_hat, "try-error")) {bayes_hat$estimate.dr} else {rep(NA, length(a.vals))})
     
     #standard error
     se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},

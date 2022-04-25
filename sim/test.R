@@ -37,7 +37,7 @@ a.vals <- seq(6, 14, by = 0.02)
 # mcmc arguments
 n.iter <- 2000
 n.adapt <- 2000
-thin <- 20
+thin <- 40
 bw <- 0.2
 scale <- 1e6
 shape <- 1e-3
@@ -98,7 +98,7 @@ out <- mclapply(1:n.sim, function(i, ...) {
   # Bayes DR Approach
   bayes_hat <- try(bayes_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id,
                              w = w, x = x, offset = offset, a.vals = a.vals, bw = bw,
-                             scale = scale, shape = shape, rate = rate, 
+                             scale = scale, shape = shape, rate = rate, dr = T,
                              n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # estimates

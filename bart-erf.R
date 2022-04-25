@@ -194,12 +194,16 @@ bart_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
       psi.mat[j,] <- psi <- c(ybar - muhat + mhat)
       
       # integration matrix
-      a.std <- (c(a, a.vals) - mean(a))/sd(a)
-      dens <- density(a.std[1:n])
-      phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
+      pimod.vals <- c(x %*% beta[i,])
+      
+      # density estimation
+      phat.vals <- sapply(c(a.vals), function(a.tmp){
+        mean(dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
+      })
+      
       phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)  
       int.mat <- (muhat.mat - mhat.mat)*phat.mat
-
+      
       # select bw if NULL
       if (j == 1 & is.null(bw))
         bw <- cv_bw(a = a, psi = psi, folds = folds, bw.seq = bw.seq)

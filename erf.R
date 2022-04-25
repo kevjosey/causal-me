@@ -170,7 +170,6 @@ kern_est <- function(a.new, a, psi, bw, weights = NULL, se.fit = FALSE, int.mat 
   mu <- b[1]
   
   if (se.fit & !is.null(int.mat)) {
-    
   
     eta <- c(g.std %*% b)
     

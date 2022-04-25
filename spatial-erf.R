@@ -251,12 +251,16 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
       # pseudo-outcome
       psi.mat[j,] <- psi <- (ybar - muhat + mhat)
       
-      # exposure model for integtion
-      a.std <- c(c(a, a.vals) - mean(a)) / sd(a)
-      dens <- density(a.std[1:n])
-      phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
-      phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)
-      int.mat <- (muhat.mat - mhat.mat) * phat.mat
+      # integration matrix
+      pimod.vals <- c(x %*% beta[i,])
+      
+      # density estimation
+      phat.vals <- sapply(c(a.vals), function(a.tmp){
+        mean(dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
+      })
+      
+      phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)  
+      int.mat <- (muhat.mat - mhat.mat)*phat.mat
       
       # select bw if NULL
       if (j == 1 & is.null(bw))

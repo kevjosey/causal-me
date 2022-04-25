@@ -113,6 +113,8 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
   # gibbs sampler for predictors
   for(i in 2:(n.iter + n.adapt)) {
     
+    print(i)
+    
     # sample S
     sig.s <- (1/omega2[i - 1] + 1/tau2[i - 1])^(-1)
     mu.s <- (sig.s)*(a.s/omega2[i - 1] + c(ws %*% alpha[i - 1,])/tau2[i - 1])
@@ -209,18 +211,27 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
       mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
       
       # pseudo outcome
-      psi.mat[j,] <- psi <- c(ybar - muhat + mhat)
+      # psi.mat[j,] <- psi <- c(ybar - muhat + mhat)
       
       # integration matrix
-      a.std <- (c(a, a.vals) - mean(a))/sd(a)
-      dens <- density(a.std[1:n])
-      phat.vals <- approx(x = dens$x, y = dens$y, xout = a.std[-(1:n)])$y / sd(a)
+      pimod.vals <- c(x %*% beta[i,])
+      
+      # density estimation
+      phat.vals <- sapply(c(a.vals), function(a.tmp){
+        mean(dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
+      })
+
       phat.mat <- matrix(rep(phat.vals, n), byrow = T, nrow = n)  
       int.mat <- (muhat.mat - mhat.mat)*phat.mat
       
       # select bw if NULL
       if (j == 1 & is.null(bw))
         bw <- cv_bw(a = a, psi = psi[j,], folds = folds, bw.seq = bw.seq)
+      
+      pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
+      phat <- predict(smooth.spline(x = a.vals, y = phat.vals), x = a)$y
+      phat[phat <= 0] <- .Machine$double.eps
+      psi <- psi.mat[j,] <- c(ybar - muhat)*(phat/pihat) + mhat
       
       # asymptotics
       out <- sapply(a.vals, kern_est, psi = psi, a = a, weights = weights, 
@@ -230,28 +241,21 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
       var.mat[j,] <- out[2,]
       
       # double-robust model
-      if (dr) {
-        
-        # create GPS mean
-        pimod.vals <- c(x %*% beta[i,])
-        
-        # kernel density estimation
-        pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
-        
-        phat <- sapply(a, function(a.tmp){
-          mean(dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
-        })
-        
-        psi.dr <- c(ybar - muhat)*(phat/pihat) + mhat
-        
-        # asymptotics
-        out.dr <- sapply(a.vals, kern_est, psi = psi.dr, a = a, weights = weights, 
-                         bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
-        
-        est.dr[j,] <- out.dr[1,]
-        var.dr[j,] <- out.dr[2,]
-        
-      }
+      # if (dr) {
+      #   
+      #   pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
+      #   phat <- predict(smooth.spline(x = a.vals, y = phat.vals), x = a)$y
+      #   phat[phat <= 0] <- .Machine$double.eps
+      #   psi.dr <- c(ybar - muhat)*(phat/pihat) + mhat
+      #   
+      #   # asymptotics
+      #   out.dr <- sapply(a.vals, kern_est, psi = psi.dr, a = a, weights = weights, 
+      #                    bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
+      #   
+      #   est.dr[j,] <- out.dr[1,]
+      #   var.dr[j,] <- out.dr[2,]
+      #   
+      # }
       
     }
     
