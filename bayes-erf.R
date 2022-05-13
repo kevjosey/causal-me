@@ -23,11 +23,6 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
   
   weights <- exp(offset)
   
-  s <- s[s.id %in% id]
-  s.tilde <- s.tilde[s.id %in% id]
-  w <- w[s.id %in% id,]
-  s.id <- s.id[s.id %in% id]
-  
   # create variables
   m <- length(s.id)
   n <- length(id)
@@ -41,7 +36,7 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
   
   shield <- order(id)
   y <- y[shield]
-  x <- x[shield,]
+  x <- x[shield,,drop = FALSE]
   id <- id[shield]
   offset <- offset[shield]
   weights <- weights[shield]
@@ -52,15 +47,20 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
     ws <- cbind(model.matrix(~ ., data.frame(w)), s.tilde = s.tilde)
   }
   
+  s <- s[s.id %in% id]
+  s.tilde <- s.tilde[s.id %in% id]
+  ws <- ws[s.id %in% id,,drop = FALSE]
+  s.id <- s.id[s.id %in% id]
+  
   sword <- order(s.id)
   stab <- table(s.id)
   s <- s[sword]
   s.tilde <- s.tilde[sword]
-  ws <- ws[sword,]
+  ws <- ws[sword,,drop = FALSE]
   s.id <- s.id[sword]
   
   # when s is observed
-  ws.obs <- ws[!is.na(s),]
+  ws.obs <- ws[!is.na(s),,drop = FALSE]
   s.obs <- s[!is.na(s)]
   
   # initialize exposures
@@ -211,7 +211,7 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
       mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
       
       # pseudo outcome
-      # psi.mat[j,] <- psi <- c(ybar - muhat + mhat)
+      psi.mat[j,] <- psi <- c(ybar - muhat + mhat)
       
       # integration matrix
       pimod.vals <- c(x %*% beta[i,])
@@ -228,11 +228,6 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
       if (j == 1 & is.null(bw))
         bw <- cv_bw(a = a, psi = psi[j,], folds = folds, bw.seq = bw.seq)
       
-      pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
-      phat <- predict(smooth.spline(x = a.vals, y = phat.vals), x = a)$y
-      phat[phat <= 0] <- .Machine$double.eps
-      psi <- psi.mat[j,] <- c(ybar - muhat)*(phat/pihat) + mhat
-      
       # asymptotics
       out <- sapply(a.vals, kern_est, psi = psi, a = a, weights = weights, 
                     bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
@@ -241,21 +236,21 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
       var.mat[j,] <- out[2,]
       
       # double-robust model
-      # if (dr) {
-      #   
-      #   pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
-      #   phat <- predict(smooth.spline(x = a.vals, y = phat.vals), x = a)$y
-      #   phat[phat <= 0] <- .Machine$double.eps
-      #   psi.dr <- c(ybar - muhat)*(phat/pihat) + mhat
-      #   
-      #   # asymptotics
-      #   out.dr <- sapply(a.vals, kern_est, psi = psi.dr, a = a, weights = weights, 
-      #                    bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
-      #   
-      #   est.dr[j,] <- out.dr[1,]
-      #   var.dr[j,] <- out.dr[2,]
-      #   
-      # }
+      if (dr) {
+        
+        pihat <- dnorm(a, pimod.vals, sqrt(sigma2[i]))
+        phat <- predict(smooth.spline(x = a.vals, y = phat.vals), x = a)$y
+        phat[phat <= 0] <- .Machine$double.eps
+        psi.dr <- c(ybar - muhat)*(phat/pihat) + mhat
+
+        # asymptotics
+        out.dr <- sapply(a.vals, kern_est, psi = psi.dr, a = a, weights = weights,
+                         bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
+
+        est.dr[j,] <- out.dr[1,]
+        var.dr[j,] <- out.dr[2,]
+
+      }
       
     }
     

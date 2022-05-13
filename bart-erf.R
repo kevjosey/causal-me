@@ -25,11 +25,6 @@ bart_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
   
   weights <- exp(offset)
   
-  s <- s[s.id %in% id]
-  s.tilde <- s.tilde[s.id %in% id]
-  w <- w[s.id %in% id,]
-  s.id <- s.id[s.id %in% id]
-  
   # create variables
   m <- length(s.id)
   n <- length(id)
@@ -43,7 +38,7 @@ bart_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
   
   shield <- order(id)
   y <- y[shield]
-  x <- x[shield,]
+  x <- x[shield,,drop = FALSE]
   id <- id[shield]
   offset <- offset[shield]
   weights <- weights[shield]
@@ -54,15 +49,20 @@ bart_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
     ws <- cbind(model.matrix(~ ., data.frame(w)), s.tilde = s.tilde)
   }
   
+  s <- s[s.id %in% id]
+  s.tilde <- s.tilde[s.id %in% id]
+  ws <- ws[s.id %in% id,,drop = FALSE]
+  s.id <- s.id[s.id %in% id]
+  
   sword <- order(s.id)
   stab <- table(s.id)
   s <- s[sword]
   s.tilde <- s.tilde[sword]
-  ws <- ws[sword,]
+  ws <- ws[sword,,drop = FALSE]
   s.id <- s.id[sword]
   
   # when s is observed
-  ws.obs <- ws[!is.na(s),]
+  ws.obs <- ws[!is.na(s),,drop = FALSE]
   s.obs <- s[!is.na(s)]
   
   # initialize exposures

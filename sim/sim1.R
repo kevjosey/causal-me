@@ -37,7 +37,7 @@ scen_mat <- expand.grid(n = n, mult = mult, sig_agg = sig_agg, sig_pred = sig_pr
                         stringsAsFactors = FALSE)
 scenarios <- lapply(seq_len(nrow(scen_mat)), function(i) scen_mat[i,])
 
-for (i in 4:length(scenarios)) {
+for (i in 1:length(scenarios)) {
   
   scenario <- scenarios[[i]]
   
@@ -57,7 +57,7 @@ for (i in 4:length(scenarios)) {
   # gibbs sampler stuff
   n.iter <- 2000
   n.adapt <- 2000
-  thin <- 50
+  thin <- 40
   scale <- 1e6
   shape <- 1e-3
   rate <- 1e-3
