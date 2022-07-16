@@ -75,8 +75,7 @@ dev.off()
 
 ### Model Misspecification
 
-a.vals <- seq(6, 14, by = 0.08)
-filenames_2 <- 
+a.vals <- seq(6, 14, by = 0.04)
 
 filenames_2 <- c("~/Dropbox/Projects/ERC-EPE/Output/sim_2/800_5_1.4142135623731_1_b_a_a.RData",
                  "~/Dropbox/Projects/ERC-EPE/Output/sim_2/800_5_1.4142135623731_1_a_b_a.RData",

@@ -35,9 +35,9 @@ prob <- 0.1
 a.vals <- seq(6, 14, by = 0.02)
 
 # mcmc arguments
-n.iter <- 10000
+n.iter <- 2000
 n.adapt <- 2000
-thin <- 20
+thin <- 40
 bw <- 0.2
 scale <- 1e6
 shape <- 1e-3
@@ -91,7 +91,7 @@ out <- mclapply(1:n.sim, function(i, ...) {
   
   # BART Approach
   bart_hat <- try(bart_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id, 
-                           w = w, x = NULL, offset = offset, a.vals = a.vals, bw = bw,
+                           w = w, x = x, offset = offset, a.vals = a.vals, bw = bw,
                            scale = scale, shape = shape, rate = rate, 
                            n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
@@ -114,13 +114,7 @@ out <- mclapply(1:n.sim, function(i, ...) {
               if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$variance)} else {rep(NA, length(a.vals))},
               if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$variance)} else {rep(NA, length(a.vals))})
   
-  lower <- rbind( if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$lower)} else {rep(NA, length(a.vals))},
-              if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$lower)} else {rep(NA, length(a.vals))})
-  
-  upper <- rbind( if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$upper)} else {rep(NA, length(a.vals))},
-                  if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$upper)} else {rep(NA, length(a.vals))})
-  
-  return(list(est = est, se = se, lower = lower, upper = upper))
+  return(list(est = est, se = se))
   
 }, mc.cores = 25, mc.preschedule = TRUE)
 
@@ -129,15 +123,13 @@ stop - start
 
 est <- abind(lapply(out, function(lst, ...) lst$est), along = 3)
 se <- abind(lapply(out, function(lst, ...) lst$se), along = 3)
-lower <- abind(lapply(out, function(lst, ...) lst$lower), along = 3)
-upper <- abind(lapply(out, function(lst, ...) lst$upper), along = 3)
 mu.mat <- matrix(rep(rowMeans(est[1,,]), n.sim), nrow = length(a.vals), ncol = n.sim)
 
 # coverage probability
 cp <- list(as.matrix((est[2,,] - 1.96*se[1,,]) < mu.mat & (est[2,,] + 1.96*se[1,,]) > mu.mat),
            as.matrix((est[3,,] - 1.96*se[2,,]) < mu.mat & (est[3,,] + 1.96*se[2,,]) > mu.mat),
-           as.matrix(lower[1,,] < mu.mat & upper[1,,] > mu.mat),
-           as.matrix(lower[2,,] < mu.mat & upper[2,,] > mu.mat))
+           as.matrix((est[4,,] - 1.96*se[3,,]) < mu.mat & (est[4,,] + 1.96*se[3,,]) > mu.mat),
+           as.matrix((est[5,,] - 1.96*se[4,,]) < mu.mat & (est[5,,] + 1.96*se[4,,]) > mu.mat))
 
 out_est <- t(apply(est, 1, rowMeans, na.rm = T))
 colnames(out_est) <- a.vals

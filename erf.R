@@ -1,5 +1,5 @@
 # wrapper function to fit an ERF with measurement error using LOESS regression on a nonparametric models
-erf <- function(a, y, x, offset = NULL, bart = FALSE,
+erf <- function(a, y, x, offset = NULL, bart = TRUE,
                 a.vals = seq(min(a), max(a), length.out = 100),
                 n.iter = 10000, n.adapt = 1000, thin = 10,
                 bw = NULL, bw.seq = seq(0.1, 2, by = 0.1), folds = 5) {	
@@ -11,8 +11,11 @@ erf <- function(a, y, x, offset = NULL, bart = FALSE,
   ybar <- exp(log(y) - offset)
   n <- length(a)
   
-  wrap <- bart_est(y = ybar, a = a, x = x, a.vals = a.vals, weights = weights,
-                   n.iter = n.iter, n.adapt = n.adapt, thin = thin)
+  if (bart)
+    wrap <- bart_est(y = ybar, a = a, x = x, a.vals = a.vals, weights = weights,
+                     n.iter = n.iter, n.adapt = n.adapt, thin = thin)
+  else
+    wrap <- glm_est(y = ybar, a = a, x = x, a.vals = a.vals, weights = weights)
   
   psi <- wrap$psi
   int.mat <- wrap$int.mat
@@ -50,7 +53,7 @@ erf <- function(a, y, x, offset = NULL, bart = FALSE,
 
 # estimate bart outcome model
 bart_est <- function(a, y, x, a.vals, weights = NULL,
-                     n.iter = 1000, n.adapt = 1000, thin = 10) {
+                     n.iter = 1000, n.adapt = 1000, thin = 10, ...) {
   
   if (is.null(weights))
     weights <- rep(1, nrow(x))
