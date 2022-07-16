@@ -106,7 +106,6 @@ predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
   u4 <- as.numeric(scale((x[,2] + x[,4] + 20)^2))
 
   u <- cbind(u1, u2, u3, u4)
-  u <- u%*%solve(chol(cov(u)))
   out <- rep(NA, length(a.vals))
 
   for(i in 1:length(a.vals)) {
