@@ -1,4 +1,5 @@
-# wrapper function to fit an ERF with measurement error using LOESS regression on a nonparametric models
+# wrapper function to fit a nonparametric ERF with measurement error using 
+# kernel-weighted least-squares regression
 erf <- function(a, y, x, offset = NULL, bart = TRUE,
                 a.vals = seq(min(a), max(a), length.out = 100),
                 n.iter = 10000, n.adapt = 1000, thin = 10,
@@ -149,26 +150,27 @@ kern_est <- function(a.new, a, psi, bw, weights = NULL, se.fit = FALSE, int.mat 
   
   ## LOESS Kernel
   
-  # # subset index
+  # index
   # a.std <- a - a.new
   # k <- floor(min(bw, 1)*length(a))
   # idx <- order(abs(a.std))[1:k]
-  # 
-  # # subset
+  
+  # subset
   # a.std <- a.std[idx]
   # psi <- psi[idx]
   # weights <- weights[idx]
   # max.a.std <- max(abs(a.std))
-  # 
-  # # construct kernel weight
+  
+  # construct kernel weight
   # k.std <- c((1 - abs(a.std/max.a.std)^3)^3)
   # g.std <- cbind(1, a.std)
   
-  ## Gaussian Kernel
+  ## Gaussian kernel
   a.std <- (a - a.new) / bw
   k.std <- dnorm(a.std) / bw
   g.std <- cbind(1, a.std)
   
+  # kernel-weighted least squares
   b <- lm(psi ~ -1 + g.std, weights = k.std*weights)$coefficients
   mu <- b[1]
   
@@ -188,7 +190,7 @@ kern_est <- function(a.new, a, psi, bw, weights = NULL, se.fit = FALSE, int.mat 
     # int2 <- apply(matrix(rep((a.vals[-1] - a.vals[-length(a.vals)]), k), byrow = T, nrow = k)*
     #                 (intfn2.mat[,-1] + intfn2.mat[,-length(a.vals)])/2, 1, sum)
     
-    ## Gaussian
+    ## Gaussian kernel
     kern.mat <- matrix(rep(dnorm((a.vals - a.new) / bw) / bw, n), byrow = T, nrow = n)
     g.vals <- matrix(rep(c(a.vals - a.new) / bw, n), byrow = T, nrow = n)
     intfn1.mat <- kern.mat * int.mat

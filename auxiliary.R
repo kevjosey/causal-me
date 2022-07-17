@@ -1,5 +1,5 @@
 
-# regression calibration function
+# validation regression calibration function
 pred <- function(s, s.tilde, w, sl.lib = c("SL.mean", "SL.glm", "SL.glmnet", "SL.earth", "SL.ranger")){
   
   # set up evaluation points & matrices for predictions

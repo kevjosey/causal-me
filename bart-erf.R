@@ -197,7 +197,7 @@ bart_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
       pimod.vals <- c(x %*% beta[i,])
       
       # density estimation
-      phat.vals <- sapply(c(a.vals), function(a.tmp){
+      phat.vals <- sapply(a.vals, function(a.tmp, ...){
         mean(dnorm(a.tmp, pimod.vals, sqrt(sigma2[i])))
       })
       
