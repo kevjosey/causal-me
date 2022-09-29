@@ -61,5 +61,6 @@ quants <- function(V) {
   results <- list(V = V, V.triplet = V.triplet, n.triplet = n.triplet, 
                   V.triplet.sum = V.triplet.sum, n.neighbours = n.neighbours, 
                   V.begfin = V.begfin, n = n)
-  return(results)   
+  return(results)
+  
 }

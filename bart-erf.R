@@ -5,7 +5,7 @@ bart_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
                      shape = 1e-3, rate = 1e-3, scale = 1e6,
                      bw = NULL, bw.seq = seq(0.1, 2, by = 0.1), folds = 5,
                      control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
-                                             n.samples = 1L, n.thin = thin, n.chains = 1L)) {
+                                             n.samples = 1L, n.trees = 200, n.thin = thin, n.chains = 1L)) {
   
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
@@ -129,7 +129,7 @@ bart_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
       log.eps <- dnorm(ybar, xa.pred, mean(samples$sigma)/sqrt(weights), log = TRUE) +
         dnorm(a_, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) +
         dnorm(z.hat, a_, sqrt(omega2[i - 1]/stab), log = TRUE) -
-        dnorm(ybar, samples$train, mean(samples$sigma)/sqrt(weights), log = TRUE) -
+        dnorm(ybar, rowMeans(samples$train), mean(samples$sigma)/sqrt(weights), log = TRUE) -
         dnorm(a, c(x%*%beta[i - 1,]), sqrt(sigma2[i - 1]), log = TRUE) -
         dnorm(z.hat, a, sqrt(omega2[i - 1]/stab), log = TRUE)
       
