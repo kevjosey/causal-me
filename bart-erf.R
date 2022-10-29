@@ -163,8 +163,8 @@ bart_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
     # update random walk parameters
     if(ceiling(i/100) == floor(i/100) & i < n.adapt) {
       
-      h.a <- ifelse(accept.a > 20, h.a + 0.1 * h.a,
-                    ifelse(accept.a < 10, h.a - 0.1 * h.a, h.a))
+      h.a <- ifelse(accept.a > 40, h.a + 0.1 * h.a,
+                    ifelse(accept.a < 20, h.a - 0.1 * h.a, h.a))
       accept.a <- rep(0, n)
       
     }

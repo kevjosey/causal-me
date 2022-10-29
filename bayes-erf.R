@@ -180,10 +180,10 @@ bayes_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL
     if(ceiling(i/100) == floor(i/100) & i < n.adapt) {
     
       h.gamma <- ifelse(accept.gamma > 40, h.gamma + 0.1 * h.gamma,
-                        ifelse(accept.gamma < 30, h.gamma - 0.1 * h.gamma, h.gamma))
+                        ifelse(accept.gamma < 20, h.gamma - 0.1 * h.gamma, h.gamma))
       
       h.a <- ifelse(accept.a > 40, h.a + 0.1 * h.a,
-                    ifelse(accept.a < 30, h.a - 0.1 * h.a, h.a))
+                    ifelse(accept.a < 20, h.a - 0.1 * h.a, h.a))
       
       accept.a <- rep(0, n)
       accept.gamma <- rep(0, o)
