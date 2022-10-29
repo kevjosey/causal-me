@@ -270,8 +270,8 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
       out <- sapply(a.vals, kern_est, psi = psi, a = a, weights = weights, 
                     bw = bw, se.fit = TRUE, int.mat = int.mat, a.vals = a.vals)
       
-      est.mat[j,] <- do.call(rbind, out)[1,]
-      var.mat[j,] <- do.call(rbind, out)[2,]
+      est.mat[j,] <- out[1,]
+      var.mat[j,] <- out[2,]
       
     }
     
