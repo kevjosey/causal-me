@@ -35,7 +35,7 @@ a.vals <- seq(6, 14, by = 0.02)
 
 # mcmc arguments
 n.iter <- 2000
-n.adapt <- 2000
+n.adapt <- 1000
 thin <- 40
 bw <- 0.2
 scale <- 1e6
@@ -82,11 +82,11 @@ out <- mclapply(1:n.sim, function(i, ...) {
   
   # real
   rc_hat <- try(erf(y = y, a = z.hat, x = x, offset = offset, a.vals = a.vals, bw = bw,
-                    n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
+                    n.iter = n.iter, n.adapt = n.adapt, thin = thin, bart = FALSE), silent = TRUE)
   
   # naive
   naive_hat <- try(erf(y = y, a = z.tilde, x = x, offset = offset, a.vals = a.vals, bw = bw,
-                       n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
+                       n.iter = n.iter, n.adapt = n.adapt, thin = thin, bart = FALSE), silent = TRUE)
   
   # BART Approach
   bart_hat <- try(bart_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id, 

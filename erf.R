@@ -204,9 +204,9 @@ kern_est <- function(a.new, a, psi, bw, weights = NULL, se.fit = FALSE, int.mat 
     U <- solve(crossprod(g.std, weights*k.std*g.std))
     V <- cbind(weights * (k.std * (psi - eta) + int1),
                weights * (a.std * k.std * (psi - eta) + int2))
-    sig <- U %*% crossprod(V) %*% U
+    sig2 <- U %*% crossprod(V) %*% U
     
-    return(c(mu = mu, sig = sig[1,1]))
+    return(c(mu = mu, sig2 = sig2[1,1]))
     
   } else
     return(mu)
