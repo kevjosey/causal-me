@@ -30,7 +30,7 @@ hpd <- function(x, alpha = 0.05){
   
 }
 
-# Check the V matrix
+# Check the adjacency matrix for spatial gps
 quants <- function(V) {
   
   #### Check V is a matrix of the correct dimension
