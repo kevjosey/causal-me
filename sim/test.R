@@ -82,36 +82,32 @@ out <- mclapply(1:n.sim, function(i, ...) {
   
   # real
   rc_hat <- try(erf(y = y, a = z.hat, x = x, offset = offset, a.vals = a.vals, bw = bw,
-                    n.iter = n.iter, n.adapt = n.adapt, thin = thin, bart = FALSE), silent = TRUE)
+                    bart = FALSE, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # naive
   naive_hat <- try(erf(y = y, a = z.tilde, x = x, offset = offset, a.vals = a.vals, bw = bw,
-                       n.iter = n.iter, n.adapt = n.adapt, thin = thin, bart = FALSE), silent = TRUE)
+                       bart = FALSE, n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
-  # BART Approach
-  bart_hat <- try(bart_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id, 
-                           w = w, x = x, offset = offset, a.vals = a.vals, bw = bw,
-                           scale = scale, shape = shape, rate = rate, 
-                           n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
-  
-  # Bayes DR Approach
-  bayes_hat <- try(bayes_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id,
-                             w = w, x = x, offset = offset, a.vals = a.vals, bw = bw,
-                             scale = scale, shape = shape, rate = rate, dr = FALSE,
-                             n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
+  # # BART Approach
+  # bart_hat <- try(bart_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id, 
+  #                          w = w, x = x, offset = offset, a.vals = a.vals, bw = bw,
+  #                          scale = scale, shape = shape, rate = rate, 
+  #                          n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
+  # 
+  # # Bayes DR Approach
+  # bayes_hat <- try(bayes_erf(s = s, s.tilde = s.tilde, y = y, s.id = s.id, id = id,
+  #                            w = w, x = x, offset = offset, a.vals = a.vals, bw = bw,
+  #                            scale = scale, shape = shape, rate = rate, dr = FALSE,
+  #                            n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
   
   # estimates
   est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
                if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
-               if (!inherits(rc_hat, "try-error")) {rc_hat$estimate} else {rep(NA, length(a.vals))},
-               if (!inherits(bart_hat, "try-error")) {bart_hat$estimate} else {rep(NA, length(a.vals))},
-               if (!inherits(bayes_hat, "try-error")) {bayes_hat$estimate} else {rep(NA, length(a.vals))})
+               if (!inherits(rc_hat, "try-error")) {rc_hat$estimate} else {rep(NA, length(a.vals))})
   
   #standard error
   se <- rbind(if (!inherits(naive_hat, "try-error")) {sqrt(naive_hat$variance)} else {rep(NA, length(a.vals))},
-              if (!inherits(rc_hat, "try-error")) {sqrt(rc_hat$variance)} else {rep(NA, length(a.vals))},
-              if (!inherits(bart_hat, "try-error")) {sqrt(bart_hat$variance)} else {rep(NA, length(a.vals))},
-              if (!inherits(bayes_hat, "try-error")) {sqrt(bayes_hat$variance)} else {rep(NA, length(a.vals))})
+              if (!inherits(rc_hat, "try-error")) {sqrt(rc_hat$variance)} else {rep(NA, length(a.vals))})
   
   return(list(est = est, se = se))
   
@@ -126,19 +122,17 @@ mu.mat <- matrix(rep(rowMeans(est[1,,]), n.sim), nrow = length(a.vals), ncol = n
 
 # coverage probability
 cp <- list(as.matrix((est[2,,] - 1.96*se[1,,]) < mu.mat & (est[2,,] + 1.96*se[1,,]) > mu.mat),
-           as.matrix((est[3,,] - 1.96*se[2,,]) < mu.mat & (est[3,,] + 1.96*se[2,,]) > mu.mat),
-           as.matrix((est[4,,] - 1.96*se[3,,]) < mu.mat & (est[4,,] + 1.96*se[3,,]) > mu.mat),
-           as.matrix((est[5,,] - 1.96*se[4,,]) < mu.mat & (est[5,,] + 1.96*se[4,,]) > mu.mat))
+           as.matrix((est[3,,] - 1.96*se[2,,]) < mu.mat & (est[3,,] + 1.96*se[2,,]) > mu.mat))
 
 out_est <- t(apply(est, 1, rowMeans, na.rm = T))
 colnames(out_est) <- a.vals
 rownames(out_est) <- c("ERF","NAIVE","RC","BART","GLM")
 
-out_bias <- t(apply(est[2:5,,], 1, function(x) rowMeans(abs(x - mu.mat), na.rm = T)))
+out_bias <- t(apply(est[2:3,,], 1, function(x) rowMeans(abs(x - mu.mat), na.rm = T)))
 colnames(out_bias) <- a.vals
 rownames(out_bias) <- c("NAIVE","RC","BART","GLM")
 
-out_mse <- t(apply(est[2:5,,], 1, function(x) rowMeans((x - mu.mat)^2, na.rm = T)))
+out_mse <- t(apply(est[2:3,,], 1, function(x) rowMeans((x - mu.mat)^2, na.rm = T)))
 colnames(out_mse) <- a.vals
 rownames(out_mse) <- c("NAIVE","RC","BART","GLM")
 

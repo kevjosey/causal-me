@@ -5,7 +5,7 @@ bart_spatial <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = N
                          shape = 1e-3, rate = 1e-3, scale = 1e6, 
                          bw = NULL, bw.seq = seq(0.1, 2, by = 0.1), folds = 5,
                          control = dbartsControl(updateState = FALSE, verbose = FALSE, n.burn = 0L, 
-                                                 n.samples = 1L, n.thin = 1L, n.chains = 1L)) {
+                                                 n.samples = 1L, n.trees = 200L, n.thin = 1L, n.chains = 1L)) {
   
   # remove any s.id not present in id
   check <- unique(s.id)[order(unique(s.id))]
