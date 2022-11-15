@@ -57,7 +57,7 @@ for (i in 1:length(scenarios)) {
   # gibbs sampler stuff
   n.iter <- 2000
   n.adapt <- 2000
-  thin <- 40
+  thin <- 20
   scale <- 1e6
   shape <- 1e-3
   rate <- 1e-3
