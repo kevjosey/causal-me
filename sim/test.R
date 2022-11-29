@@ -28,7 +28,7 @@ out_scen <- "a"
 pred_scen <- "a"
 mult <- 5
 n <- 400
-prob <- 1
+prob <- 0.1
 
 # model arguments
 a.vals <- seq(6, 14, by = 0.08)
@@ -37,7 +37,7 @@ a.vals <- seq(6, 14, by = 0.08)
 n.iter <- 2000
 n.adapt <- 1000
 thin <- 20
-bw <- 0.2
+bw <- 0.4
 scale <- 1e6
 shape <- 1e-3
 rate <- 1e-3
