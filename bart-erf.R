@@ -186,7 +186,7 @@ bart_erf <- function(s, s.tilde, y, s.id, id, w = NULL, x = NULL, offset = NULL,
         
       })
 
-      mhat.vals <- apply(muhat.mat, 2, weighted.mean, w = weights)
+      mhat.vals <- colMeans(muhat.mat)
       mhat <- predict(smooth.spline(x = a.vals, y = mhat.vals), x = a)$y
       mhat.mat <- matrix(rep(mhat.vals, n), byrow = T, nrow = n)
       
