@@ -122,7 +122,7 @@ for (i in 1:length(scenarios)) {
                                n.iter = n.iter, n.adapt = n.adapt, thin = thin), silent = TRUE)
     
     # estimates
-    est <- rbind(predict_example(a = a.vals, x = x, out_scen = out_scen),
+    est <- rbind(predict_example(a = a.vals, x = x, offset = offset, out_scen = out_scen),
                  if (!inherits(naive_hat, "try-error")) {naive_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(rc_hat, "try-error")) {rc_hat$estimate} else {rep(NA, length(a.vals))},
                  if (!inherits(bart_hat, "try-error")) {bart_hat$estimate} else {rep(NA, length(a.vals))},

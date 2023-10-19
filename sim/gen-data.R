@@ -97,7 +97,7 @@ gen_data <- function(n = c(400, 800), mult = c(5, 10), sig_agg = sqrt(2), sig_gp
   
 }
 
-predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
+predict_example <- function(a.vals, x, offset, out_scen = c("a", "b")) {
   
   # transformed predictors
   u1 <- as.numeric(scale(exp(x[,1]/2)))
@@ -118,7 +118,7 @@ predict_example <- function(a.vals, x, out_scen = c("a", "b")) {
       mu_out <- exp(-3 + x %*% c(-0.5,-0.25,0.25,0.5) + 0.25*(a.vec - 10) - 0.75*cos(pi*(a.vec - 6)/4) - 0.25*(a.vec - 10)*x[,1])
     }
 
-    out[i] <- mean(mu_out)
+    out[i] <- weighted.mean(mu_out, exp(offset))
 
   }
   
